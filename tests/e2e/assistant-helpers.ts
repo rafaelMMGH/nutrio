@@ -398,16 +398,13 @@ export async function openAssistant(page: Page) {
 
 const plain = (rich: Rich) => rich.map((span) => span.text).join("");
 
-/** What a mocked answer carries: the wire model without the scope-era top-level fields (removed from `ChatAnswer` in T016). */
-export type MockAnswer = Pick<ChatAnswer, "answer" | "context_used" | "sources" | "kind" | "blocks" | "buttons">;
-
 const question = (message: string): Button => ({ type: "question", label: message, message });
 
 /**
  * A contract-valid answer of one untitled block: `answer` is derived from the lead and sections the way the server builds
  * it. `buttons` are the answer-level buttons (follow-ups, starters); the block itself carries none.
  */
-export function buildAnswer(parts: { kind?: ChatAnswer["kind"]; lead: Rich; sections?: Section[]; sources?: string[]; buttons?: Button[] }): MockAnswer {
+export function buildAnswer(parts: { kind?: ChatAnswer["kind"]; lead: Rich; sections?: Section[]; sources?: string[]; buttons?: Button[] }): ChatAnswer {
   const { kind = "answer", lead, sections = [], sources = [], buttons = [] } = parts;
   const lines = [plain(lead), ...sections.flatMap((section) => [section.title, ...section.items.map(plain)])];
   return { answer: lines.join("\n"), context_used: "Todo el sistema", sources, kind, blocks: [{ title: null, lead, sections, buttons: [] }], buttons };
@@ -422,7 +419,7 @@ export const NO_MATCH_ANSWER = buildAnswer({
 });
 
 /** A cart answer with `count` items, quantities highlighted, capped like the server does (8 items plus "y <n> más"). */
-export function cartAnswer(count = 3): MockAnswer {
+export function cartAnswer(count = 3): ChatAnswer {
   // The Cart row of the spec's Topics table.
   const buttons = ["¿Qué recetas hay en mi plan?", "Mi cena de hoy"].map(question);
   if (count === 0) return buildAnswer({ lead: [{ text: "Tu carrito está vacío." }], buttons });
@@ -459,7 +456,7 @@ export type ChatMock = {
  * Intercepts POST /api/rag/chat. `answer` may be a function of the request body. A mocked failure is still an issue for
  * the zero-undeclared-issues check, so the test must declare it with `expectIssues`.
  */
-export async function mockChat(page: Page, answer: MockAnswer | ((body: { message: string }) => MockAnswer), options: MockOptions = {}): Promise<ChatMock> {
+export async function mockChat(page: Page, answer: ChatAnswer | ((body: { message: string }) => ChatAnswer), options: MockOptions = {}): Promise<ChatMock> {
   let release!: () => void;
   const released = new Promise<void>((resolve) => (release = resolve));
   const mock: ChatMock = { requests: [], release };
