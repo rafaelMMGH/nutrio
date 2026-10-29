@@ -43,17 +43,20 @@ export function matchWord(word: string, entries: readonly string[]): string[] {
 }
 
 /**
- * Multi-word entries found in a text's words: consecutive words, each compared with its own length's allowance. The
- * longest phrase wins and consumes its words (`from` inclusive, `to` exclusive), which later phrases cannot reuse.
+ * Multi-word entries found in a text's words: consecutive words, each compared with its own length's allowance. A word
+ * is compared with the words every phrase has at that position, so an exact word never fuzzy-matches a rival phrase's
+ * ("me llevo" is not "me lleva"). The longest phrase wins and consumes its words (`from` inclusive, `to` exclusive),
+ * which later phrases cannot reuse.
  */
 export function matchPhrases(tokens: readonly string[], phrases: readonly string[]): { phrase: string; from: number; to: number }[] {
   const consumed = new Set<number>();
   const found: { phrase: string; from: number; to: number }[] = [];
-  for (const phrase of [...phrases].sort((a, b) => b.split(" ").length - a.split(" ").length)) {
-    const parts = phrase.split(" ");
+  const split = phrases.map((phrase) => ({ phrase, parts: phrase.split(" ") }));
+  const rivals = (k: number) => [...new Set(split.flatMap(({ parts }) => parts.slice(k, k + 1)))];
+  for (const { phrase, parts } of [...split].sort((a, b) => b.parts.length - a.parts.length)) {
     for (let from = 0; from + parts.length <= tokens.length; from++) {
       const span = parts.map((_, k) => from + k);
-      if (span.some((index) => consumed.has(index)) || !parts.every((part, k) => matchWord(tokens[from + k], [part]).length)) continue;
+      if (span.some((index) => consumed.has(index)) || !parts.every((part, k) => matchWord(tokens[from + k], rivals(k)).includes(part))) continue;
       span.forEach((index) => consumed.add(index));
       found.push({ phrase, from, to: from + parts.length });
     }
