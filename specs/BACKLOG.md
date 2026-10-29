@@ -2,13 +2,13 @@
 
 Open work for future sessions. The orchestrator should read this at session start and offer the top open item. Tick items when done; move finished items to "Done" with the date.
 
-_Last updated: 2026-10-29_
+_Last updated: 2026-10-29 (session handoff)_
 
 ## In progress
 
-- [ ] **Assistant data scope**, branch `feature/assistant-data-scope`. Spec `specs/assistant-data-scope/spec.md` v1.5 (status `planned`), plan and tasks (T001-T072, 26 batches) in the same folder. Also delivers chat-polish REQ-23 (HTTP 500), which keeps `assistant-chat-polish` in `partial` until then. Next: batch F1a (T003, T004).
-  - Asks the user for a yes at: T025 (install fuse.js 7.5.0 exactly), T071 and T057 (snapshot refreshes), T065 (manual 1 s check on real data before merge), push and PR.
-  - Future (not in this feature): conversation memory so "¿y la cena?" works; plan the stateless design so it can be added.
+- [ ] **Assistant data scope**, branch `feature/assistant-data-scope` (local, never pushed), tip `1308a50`. **Start here: `specs/assistant-data-scope/HANDOFF.md`** (state, next steps in order, rules the user set, traps). Spec v1.6 (`planned`), plan and tasks in the same folder; 25 of 76 tasks done. Next: re-run the reviewer for batch 1c2 (it died on a rate limit), then cherry-pick batch 3a2 from worktree branch `worktree-agent-a4fb1720775853511` and run the single allowed targeted e2e (`npx playwright test assistant-parity.spec.ts -g "dashboard"`), then continue with 1d1. Also delivers chat-polish REQ-23 (HTTP 500, already implemented in F1b), which keeps `assistant-chat-polish` in `partial` until the feature is done.
+  - Asks the user for a yes at: T025 (install fuse.js 7.5.0 exactly), T057 (the one snapshot refresh), T065 (manual 1 s check on real data before merge), deleting the agent branches/worktrees, push and PR.
+  - Future (not in this feature): conversation memory so "¿y la cena?" works; the design is stateless so it can be added.
 
 - [ ] **E2E run guard**, branch `fix/e2e-run-guard` (no commits of its own yet; its base, `feature/theme-switcher`, is merged into `main`, so the PR can target `main`). The bug note is `specs/bugs/e2e-run-guard.md`.
   - **⚠️ The code is in `stash@{0}`, not in the working tree.** On 2026-10-24 at 18:27 another Claude session stashed it ("fix/e2e-run-guard WIP: run guard + local server.js/package.json changes") and switched to `fix/shopping-list-quick`.
