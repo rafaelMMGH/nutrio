@@ -117,21 +117,29 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 
 **Batch 1b1a: scope-free client state and button renderer**, about 430 lines with tests (revision 7 split of 1b1; ~45% deletions)
 
-- [ ] T012 [US1] Tests REQ-4 UI, REQ-5 client, e2e only, written (tests/e2e/assistant-noscope.spec.ts)
+- [x] T012 [US1] Tests REQ-4 UI, REQ-5 client, e2e only, written (tests/e2e/assistant-noscope.spec.ts)
   - On a recipe page, "¿Qué hay en mi carrito?" gives the cart answer.
   - The search bar opens the panel and sends "¿Cuál es mi peso?"; the request carries only `{ message }` (copy asserted in T044).
   - No "Alcance", scope menu or "Preguntar en Todo" on `/`, `/recipes/<id>`, `/groceries` or `/plans`.
   - The 4 starters on every page; the same question on `/recipes/<id>` and on `/groceries` (different subtitles) gives identical visible answer text and buttons.
   - 360 px header row 1: title, "Nueva conversación" and ×, each ≥44×44, no overlap.
   - Placeholder "Pregunta por tu plan, tu avance o tus compras" and aria name "Preguntar al asistente".
-- [ ] T014 [US1] Client state (src/components/app/assistant.tsx, src/components/app/AppShell.tsx)
+- [x] T014 [US1] Client state (src/components/app/assistant.tsx, src/components/app/AppShell.tsx)
   - Remove scope state, `chipsFor`, page suggestions and `askInScope` scope; `send({ message })`, `askAssistant(message)`.
   - So every task commit type-checks: `askAssistant`/`askInScope` keep an optional, ignored `scope?: ScopeKey` and the page-context type keeps `defaultScope?`/`suggestions?` optional until T069 removes the call sites and then these parameters. `ScopeKey`, `SCOPE_LABEL` and the suggestion builders stay in src/lib/assistant.ts until T016.
   - The `AssistantChat`/`ScopeSwitcher` props stay optional or are still passed by AppShell until T015 removes them, or T014 and T015 land as one commit.
-- [ ] T015 [US1] Renderer and header (src/components/shared/AssistantTurn.tsx, src/components/shared/AssistantChat.tsx, src/components/shared/assistant-chat.css; delete src/components/shared/ScopeSwitcher.tsx)
+- [x] T015 [US1] Renderer and header (src/components/shared/AssistantTurn.tsx, src/components/shared/AssistantChat.tsx, src/components/shared/assistant-chat.css; delete src/components/shared/ScopeSwitcher.tsx)
   - Render blocks (title, lead, sections, block buttons) and answer buttons; question buttons only under the latest answer; links (`next/link`) on every answer. Header row 2 removed.
 
 **Review checkpoint 1b1a:** tsc + unit.
+
+**Batch note 1b1a (done; T012, T014, T015, commits 43ef91c, ea7284e, 536d1a5; +244/-306, ~550 changed vs ~430 planned):** reviewer PASS (HIGH none); findings folded into T013 (MEDIUM 3, LOW 1), T016 (MEDIUM 1), T060 (MEDIUM 2) and T056 (LOW 2).
+- **Size (LOW 4):** 303 lines are deletions in src (ScopeSwitcher 133, scope CSS, `chipsFor`). T014 and T015 landed as one commit (allowed: `Turn`/`AssistantRequest` live in AssistantTurn.tsx), so there was no earlier task boundary to stop at.
+- **Recovery:** a partial edit was saved as a patch in the scratchpad (tsc red on its own) and re-applied after the T012 tests were committed, keeping test-first order.
+- **360 px (LOW 3):** the T012 test applies the ≥44×44 check to "Nueva conversación" and × only, not the title (accepted reading of "each ≥44×44"; Batch E does not reopen it).
+- **Expected red until T069:** assistant-noscope.spec.ts "REQ-4 the dashboard has no scope control…" and "REQ-4 the search bar opens the panel…" (placeholder and aria name).
+- **Left for later:** `layout: "option"` styling → T032/T056; `sources` still rendered as "Basado en:"; the panel placeholder "Escribe tu pregunta" is unchanged (the spec placeholder applies to the search bar, T069).
+- **Unproven until Batch E:** the T012 UI tests; the 360 px header grid; `next/link` rendering (first links arrive with T034/T048); the starters on all 4 pages; the request recorder seeing only `{ message }`; every `mockChat` spec red until T013; plus the 1a2 list above.
 
 **Batch 1b1b: pages**, about 190 lines with tests
 - [ ] T069 [US1] Pages (src/components/dashboard/DashboardView.tsx, src/components/dashboard/home.css, src/components/recipes/RecipeDetail.tsx, src/components/groceries/GroceriesChat.tsx, src/components/app/assistant.tsx, src/components/app/AppShell.tsx, tests/e2e/theme-palette.spec.ts)
@@ -145,12 +153,15 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 
 - [ ] T013 [US1] Test churn (tests/e2e/*.spec.ts, tests/e2e/assistant-helpers.ts)
   - Delete tests/e2e/assistant-scope.spec.ts. Move `buildAnswer`/`mockChat` to the new shape; replace `UNKNOWN_LEAD`/`UNKNOWN_ANSWER`/`CAPABILITY_LINE` and every `follow_ups` use.
+  - 1b1a review (MEDIUM 3): `buildAnswer` in tests/e2e/assistant-helpers.ts (~405) returns `blocks: [], buttons: []`, so every `mockChat` user (assistant-a11y, -answers, -composer, -look, -next-step, -scope) renders an empty mocked answer and loses its content assertions until this task; assistant-composer.spec.ts joins the old-UI list below.
+  - 1b1a review (LOW 1): in assistant-noscope.spec.ts "the subtitle is a label only", add `expect(recipe.buttons.length).toBeGreaterThan(0)` so the `buttons` equality cannot pass on `[] == []`.
   - Old specs that mock a 500 and expect "No pude responder en este momento." now get "Algo salió mal al responder. Intenta de nuevo." (F1b, T007; F1b reviewer line numbers, where the copy is asserted): assistant-next-step.spec.ts 317-318, 372, 391 and 512 (the "REQ-5 with REQ-8" describe), assistant-a11y.spec.ts 385 and 715, assistant-answers.spec.ts:84, assistant-look.spec.ts:112 (a snapshot, refreshed in T057). Vacuous after the change: next-step 330 and 338 (`not.toContainText(ERROR_COPY)` after the retry) assert the copy actually shown. Unaffected: a11y 185 and 480, next-step 402 and 427 (abort/timeout keep the generic copy); mocks of a 400 or a network error keep the old copy. Rule: a test about REQ-23 behaviour asserts the server-error copy; a test meant to cover chat-polish REQ-8's generic copy switches its mock to a non-500 status, at least one of them to 503 (today only 400 and abort cover "any other non-2xx"); a vacuous `not.toContainText` asserts the copy actually shown.
   - Rewrite to the new behavior, or delete, every test in assistant-answers, -next-step, -a11y, -composer and -look that asserts chips, scope, "Alcance", "Preguntar en Todo", the old placeholder, `follow_ups`, or the kinds `out_of_scope`/`missing_recipe`/`overview` (found by grep). Batch note: each title rewritten or deleted, with its superseding task. No `test.skip`/`fixme`/`fail`.
 - [ ] T016 [US1] Leftovers (tests/e2e/assistant-api.spec.ts, src/lib/assistant.ts, src/lib/domain/chat.ts)
   - First, as the tests-first commit: move every remaining top-level `lead`/`sections`/`body` assertion in tests/e2e/assistant-api.spec.ts to `blocks`.
   - Gate before removing anything: `grep -rEn "ScopeKey|SCOPE_LABEL|FollowUp|follow_ups|chipsFor" tests/e2e` returns nothing, `grep -En "\.lead|\.sections|\.body" tests/e2e/assistant-api.spec.ts | grep -v "blocks"` returns nothing, and tsc passes. A hit goes back to T013.
   - Remove `ScopeKey`, `SCOPE_LABEL`, the suggestion builders and the old top-level response fields.
+  - 1b1a review (MEDIUM 1): one source for the 4 starters. `STARTERS` in src/components/shared/AssistantTurn.tsx:395 duplicates `STARTERS` in src/lib/domain/chat-topics.ts:44 (greeting/no_match); keep one client-safe constant (e.g. in src/lib/assistant.ts) imported by both, with a unit test (red first) pinning the four strings against the spec Copy.
 - T071 removed in revision 6 (the mid-feature snapshot refresh; the only refresh is T057 in Batch E).
 
 **Review checkpoint 1b2:** tsc + unit; `grep -rEn "ScopeKey|SCOPE_LABEL|FollowUp|follow_ups|chipsFor|out_of_scope|missing_recipe|Preguntar en Todo" src tests/e2e --exclude=assistant-noscope.spec.ts` returns nothing (src plus the old specs; tests/unit and the new negative-assertion files excluded per Global rules). The 3a worktree may start from this tip.
@@ -395,6 +406,7 @@ UI-only: e2e tests are written here and proven in Batch E (T076 run, T077 breaka
 **Batch 6a2: bubbles, avatar, button variants**, about 260 lines
 
 - [ ] T056 [US6] Single button component with `option` and `link` variants (`ArrowUpRight`); bubbles and avatar with theme tokens only (src/components/shared/PromptSuggestion.tsx, src/components/shared/AssistantTurn.tsx, src/components/shared/assistant-chat.css)
+  - 1b1a review (LOW 2): question buttons still use native `disabled` (PromptSuggestion → base-ui Button); switch to `aria-disabled` while pending (REQ-34).
 
 **Review checkpoint 6a2:** tsc + unit.
 
@@ -410,6 +422,7 @@ UI-only: e2e tests are written here and proven in Batch E (T076 run, T077 breaka
   - The live region changes once and includes "3 opciones" and the labels.
   - No replay after close/reopen or navigation; the scroll uses the final height.
 - [ ] T060 [US6] Type the first lead only (precomputed full-height layout); fades ≤200 ms; reduced motion; typed-once flag; hidden option count in the live region (src/components/shared/AssistantTurn.tsx, src/components/shared/assistant-chat.css)
+  - 1b1a review (MEDIUM 2), owned here: block-level buttons render inside `.assistant-turn-live` (AssistantTurn.tsx:438, :476); move them outside the live region, leaving only the hidden option count and labels (plan UI rule, ux checklist v1.2, chat-polish REQ-17 as amended). Between T032 (2b1) and here, option buttons sit inside the region; no e2e runs before Batch E, so this lands before any tested UI sees them. e2e (with T059, tests/e2e/assistant-a11y.spec.ts): no `button` inside the live region, and the region holds "3 opciones" plus the labels.
 
 **Review checkpoint 6b2:** tsc + unit.
 
