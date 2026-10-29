@@ -3,7 +3,7 @@ import { test } from "node:test";
 import { normalizeText, words } from "@/lib/assistant";
 import { matchPhrases, matchWord } from "@/lib/domain/chat-match";
 
-// Spec assistant-data-scope REQ-2 matcher table, run on the matcher alone. `entries` is the vocabulary the word is compared with.
+// Spec assistant-data-scope REQ-2 matcher table, run on the matcher alone. `entries` is the vocabulary; the row asks whether the word matches the first one.
 const TABLE: { word: string; entries: string[]; matches: boolean; why: string }[] = [
   { word: "carito", entries: ["carrito"], matches: true, why: "one deletion" },
   { word: "carrtio", entries: ["carrito"], matches: true, why: "a swap is one edit" },
@@ -19,7 +19,7 @@ const TABLE: { word: string; entries: string[]; matches: boolean; why: string }[
   { word: "carritito", entries: ["carrito"], matches: false, why: "two edits, 7 letters" },
   { word: "pasar", entries: ["pesar"], matches: false, why: "never-fuzzy" },
   { word: "paso", entries: ["peso"], matches: false, why: "never-fuzzy" },
-  { word: "lleva", entries: ["lleva", "llevo"], matches: false, why: "exact vocabulary word never matches the other entry" },
+  { word: "lleva", entries: ["llevo", "lleva"], matches: false, why: "exact vocabulary word never matches the other entry" },
   { word: "garrito", entries: ["carrito"], matches: false, why: "first letter" },
   { word: "vasto", entries: ["vaso"], matches: false, why: "4 letters are exact only" },
   { word: "objeto", entries: ["objetivo"], matches: false, why: "never-fuzzy" },
@@ -31,7 +31,7 @@ const TABLE: { word: string; entries: string[]; matches: boolean; why: string }[
 
 for (const { word, entries, matches, why } of TABLE) {
   test(`matchWord ${word} ${matches ? "matches" : "does not match"} ${entries.join("/")} (${why})`, () => {
-    assert.equal(matchWord(normalizeText(word), entries).length > 0, matches);
+    assert.equal(matchWord(normalizeText(word), entries).includes(entries[0]), matches);
   });
 }
 
