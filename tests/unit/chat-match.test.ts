@@ -25,6 +25,15 @@ const TABLE: { word: string; entries: string[]; matches: boolean; why: string }[
   { word: "objeto", entries: ["objetivo"], matches: false, why: "never-fuzzy" },
   { word: "cuanto", entries: ["cuando"], matches: false, why: "never-fuzzy" },
   { word: "cuántas", entries: ["cuantos"], matches: false, why: "never-fuzzy" },
+  { word: "objeta", entries: ["objeto"], matches: false, why: "an entry that is never-fuzzy is exact only (6 letters would allow 1 edit)" },
+  { word: "pasor", entries: ["pasar"], matches: false, why: "an entry that is never-fuzzy is exact only (5 letters would allow 1 edit)" },
+  { word: "peso", entries: ["pero"], matches: false, why: "never-fuzzy entry" },
+  { word: "peso", entries: ["paso"], matches: false, why: "never-fuzzy entry" },
+  { word: "objetio", entries: ["objetivo"], matches: true, why: "one edit, 8 letters" },
+  { word: "ojtivo", entries: ["objetivo"], matches: true, why: "two edits, 8 letters" },
+  { word: "ojtiva", entries: ["objetivo"], matches: false, why: "three edits, 8 letters" },
+  { word: "ejrcisia", entries: ["ejercicio"], matches: false, why: "three edits, 9 letters" },
+  { word: "panes", entries: ["pan"], matches: true, why: "plain es plural" },
   { word: "planta", entries: ["plan"], matches: false, why: "a prefix is not a stem match" },
   { word: "prepararse", entries: ["prepar"], matches: false, why: "no star, no prefix" }
 ];
