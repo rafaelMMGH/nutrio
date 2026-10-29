@@ -3,7 +3,7 @@ import { type Block, type Button, type ChatAnswer, type Intent, type ReplyKind, 
 import { consolidateCart } from "@/lib/domain/cart";
 import { greetingOf, isTopicWord, matchTopic, TOPICS, type TopicId } from "@/lib/domain/chat-topics";
 import { activePlan } from "@/lib/domain/plans";
-import { formatQty, normalize } from "@/lib/domain/nutrition";
+import { formatQty } from "@/lib/domain/nutrition";
 
 const plain = (rich: Rich) => rich.map((span) => span.text).join("");
 
@@ -101,7 +101,7 @@ const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: st
   mealTimes: (db, userId) => mealTimes(db, userId),
   cart: (db, userId) => cartSummary(db, userId),
   recipes: recipeList,
-  plan: (db, userId, question) => planSummary(db, userId, normalize(question))
+  plan: (db, userId, question) => planSummary(db, userId, normalizeText(question))
 };
 
 /** The interim answer of a topic whose builder has not landed (plan D3). Never asserted by a test; T063 requires none left. */

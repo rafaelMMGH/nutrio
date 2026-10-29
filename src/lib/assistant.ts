@@ -10,21 +10,22 @@ export const COUNTER_FROM = 450;
 export const STARTERS = ["Mi cena de hoy", "Mi avance de la semana", "Mi peso", "Mi carrito"];
 
 /**
- * Lowercase, accent-free text without the leading and trailing ¿ ? ¡ ! . characters (spec Terms).
- * Whitespace is trimmed first and after the strip, so "  ¿Hola?  " and "hola" compare equal.
+ * Normalized text (spec Terms): lowercase, accents removed (ñ compares as n), every non-letter, non-digit character
+ * a space, runs of spaces collapsed and the ends trimmed. Plurals are not folded here; the matcher does that.
  */
 export function normalizeText(value: string): string {
   return value
     .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
+    .replace(/\p{M}/gu, "")
     .toLowerCase()
-    .trim()
-    .replace(/^[¿?¡!.\s]+|[¿?¡!.\s]+$/g, "");
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
 }
 
-/** The words of a text: maximal runs of letters and digits of its normalized form. */
+/** The words of a text: the runs of letters and digits of its normalized form. */
 export function words(value: string): string[] {
-  return normalizeText(value).match(/[\p{L}\p{N}]+/gu) ?? [];
+  const text = normalizeText(value);
+  return text ? text.split(" ") : [];
 }
 
 /** Length that every limit uses: the trimmed text's `.length`. */
