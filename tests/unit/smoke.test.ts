@@ -18,4 +18,5 @@ test("ragAnswer answers on an empty db", () => {
   const answer = ragAnswer(emptyDb(), "demo-user", "hola");
   assert.equal(typeof answer.answer, "string");
   assert.ok(answer.answer.length > 0);
+  assert.equal(answer.kind, "unknown");
 });

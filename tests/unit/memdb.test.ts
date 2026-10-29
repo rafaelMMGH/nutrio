@@ -80,3 +80,18 @@ test("every collection's record keys equal the keys the SQL seed's rows produce 
     for (const record of records) assert.deepEqual(Object.keys(record).sort(), [...keys].sort(), collection);
   }
 });
+
+test("times: none leaves every slot without a time window", () => {
+  const { db } = memDb({ times: "none" });
+  assert.deepEqual(db.mealTypes.map((meal) => meal.time_window), ["", "", "", ""]);
+});
+
+test("ids follow the scheme the SQL seed uses", () => {
+  const { db, user } = memDb();
+  const versionId = db.planVersions[0].id;
+  const recipe = db.recipes.find((row) => row.name === "Pollo asado")!;
+  assert.equal(recipe.id, `${user.id}-rec-pollo-asado`);
+  assert.equal(db.mealOptions.find((row) => row.recipe_id === recipe.id)!.id, `${recipe.id}-opt`);
+  assert.equal(db.planVersionRecipes.find((row) => row.recipe_id === recipe.id)!.id, `${recipe.id}-pvr`);
+  assert.deepEqual(db.mealTypes.map((meal) => meal.id), [0, 1, 2, 3].map((index) => `${versionId}-meal-${index}`));
+});
