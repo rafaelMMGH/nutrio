@@ -103,7 +103,7 @@ const PENDING = ["¿Cuál es mi meta?", "Mi peso", "Mi avance de la semana", "Mi
 
 test("REQ-5 every starter and follow-up with a builder resolves to its Button-column topic and gives the same answer", () => {
   const { db, user } = memDb({ cart: 3 });
-  const answers = ["hola", "Mi carrito", "¿Cuál es mi horario?", "¿Qué suplementos tomo?"].map((message) => ragAnswer(db, user, message, TODAY));
+  const answers = ["hola", "Mi carrito", "¿Cuál es mi horario?", "¿Cuál es mi plan?"].map((message) => ragAnswer(db, user, message, TODAY));
   assert.deepEqual(sweep(db, user, answers, TODAY, { skip: PENDING }).sort(), ["Mi carrito", "¿Qué suplementos tomo?"].sort());
 });
 

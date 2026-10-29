@@ -1,7 +1,7 @@
 import type { AppDb, AppUser } from "@/lib/types";
 import { type Block, type Button, type ChatAnswer, type Intent, type ReplyKind, type Rich, type Section, normalizeText, STARTERS, words } from "@/lib/assistant";
 import { consolidateCart } from "@/lib/domain/cart";
-import { greetingOf, isTopicWord, matchTopic, TOPICS, type TopicId } from "@/lib/domain/chat-topics";
+import { greetingOf, matchTopics, TOPICS, type TopicId } from "@/lib/domain/chat-topics";
 import { activePlan } from "@/lib/domain/plans";
 import { formatQty } from "@/lib/domain/nutrition";
 
@@ -81,13 +81,17 @@ function cartSummary(db: AppDb, userId: string): Built {
   };
 }
 
-// Question words that never narrow the recipe list: the stop words of the spec (REQ-1) and, via `isTopicWord`, the Topics vocabulary.
-const STOP_WORDS = new Set(["que", "hay", "en", "mi", "mis", "de", "del", "el", "la", "los", "las", "con", "para", "por", "tengo", "cual", "cuales", "como", "cuanto", "es", "un", "una"]);
+// Question words that never narrow the recipe list: the frozen filter words of the spec Terms (not the vocabulary: that grows with the Topics table).
+const DROPPED_WORDS = new Set([
+  ...["que", "hay", "en", "mi", "mis", "de", "del", "el", "la", "los", "las", "con", "para", "por", "tengo", "cual", "cuales", "como", "cuanto", "es", "un", "una"],
+  ...["hora", "horas", "horario", "horarios", "cuando", "desayuno", "desayunos", "comida", "comidas", "cena", "cenas", "colacion", "colaciones", "carrito", "carritos", "plan", "planes", "objetivo", "objetivos"]
+]);
+const DROPPED_PREFIXES = ["compr", "receta", "ingrediente", "prepar", "suplement", "recomend"];
 
 function recipeList(db: AppDb, userId: string, question: string): Built {
   const recipes = db.recipes.filter((item) => item.user_id === userId && !item.deleted_at);
   if (!recipes.length) return { lead: textLead("Aún no tienes recetas.") };
-  const filter = words(question).filter((word) => word.length >= 3 && !STOP_WORDS.has(word) && !isTopicWord(word));
+  const filter = words(question).filter((word) => word.length >= 3 && !DROPPED_WORDS.has(word) && !DROPPED_PREFIXES.some((prefix) => word.startsWith(prefix)));
   const matching = recipes.filter((recipe) => words(recipe.name).some((word) => filter.includes(word)));
   const filtered = matching.length > 0;
   return {
@@ -105,11 +109,15 @@ const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: st
 };
 
 /** The interim answer of a topic whose builder has not landed (plan D3). Never asserted by a test; T063 requires none left. */
-const pending = (topic: TopicId): Built => ({ lead: textLead(`Pronto podré responder sobre ${TOPICS[topic].title}.`) });
+const pending = (topic: TopicId): Built => ({ lead: textLead(`Pronto podré responder sobre ${TOPICS[topic].title ?? "esta pregunta"}.`) });
+
+/** At most this many topics are answered; the rest become their topic buttons (REQ-24). */
+const MAX_TOPICS = 2;
 
 /**
  * The answer to one message: depends only on the message, the user's data and `today` (REQ-5). `trace` adds the
- * resolved intents for the e2e suite (plan D2). `today` is read once the date-based topics exist (US3).
+ * resolved intents for the e2e suite (plan D2). `today` is read once the date-based topics exist (US3). Until the
+ * resolver (T023) the topics are the matched ones in order of first appearance.
  */
 export function ragAnswer(db: AppDb, user: AppUser, message: string, _today: string, { trace = false }: { trace?: boolean } = {}): ChatAnswer {
   const starters = STARTERS.map(questionButton);
@@ -119,13 +127,15 @@ export function ragAnswer(db: AppDb, user: AppUser, message: string, _today: str
     return reply("greeting", standalone(lead), starters, [], trace ? [{ topic: "greeting" }] : undefined);
   }
 
-  const topic = matchTopic(message);
-  if (!topic) return reply("no_match", standalone("No entendí tu pregunta. Puedo ayudarte con:"), starters, [], trace ? [] : undefined);
+  const matched = matchTopics(message);
+  if (!matched.length) return reply("no_match", standalone("No entendí tu pregunta. Puedo ayudarte con:"), starters, [], trace ? [] : undefined);
 
-  const built = BUILDERS[topic]?.(db, user.id, message) ?? pending(topic);
+  const answered = matched.slice(0, MAX_TOPICS);
+  const overflow = matched.slice(MAX_TOPICS).flatMap((topic) => TOPICS[topic].button ?? []);
   const asked = normalizeText(message);
+  const builts = answered.map((topic) => BUILDERS[topic]?.(db, user.id, message) ?? pending(topic));
+  const blocks = builts.map((built, index): Block => ({ title: answered.length > 1 ? TOPICS[answered[index]].title : null, lead: built.lead, sections: built.sections ?? [], buttons: [] }));
   // Repeat rule (chat-polish REQ-5): a follow-up that repeats the question just asked is not offered. Follow-ups only.
-  const followUps = TOPICS[topic].followUps.filter((text) => normalizeText(text) !== asked).map(questionButton);
-  const block: Block = { title: null, lead: built.lead, sections: built.sections ?? [], buttons: [] };
-  return reply("answer", [block], followUps, built.sources ?? [], trace ? [{ topic }] : undefined);
+  const followUps = [...TOPICS[answered[answered.length - 1]].followUps.filter((text) => normalizeText(text) !== asked), ...overflow];
+  return reply("answer", blocks, followUps.map(questionButton), builts.flatMap((built) => built.sources ?? []), trace ? answered.map((topic) => ({ topic })) : undefined);
 }
