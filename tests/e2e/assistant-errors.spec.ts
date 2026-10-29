@@ -1,4 +1,4 @@
-import type { Route } from "@playwright/test";
+import type { APIRequestContext, Route } from "@playwright/test";
 import { expectIssues } from "./fixtures";
 import { assistantUi, ask, chatUserId, createChatUser, deleteChatUser, expect, openAssistant, serverLog, test } from "./assistant-helpers";
 
@@ -25,10 +25,15 @@ async function logWith(log: ReturnType<typeof serverLog>, needle: string) {
   return log.since();
 }
 
-/** Waits out the same 2 s a logged entry may need to appear (see `logWith`), then requires that none did. */
-async function expectNoErrorLog(log: ReturnType<typeof serverLog>) {
-  await new Promise((resolve) => setTimeout(resolve, 2000));
-  expect(log.since()).not.toContain(LOG_MARK);
+/**
+ * Requires that the request just made logged no error entry. The log pipe may lag, so instead of sleeping, a sentinel
+ * request that does fail is logged after it: once the sentinel's entry shows, everything before it is in the log too,
+ * and the only entry must be the sentinel's.
+ */
+async function expectNoErrorLog(request: APIRequestContext, log: ReturnType<typeof serverLog>) {
+  await ask(request, "x", { fail: true });
+  const text = await logWith(log, INJECTED);
+  expect(text.split(LOG_MARK).length - 1).toBe(1);
 }
 
 test.describe("API", () => {
@@ -47,7 +52,7 @@ test.describe("API", () => {
     expect(text).toMatch(/Error: Injected chat failure[\s\S]*\n\s+at /);
   });
 
-  test("without the hook header the question is answered", async ({ chatContext }) => {
+  test("a question without hook headers is answered with a 200", async ({ chatContext }) => {
     const { status } = await ask(chatContext.request, "hola");
     expect(status).toBe(200);
   });
@@ -59,7 +64,7 @@ test.describe("API", () => {
     const body = await response.json();
     expect(body.error).toBe("Invalid request");
     expect(body.issues.fieldErrors.message).toBeDefined();
-    await expectNoErrorLog(log);
+    await expectNoErrorLog(chatContext.request, log);
   });
 
   test("a malformed JSON body is a 400 and no error-level log entry", async ({ chatContext }) => {
@@ -67,7 +72,7 @@ test.describe("API", () => {
     const response = await chatContext.request.post("/api/rag/chat", { data: '{"message":', headers: { "Content-Type": "application/json" } });
     expect(response.status()).toBe(400);
     expect(await response.json()).toHaveProperty("error");
-    await expectNoErrorLog(log);
+    await expectNoErrorLog(chatContext.request, log);
   });
 });
 
@@ -93,6 +98,9 @@ test.describe("panel", () => {
       await retry.click();
       await expect(ui.assistantTurns).toHaveCount(1);
       await expect(ui.panel).not.toContainText(SERVER_ERROR_COPY);
+      await expect(ui.panel).not.toContainText(REQUEST_ERROR_COPY);
+      await expect(chat.getByRole("button", { name: "Reintentar" })).toHaveCount(0);
+      await expect(ui.live.first()).not.toHaveText("");
       await expect(ui.userTurns).toHaveText(["hola"]);
     });
   });

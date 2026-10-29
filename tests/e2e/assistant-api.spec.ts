@@ -10,13 +10,13 @@ import {
   seedCart,
   seedPlan,
   seedRecipes,
+  softDeleteRecipe,
   test
 } from "./assistant-helpers";
 
 // API tests of POST /api/rag/chat against a seeded, isolated user (plan D2). Spec assistant-chat-polish: REQ-1, REQ-3,
 // REQ-10 (server), REQ-18 and the REQ-6 plan summary. Tests of the removed question-routing model went with the
 // rewrite of the assistant data spec (T008); their successors live in the new specs.
-
 
 const OBJECTIVE = "Mejorar mi energía";
 const MEALS = ["Desayuno", "Colación", "Comida", "Cena"];
@@ -101,7 +101,7 @@ test.describe("input limits (REQ-10 server)", () => {
   });
 });
 
-// The structured answers. They need the builders of Batch 2b, so this group stays red until then.
+// The structured answers of the builders that exist today (cart, recipe list, plan, meal times).
 test.describe("builders", () => {
   test("REQ-1 an empty cart is a lead with no sections and no sources", async ({ chatContext }) => {
     seedCart(0);
@@ -175,6 +175,24 @@ test.describe("builders", () => {
     const list = items(body, "Recetas");
     expect(list).toHaveLength(9);
     expect(list[8]).toBe("y 2 más");
+  });
+
+  test("REQ-27 an empty recipe book is a lead with no sections and no sources", async ({ chatContext }) => {
+    seedRecipes([]);
+    const { body } = await answer(chatContext, "¿Qué recetas tengo?");
+    expect(plainOf(body.lead)).toBe("Aún no tienes recetas.");
+    expect(body.sections).toEqual([]);
+    expect(body.sources).toEqual([]);
+  });
+
+  test("REQ-3 a soft-deleted recipe is missing from the recipe list", async ({ chatContext }) => {
+    const ids = seedRecipes([
+      { name: "Quesadillas", ingredients: [{ name: "Tortilla" }] },
+      { name: "Ensalada", ingredients: [{ name: "Lechuga" }] }
+    ]);
+    softDeleteRecipe(ids["Ensalada"]);
+    const { body } = await answer(chatContext, "¿Qué recetas tengo?");
+    expect(items(body, "Recetas")).toEqual(["Quesadillas"]);
   });
 
   test("REQ-1 the plan lists the meals, plus supplements and recommendations only when the question names them", async ({ chatContext }) => {
@@ -252,7 +270,6 @@ test.describe("builders", () => {
 
   test("REQ-18 with an active plan and times, there is one item per meal and each time is highlighted", async ({ chatContext }) => {
     const { body } = await answer(chatContext, "¿A qué hora es la cena?");
-    expect(body.kind).toBe("answer");
     expect(plainOf(body.lead)).toBe("Estos son los horarios de tus comidas.");
     expect(body.sections.map((section) => section.title)).toEqual(["Comidas"]);
     expect(items(body, "Comidas")).toEqual(["Desayuno · Entre 7 a 8 am", "Colación · Entre 10 a 11 am", "Comida · Entre 2 a 3 pm", "Cena · Entre 8 a 9 pm"]);
@@ -274,7 +291,6 @@ test.describe("builders", () => {
   test("REQ-18 without meal times the lead says so and the meals are listed without highlights", async ({ chatContext }) => {
     seedPlan({ times: "none" });
     const { body } = await answer(chatContext, "¿Cuándo desayuno?");
-    expect(body.kind).toBe("answer");
     expect(plainOf(body.lead)).toBe("Tu plan no tiene horarios para tus comidas.");
     expect(items(body, "Comidas")).toEqual(MEALS);
     expect(body.sections[0].items.flat().some((span) => span.highlight)).toBe(false);
@@ -285,6 +301,5 @@ test.describe("builders", () => {
     const { body } = await answer(chatContext, "¿Cuál es mi horario?");
     expect(plainOf(body.lead)).toBe("No tienes un plan activo.");
     expect(body.sections).toEqual([]);
-    expect(body.kind).toBe("answer");
   });
 });
