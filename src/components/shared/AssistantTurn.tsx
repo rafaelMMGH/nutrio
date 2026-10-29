@@ -3,7 +3,7 @@
 // (the "Pensando…" Loader text variant)
 import Link from "next/link";
 import { Bot, RotateCcw } from "lucide-react";
-import type { Block, Button, ChatAnswer, Rich } from "@/lib/assistant";
+import { STARTERS, type Block, type Button, type ChatAnswer, type Rich } from "@/lib/assistant";
 import { PromptSuggestion } from "./PromptSuggestion";
 
 /** What a turn sent: the message alone, with no scope, page or history (REQ-4, REQ-5). */
@@ -28,7 +28,7 @@ export type Turn =
 export type ButtonsAction = { disabled: boolean; onAsk: (message: string) => void };
 
 /** The starter questions of an empty thread (REQ-4), as the server sends them. */
-export const STARTERS: Button[] = ["Mi cena de hoy", "Mi avance de la semana", "Mi peso", "Mi carrito"].map((message) => ({ type: "question", label: message, message }));
+export const STARTER_BUTTONS: Button[] = STARTERS.map((message) => ({ type: "question", label: message, message }));
 
 /** Question buttons send their message as a user turn; links navigate in-app and stay on every answer. */
 export function ButtonList({ buttons, action }: { buttons: Button[]; action?: ButtonsAction }) {

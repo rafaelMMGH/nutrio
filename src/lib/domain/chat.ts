@@ -1,7 +1,7 @@
 import type { AppDb, AppUser } from "@/lib/types";
-import { type Block, type Button, type ChatAnswer, type Intent, type ReplyKind, type Rich, type Section, normalizeText, words } from "@/lib/assistant";
+import { type Block, type Button, type ChatAnswer, type Intent, type ReplyKind, type Rich, type Section, normalizeText, STARTERS, words } from "@/lib/assistant";
 import { consolidateCart } from "@/lib/domain/cart";
-import { greetingOf, isTopicWord, matchTopic, STARTERS, TOPICS, type TopicId } from "@/lib/domain/chat-topics";
+import { greetingOf, isTopicWord, matchTopic, TOPICS, type TopicId } from "@/lib/domain/chat-topics";
 import { activePlan } from "@/lib/domain/plans";
 import { formatQty, normalize } from "@/lib/domain/nutrition";
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Bot, Loader2, MessageSquarePlus, Mic, Square, X } from "lucide-react";
-import { AssistantTurn, ButtonList, STARTERS, type Turn } from "./AssistantTurn";
+import { AssistantTurn, ButtonList, STARTER_BUTTONS, type Turn } from "./AssistantTurn";
 import { useMediaQuery } from "@/lib/client/useMediaQuery";
 import { PromptInput } from "./PromptInput";
 import { ScrollButton } from "./ScrollButton";
@@ -211,7 +211,7 @@ export function AssistantChat({ title = "Asistente", subtitle, turns, busy, open
             {turns.length === 0 && (
               <div className="assistant-chat-empty">
                 <p>Pregúntame lo que quieras saber. Respondo con la información de tus planes.</p>
-                <ButtonList buttons={STARTERS} action={{ disabled: busy, onAsk: askButton }} />
+                <ButtonList buttons={STARTER_BUTTONS} action={{ disabled: busy, onAsk: askButton }} />
               </div>
             )}
             {turns.map((turn) => <AssistantTurn key={turn.id} turn={turn} buttonsAction={turn.id === buttonsTurnId ? { disabled: busy, onAsk: askButton } : undefined} onRetry={turn.id === lastAssistant?.id ? retry : undefined} />)}

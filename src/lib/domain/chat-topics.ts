@@ -40,9 +40,6 @@ export const TOPICS: Record<TopicId, { title: string; followUps: string[] }> = {
   weekly: { title: "Avance", followUps: ["Mi peso", "¿Cuál es mi meta?"] }
 };
 
-/** Empty state, greeting and no-match buttons. */
-export const STARTERS = ["Mi cena de hoy", "Mi avance de la semana", "Mi peso", "Mi carrito"];
-
 const GREETING_WORDS = /(^| )(hola|buenos dias|buenas tardes|buenas noches|que tal|gracias)(?= |$)/g;
 
 /** "hello" or "thanks" when the message is made only of greeting or thanks words, else null (a greeting before a question is ignored by the matcher). */

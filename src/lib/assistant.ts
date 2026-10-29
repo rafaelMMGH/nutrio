@@ -6,6 +6,9 @@ export const MAX_MESSAGE = 500;
 /** Length from which the composer shows the "n/500" counter. */
 export const COUNTER_FROM = 450;
 
+/** The starter questions of the empty state, the greeting and the no-match reply (spec Copy, REQ-4). */
+export const STARTERS = ["Mi cena de hoy", "Mi avance de la semana", "Mi peso", "Mi carrito"];
+
 /** Wire values of the `scope` request field. "Receta" is "Esta receta" in the UI. */
 export type ScopeKey = "auto" | "Plan activo" | "Recetario" | "Carrito" | "Receta";
 
