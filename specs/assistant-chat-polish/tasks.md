@@ -1,6 +1,6 @@
 # Tasks: Assistant chat polish
 
-**Spec:** [spec.md](spec.md) (v1.8) · **Plan:** [plan.md](plan.md) · **Contract:** [contracts/chat-api.md](contracts/chat-api.md)
+**Spec:** [spec.md](spec.md) (v1.9) · **Plan:** [plan.md](plan.md) · **Contract:** [contracts/chat-api.md](contracts/chat-api.md)
 
 Format: `- [ ] T### [P] [US#] Description (path/to/file)`.
 `[P]` = can run in parallel with other `[P]` tasks in the same batch (different files, no shared dependency).

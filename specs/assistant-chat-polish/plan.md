@@ -1,6 +1,6 @@
 # Plan: Assistant chat polish
 
-**Spec:** [spec.md](spec.md) · **Version:** 1.4 · **Checklist:** [checklists/ux.md](checklists/ux.md) · **Contract:** [contracts/chat-api.md](contracts/chat-api.md)
+**Spec:** [spec.md](spec.md) · **Version:** 1.9 · **Checklist:** [checklists/ux.md](checklists/ux.md) · **Contract:** [contracts/chat-api.md](contracts/chat-api.md)
 
 ## Decisions
 
