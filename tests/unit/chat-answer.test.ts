@@ -188,3 +188,9 @@ for (const message of NOT_TOPICS) {
     assert.deepEqual(messagesOf(reply.buttons), STARTERS);
   });
 }
+
+test("REQ-24 a topic button already among the second block's follow-ups is offered once", () => {
+  const { db, user } = memDb();
+  const reply = ragAnswer(db, user, "agua, ejercicio y peso", TODAY);
+  assert.deepEqual(messagesOf(reply.buttons), ["¿Cuánta agua llevo?", "Mi peso"]);
+});
