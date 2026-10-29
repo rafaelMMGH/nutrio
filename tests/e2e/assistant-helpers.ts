@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
+import path from "node:path";
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import type { ChatAnswer, Rich, ScopeKey, Section } from "../../src/lib/assistant";
 import { addOnSpecs, DEFAULT_MEALS, PLAN_NAME, planFixture, TIME_WINDOWS, type SeedRecipe } from "../shared/assistant-fixture";
@@ -84,7 +85,7 @@ function recipeRowDeletes(u: string) {
   const recipes = `(select id from recipes where user_id = ${u})`;
   const ingredients = `(select id from ingredients where user_id = ${u})`;
   return [
-    `delete from ingredient_usages where source_id in ${recipes} or ingredient_id in ${ingredients}`,
+    `delete from ingredient_usages where source_type = 'recipe' and (source_id in ${recipes} or ingredient_id in ${ingredients})`,
     `delete from recipes where user_id = ${u}`,
     `delete from ingredients where user_id = ${u}`
   ];
@@ -110,12 +111,14 @@ function removeUserRows(userId: string) {
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
-// Seeders. Each one replaces what it seeded before (seedRecipes: all of the user's recipes), so a describe block can reseed between tests.
+// Seeders. Each one replaces what it seeded before (seedRecipes: all of the user's recipes, and so the plan, which points at them), so a describe block can reseed between tests.
 
-/** Inserts the recipes with their ingredients and usages. Returns each recipe's id by name. */
+/** Replaces all of the user's recipes (and so clears the plan, whose options point at them) with these, with their ingredients and usages. Returns each recipe's id by name. */
 export function seedRecipes(recipes: SeedRecipe[]): Record<string, string> {
   const userId = currentUser().id;
   const ids: Record<string, string> = {};
+  // meal_options and plan_version_recipes reference recipes, so the plan goes first.
+  clearPlan();
   // Reseeding starts clean, so a recipe or ingredient (and its category) from an earlier call cannot linger.
   const statements: string[] = recipeRowDeletes(lit(userId));
   for (const recipe of recipes) {
@@ -194,7 +197,7 @@ export function seedPlan({ times, meals = DEFAULT_MEALS, supplements = true, obj
   clearPlan();
   const userId = currentUser().id;
   const placed = fixture ? planFixture(meals) : [];
-  // Recipes after clearPlan: reseeding wipes the old ones, which is only possible once the plan rows pointing at them are gone.
+  // seedRecipes clears the plan again (harmless); the plan row itself is inserted below.
   const recipeIds = fixture ? seedRecipes(placed.map((entry) => entry.recipe)) : {};
   const planId = `${userId}-plan`;
   const versionId = `${planId}-v1`;
@@ -293,7 +296,8 @@ export async function pinToday(context: BrowserContext, date: string) {
   await context.route(/\/api\/rag\/chat$/, (route) => route.continue({ headers: { ...route.request().headers(), "x-e2e-today": date } }));
 }
 
-const SERVER_LOG = "tests/e2e/.server.log";
+// From this file, not the cwd, so the log is found wherever Playwright is started.
+const SERVER_LOG = path.join(__dirname, ".server.log");
 
 /** Marks the end of the e2e server's log now: `since()` returns the text appended after that point (a missing file counts as empty). */
 export function serverLog() {
