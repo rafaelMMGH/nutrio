@@ -56,24 +56,28 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 
 **Batch F1b: test hooks, 500 path (chat-polish REQ-23)**, about 250 lines. May run in a worktree beside 1a1 (plan Batches).
 
-- [ ] T005 [chat-polish REQ-23] Tests
+- [x] T005 [chat-polish REQ-23] Tests
   - Unit (tests/unit/test-hooks.test.ts): `testHooks()` with a non-test env (no `E2E_HOOKS`, or `NODE_ENV=production`) ignores `x-e2e-fail`, `x-e2e-today` and `x-e2e-trace`; with the test env it returns them (plan D4). Red first (module missing).
   - e2e, written (tests/e2e/assistant-errors.spec.ts): injected failure → 500, body has no internal text, the log has route, user id, message length and stack; 501 characters → 400 with issues and no log entry; malformed JSON (`{"message":`) → 400, no error-level log; panel: 500 shows "Algo salió mal al responder. Intenta de nuevo." with Reintentar (retry works), 400 keeps "No pude responder en este momento.". UI injection via `page.route` adding `x-e2e-fail: chat` (unroute before Reintentar) and `postData: '{"message":'`; the UI itself never sends `x-e2e-*`.
-- [ ] T006 [chat-polish REQ-23] Server (src/lib/server/test-hooks.ts, src/app/api/rag/chat/route.ts)
+- [x] T006 [chat-polish REQ-23] Server (src/lib/server/test-hooks.ts, src/app/api/rag/chat/route.ts)
   - `testHooks(headers, env)` per plan D4; the route reads headers only through it.
   - Route: JSON parse or zod failure → `badRequest`. Anything after → inline 500 with `console.error` (plan Interfaces). The `fail` hook throws inside the builder call.
-- [ ] T007 [chat-polish REQ-23] Client (src/lib/client/api.ts, src/components/app/assistant.tsx, src/components/shared/AssistantTurn.tsx)
+- [x] T007 [chat-polish REQ-23] Client (src/lib/client/api.ts, src/components/app/assistant.tsx, src/components/shared/AssistantTurn.tsx)
   - `ApiError` with `status` (message unchanged for other callers).
   - The error turn records `server: status === 500` and renders the 500 copy. Reintentar is unchanged.
   - If this batch must touch tests/e2e/assistant-helpers.ts, it is no longer parallel with 1a1.
 
 **Review checkpoint F1b:** tsc + unit. Reviewer checklist: hooks inert without `E2E_HOOKS` or under production (unit); **the route reads headers only through `testHooks()`**; 400 paths log nothing at error level (by reading the code; proven in Batch E).
 
+**Batch note F1b (done; T005–T007, commits bd537de, 10f9b28, 9536424 in worktree branch worktree-agent-a961a3030b18fbcc7):** `testHooks(headers, env)` is active only when `E2E_HOOKS === "1"` and `NODE_ENV !== "production"`; it parses `x-e2e-today` (strict YYYY-MM-DD, a real calendar day), `x-e2e-fail: chat` and `x-e2e-trace: 1`. Route: a JSON parse or zod failure → `badRequest` (no log); everything after → 500 `{ error: "Internal error" }` with `console.error("[api/rag/chat]", { userId, messageLength }, error)`. Client: `ApiError(message, status)`; the error turn records `server: status === 500`. Unproven until Batch E: assistant-errors.spec.ts (500 status and body, the log format `messageLength:\s*N`, the 2 s fixed waits for "no log entry", the `page.route` injections). Any e2e run before Batch 1b2 (e.g. the 3a2 targeted run if it touches these files) shows the old-copy failures listed in T013 (500 mocks in assistant-next-step, -a11y, -answers, -look).
+
+**Batch note F1b review:** reviewer verdict PASS (HIGH none). Findings folded into T013 (500-mock list, MEDIUM), T072 first sub-bullet (assistant-errors.spec.ts retry proof MEDIUM, sentinel instead of sleep LOW, renamed no-header test LOW), T011 (`x-e2e-today` warning, LOW), T010 (typed `body` in route.ts, LOW) and the Coverage row for chat-polish REQ-23.
+
 ## Phase 3: US1 (P1) Understand me, about everything
 
 **Batch 1a1: assistant-api pruning**, about 390 lines (about 80% deletions; no `src/` change). May run beside F1b.
 
-- [ ] T008 [US1] assistant-api pruning (tests/e2e/assistant-api.spec.ts, tests/e2e/assistant-helpers.ts)
+- [x] T008 [US1] assistant-api pruning (tests/e2e/assistant-api.spec.ts, tests/e2e/assistant-helpers.ts)
   - Grep the whole `tests/e2e/` directory for `home-search-filter`, `home-scope`, `Alcance`, `Preguntar en Todo`, `follow_ups`, `out_of_scope`, `missing_recipe`, `overview`, `chipsFor`, `defaultScope` and the `scope` request field. Record each hit in the batch note as "edited in task X": theme-palette.spec.ts:82-91 (`sharedUi` "home scope menu") → T069; assistant-api.spec.ts `FOLLOW_UPS`, `expectTopic`, `expectFixedReply`, the `FollowUp`/`ScopeKey` imports and their tests → T008; assistant-helpers.ts `ask` scope/`recipeId` parameters → T008; `buildAnswer`, `mockChat`, `UNKNOWN_LEAD`, `UNKNOWN_ANSWER`, `CAPABILITY_LINE` and the old-shape imports → T013; the old-UI assertions in assistant-scope, -answers, -next-step, -a11y, -composer, -look → T013. Known false positives to note and ignore: `.user-chip` (theme-switch, theme-palette), the `scope` option of `auditNow` (theme-audit.ts, theme-login), and bare `scope`/`overview` hits in theme-* files that do not touch the assistant.
   - Delete every assistant-api.spec.ts test asserting scope, recipe_id, `unknown`/`out_of_scope`/`missing_recipe`/`overview` kinds, UNKNOWN_LEAD, context_used by scope, or the old FOLLOW_UPS lists. Supersession for the batch note (title → task): chat-polish REQ-19 winners table, unknown reply in Todo, whole-word rule → T070 (unit) and T017; chat-polish REQ-20 scope/overview/missing-recipe tests, `context_used` by scope, the "Carrito actual" alias → T072; old fallback texts, the unknown-reply test, chat-polish REQ-6 "unrecognized question" → T048; Plan activo overview and Recetario "hola" → T048 and T050; "Esta receta" builder tests → T034; chat-polish REQ-5 follow-ups and page suggestions → T072 and T012; the `sources` test drops its out-of-scope case. Builder tests on cart, recipe list, plan and meal times stay, minus their `expectTopic`/scope parts, asserting no `follow_ups` and no kind other than `answer`.
   - `ask(request, message, { today?, fail?, trace? })` loses the legacy string form and its `ScopeKey` use (T004). `seedPlan`'s `fixture` stays opt-in (old specs seed recipes before the plan); every new spec passes `fixture: true`. Replace the "T008/T013 flip the default" comment (~line 177) with that rule.
@@ -81,9 +85,12 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 
 **Review checkpoint 1a1:** tsc + unit; `grep -En "ScopeKey|FollowUp|FOLLOW_UPS|follow_ups|UNKNOWN_LEAD|expectTopic|scope|recipe_id|overview|out_of_scope|missing_recipe" tests/e2e/assistant-api.spec.ts` returns nothing; no `test.skip`/`fixme`/`fail` added. Batch note: the "edited in task X" hits and each deleted title with its superseding task.
 
+**Batch note 1a1 (done; T008, commit babeb85, worktree branch worktree-agent-ab226b2ae9a589034, +46/-390):** about 50 generated tests deleted, each mapped to its superseding task (supersession list in T008); a single commit because tsc must pass. `ask(request, message, { today, fail, trace })` has no legacy string form; `fixture` stays opt-in; an `answer()` helper replaces `expectTopic`. Edited in task X: theme-palette.spec.ts:82-91 → T069; assistant-helpers.ts `buildAnswer`/`mockChat`/cart literals → T013; old-UI assertions in assistant-scope, -answers, -next-step, -a11y, -look → T013. False positives: assistant-helpers.ts:64 "scoped to the user", the `auditNow` `scope` option (theme-login, theme-audit), `.user-chip`.
+
 **Batch 1a2: wire model and scope-free server**, about 360 lines. After F1b (both touch route.ts).
 
 - [ ] T072 [US1] Tests REQ-4 (API), REQ-5, REQ-13 clock
+  - First commit of the batch (these hold on the current server; tests/e2e/assistant-api.spec.ts): two e2e tests: (1) empty recipe book: `seedRecipes([])`, then `answer(chatContext, "¿Qué recetas tengo?")` asserts the lead "Aún no tienes recetas.", sections `[]` and sources `[]`; (2) soft-deleted recipe: `softDeleteRecipe` on one seeded recipe, then it is missing from the "Recetas" list. 1a1 review cleanups (LOW) in the same commit: drop the redundant `expect(body.kind).toBe("answer")` in the two REQ-18 tests (`answer()` already checks it), the double blank line after the header comment (~19-20), and reword or drop the stale comment at ~104 ("They need the builders of Batch 2b, so this group stays red until then"). F1b review cleanups in tests/e2e/assistant-errors.spec.ts, same commit: (a, MEDIUM) "Reintentar works" (~94-97) also asserts the panel does not contain `REQUEST_ERROR_COPY`, the Reintentar button has count 0, and the live region is non-empty (or matches the known answer text once T048 fixes it); (b, LOW) `expectNoErrorLog` (~29-32) drops the 2 s sleep: after the 400, send `ask(request, "x", { fail: true })` as a sentinel, wait with `logWith(log, INJECTED)`, then assert `LOG_MARK` occurs exactly once in `log.since()`; (c, LOW) rename "without the hook header the question is answered" (~50) so it no longer claims REQ-23's outside-test-environment criterion (that guard is unit-covered; see Coverage).
   - Unit (tests/unit/chat-answer.test.ts, tests/unit/schemas.test.ts, tests/unit/chat-dates.test.ts): over `memDb()`, `ragAnswer(db, user, message, today)` returns a `kind` in the allowed `ReplyKind` set (plan Interfaces), asserted against that set rather than the removed names; `context_used` = "Todo el sistema"; `blocks` and `buttons` present; `answer` equals the concatenated blocks; `resolved` only with the trace option. The server repeat rule on follow-ups. Add `sweep(db, user, answers, today)` to tests/unit/memdb.ts (plan Testing strategy) and sweep the starters and follow-ups whose builders exist (cart, recipes, meal times, plan); it fails on placeholders or an empty set. `chatSchema.parse({ message, scope, recipe_id })` deep-equals `{ message }`. `serverToday(new Date("2026-10-29T03:00Z"))` = "2026-10-28". Red first.
   - e2e, written (tests/e2e/assistant-noscope.spec.ts): the same answer with and without `scope` and `recipe_id` (incl. "Receta" + a recipe id) via raw `request.post`; `resolved` absent without the trace header; `resendSweep` over the starters. First fix `resendSweep` against vacuous passes (assistant-helpers.ts): per message assert `again.status` is 200, `body.kind` is defined, `first.body.blocks` is a non-empty array before the equality, and run the placeholder check over each input's block text too. REQ-5 is claimed only after T063.
 - [ ] T009 [US1] Wire types `Button`, `Block`, new `ReplyKind`, `Intent`, optional `resolved`. Keep old top-level fields so the old client compiles (src/lib/assistant.ts)
@@ -91,9 +98,12 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
   - `ragAnswer(db, user, message, today)` with no scope; `reply()` builds blocks, buttons and `answer`.
   - Follow-ups become question buttons per the Topics table; server repeat rule; the 4 Topics starters.
   - `resolved` filled only when the route passes `trace`; topics with no builder use the D3 placeholder.
+  - Update tests/unit/smoke.test.ts in the same commit: the new `ragAnswer(db, user, message, today)` call, and "hola" → `greeting` instead of `kind === "unknown"`. Revisit the `sources` test in assistant-api.spec.ts: `sourcesOf("¿Qué hago ahora?")` stays `[]` once it becomes `no_match`, and the test also asserts that kind (finalized in T048).
+  - F1b review (LOW): when the route's `ragAnswer` call changes, type `let body;` (src/app/api/rag/chat/route.ts:13) as `z.infer<typeof chatSchema>`.
 - [ ] T011 [US1] Request, loading, today (src/lib/validation/schemas.ts, src/lib/domain/queries.ts, src/lib/domain/chat-dates.ts, src/app/api/rag/chat/route.ts)
   - `chatSchema` = `{ message }`; `needs.chat`; the route uses `loadFor(user, "chat")`.
   - `serverToday(now)` via `Intl` in America/Mexico_City; the route passes `serverToday(new Date())` and `trace` from `testHooks()`.
+  - F1b review (LOW; src/lib/server/test-hooks.ts:24-25, tests/unit/test-hooks.test.ts): with hooks enabled, an `x-e2e-today` that is present but not a real day `console.warn`s once (or throws so the test fails loudly); still ignored in production. Unit test first.
 
 **Review checkpoint 1a2:** tsc + unit. The old client still compiles (old top-level fields kept until T016).
 
@@ -123,6 +133,7 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 
 - [ ] T013 [US1] Test churn (tests/e2e/*.spec.ts, tests/e2e/assistant-helpers.ts)
   - Delete tests/e2e/assistant-scope.spec.ts. Move `buildAnswer`/`mockChat` to the new shape; replace `UNKNOWN_LEAD`/`UNKNOWN_ANSWER`/`CAPABILITY_LINE` and every `follow_ups` use.
+  - Old specs that mock a 500 and expect "No pude responder en este momento." now get "Algo salió mal al responder. Intenta de nuevo." (F1b, T007; F1b reviewer line numbers, where the copy is asserted): assistant-next-step.spec.ts 317-318, 372, 391 and 512 (the "REQ-5 with REQ-8" describe), assistant-a11y.spec.ts 385 and 715, assistant-answers.spec.ts:84, assistant-look.spec.ts:112 (a snapshot, refreshed in T057). Vacuous after the change: next-step 330 and 338 (`not.toContainText(ERROR_COPY)` after the retry) assert the copy actually shown. Unaffected: a11y 185 and 480, next-step 402 and 427 (abort/timeout keep the generic copy); mocks of a 400 or a network error keep the old copy. Rule: a test about REQ-23 behaviour asserts the server-error copy; a test meant to cover chat-polish REQ-8's generic copy switches its mock to a non-500 status, at least one of them to 503 (today only 400 and abort cover "any other non-2xx"); a vacuous `not.toContainText` asserts the copy actually shown.
   - Rewrite to the new behavior, or delete, every test in assistant-answers, -next-step, -a11y, -composer and -look that asserts chips, scope, "Alcance", "Preguntar en Todo", the old placeholder, `follow_ups`, or the kinds `out_of_scope`/`missing_recipe`/`overview` (found by grep). Batch note: each title rewritten or deleted, with its superseding task. No `test.skip`/`fixme`/`fail`.
 - [ ] T016 [US1] Leftovers (tests/e2e/assistant-api.spec.ts, src/lib/assistant.ts, src/lib/domain/chat.ts)
   - First, as the tests-first commit: move every remaining top-level `lead`/`sections`/`body` assertion in tests/e2e/assistant-api.spec.ts to `blocks`.
@@ -135,7 +146,7 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 **Batch 1c1: normalizer and word matcher**, about 240 lines
 
 - [ ] T017 [US1] Unit tests REQ-2 (tests/unit/chat-match.test.ts)
-  - The full REQ-2 matcher table on `matchWord`, each ✓ and ✗ row, plus multi-word phrase consumption and `normalizeText` per spec Terms (ñ→n, punctuation → space). Red first.
+  - The full REQ-2 matcher table on `matchWord`, each ✓ and ✗ row (incl. "una planta" ≠ "plan"), plus multi-word phrase consumption and `normalizeText` per spec Terms (ñ→n, punctuation → space). Red first.
 - [ ] T018 [US1] `normalizeText` per spec Terms and `words` (src/lib/assistant.ts)
 - [ ] T019 [US1] Matcher (src/lib/domain/chat-match.ts)
   - OSA distance and length allowance (≤4 exact, 5–7 one edit, ≥8 two); singular/plural (s, es, z→ces); `*` stems exact prefix only.
@@ -147,7 +158,7 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 **Batch 1c2: vocabulary through the answer path**, about 220 lines
 
 - [ ] T070 [US1] Tests REQ-1, REQ-2
-  - Unit (tests/unit/chat-answer.test.ts): through `ragAnswer` on `memDb()`, the REQ-1 Givens whose topic list equals the matched topics in order of first appearance (`resolved` plus answer text for cart, recipes, meal times, plan); the REQ-2 table end to end (each ✓ row resolves to its topic, each ✗ row does not); "¿Qué hago ahora?" → `no_match` with the starters; the chat-polish REQ-19 winners table re-created in the new vocabulary. Red first.
+  - Unit (tests/unit/chat-answer.test.ts): through `ragAnswer` on `memDb()`, the REQ-1 Givens whose topic list equals the matched topics in order of first appearance (`resolved` plus answer text for cart, recipes, meal times, plan); the REQ-2 table end to end (each ✓ row resolves to its topic, each ✗ row does not, incl. "una planta" not resolving to Plan); "¿Qué hago ahora?" and "¿Qué cosas tengo?" → `no_match` with the starters; the chat-polish REQ-19 winners table re-created in the new vocabulary. Red first.
   - e2e, written (tests/e2e/assistant-match.spec.ts): through `ask()`, one REQ-1 Given with answer text, one ✓ typo row and one ✗ row of REQ-2.
 - [ ] T020 [US1] Vocabulary (src/lib/domain/chat-topics.ts, src/lib/domain/chat.ts)
   - Every Topics trigger, the frozen recipe-list filter words, the Button/Title/Follow-ups table, the starters.
@@ -176,8 +187,8 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
   - Real names are read read-only (GET /api/recipes on :3000 or a single `SELECT name`); nothing else on :3000, the real DB or the repo is touched; real names never enter the repo.
 - [ ] T025 [US1] Install fuse.js exactly 7.5.0 in the repo. The orchestrator runs it, with the user's yes already given (package.json, package-lock.json)
 - [ ] T026 [US1] Tests REQ-3
-  - Unit (tests/unit/chat-dish.test.ts): every table row except "la comida opcion 1" on `memDb({ fixture: true })` (recipe id, candidates, or not found), incl. "la opcion 1" → not found and "la pizza" → not found; generic names and distractors are never candidates. The "¿Qué lleva <receta>?" message for each fixture recipe resolves to it. Red first.
-  - e2e, written (tests/e2e/assistant-match.spec.ts): "pollo asado" found and "la pizza" not found through `ask()` (text in T034, T048).
+  - Unit (tests/unit/chat-dish.test.ts): every table row except "la comida opcion 1" on `memDb({ fixture: true })` (recipe id, candidates, or not found), incl. "la opcion 1" → not found and "la pizza" → not found; generic names and distractors are never candidates; a soft-deleted fixture recipe is never a candidate (also e2e below). The "¿Qué lleva <receta>?" message for each fixture recipe resolves to it. Red first.
+  - e2e, written (tests/e2e/assistant-match.spec.ts): "pollo asado" found and "la pizza" not found through `ask()` (text in T034, T048); after `softDeleteRecipe`, that recipe's name is not found.
 - [ ] T027 [US1] Dish matcher with the spike's threshold (constant with a comment) and REQ-6 step 4 (src/lib/domain/chat-dish.ts, src/lib/domain/chat-intent.ts)
 
 **Checkpoint:** US1 resolution (REQ-1 to REQ-6) green in unit tests, except the REQ-3 row "la comida opcion 1" (T031); text coverage for REQ-3 and the slot/metric rows of REQ-1/REQ-6 completes in US2–US4.
@@ -210,7 +221,7 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 
 - [ ] T034 [US2] Tests REQ-12, REQ-11 (single option), REQ-3 text
   - Unit (tests/unit/recipe-steps.test.ts): `recipeSteps` returns no steps for "Extraído de plan.pdf", "EXTRAÍDO DE plan.pdf" and "Extraido de plan.pdf"; "¿Listo? Ásalo. Él sirve." keeps its split. Red first.
-  - Unit (tests/unit/chat-meals.test.ts): 12 ingredients all shown; steps 1–2 equal `recipeSteps(description)` 1–2, plus the "Ver receta completa" link to `/recipes/<id>`; "Extraído de plan.pdf" → the no-preparation item; complement "Agua natural · 1 vaso", none → no heading; by dish name, complements only if the recipe is in exactly one slot; ingredient formats with no unit and with neither; a generic-name lead; a single-option slot goes straight to the detail; REQ-3 text: each found row shows the detail lead and "la comida opcion 1" shows comida option 1's detail; end-of-US2 `sweep()` over every existing Topics, slot, option, paging and "¿Qué lleva <receta>?" button.
+  - Unit (tests/unit/chat-meals.test.ts): 12 ingredients all shown; steps 1–2 equal `recipeSteps(description)` 1–2, plus the "Ver receta completa" link to `/recipes/<id>`; "Extraído de plan.pdf" → the no-preparation item; complement "Agua natural · 1 vaso", none → no heading; by dish name, complements only if the recipe is in exactly one slot; ingredient formats with no unit and with neither; a generic-name lead; a single-option slot goes straight to the detail; a recipe with zero ingredients and zero steps still gets a detail answer (lead, no empty headings); every detail answer's `sources` equals `["Receta: <name>"]` (contract keeps `sources`); REQ-3 text: each found row shows the detail lead and "la comida opcion 1" shows comida option 1's detail; end-of-US2 `sweep()` over every existing Topics, slot, option, paging and "¿Qué lleva <receta>?" button.
   - e2e, written (tests/e2e/assistant-meals.spec.ts): the recipe page shows the empty-steps state for the three import notes and keeps the accented split (display unchanged by T035); "Ver receta completa" opens `/recipes/<id>`; one detail answer through `ask()`.
 - [ ] T035 [US2] Shared `recipeSteps(description)` using `normalizeText`, used by the recipe page (no display change) (src/lib/recipe-steps.ts, src/components/recipes/RecipeDetail.tsx)
 - [ ] T036 [US2] Detail builder: lead, uncapped "Ingredientes", "Preparación" (2 steps + link), "Acompaña con" from the slot's add-ons and `add_on` usages (src/lib/domain/chat-meals.ts)
@@ -288,8 +299,8 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 **Batch 4a: greeting, variants, no-match, did-you-mean**, about 290 lines
 
 - [ ] T048 [US4] Tests REQ-23, REQ-26, REQ-28, REQ-29, REQ-3 text
-  - Unit (tests/unit/chat-edges.test.ts): "hola" → greeting + 4 buttons; thanks; "Hola, ¿cuánto peso?" → weight. Pizza not-found quotes "pizza"; pollo → did-you-mean with 2 buttons (no distractor offered); "la opcion 1" → not found. The same question twice → the same variant; for each answer with variants, questions hitting different variants show identical numbers and units (REQ-28). Capital de Francia → no-match + 4 starters; a near recipe name → did-you-mean. `sweep()` over greeting, no-match and did-you-mean buttons. Red first.
-  - e2e, written (tests/e2e/assistant-edges.spec.ts): through `ask()`, "hola", pollo did-you-mean, pizza not found, the same question twice.
+  - Unit (tests/unit/chat-edges.test.ts): "hola" → greeting + 4 buttons; thanks; "Hola, ¿cuánto peso?" → weight. Pizza not-found quotes "pizza"; pollo → did-you-mean with 2 buttons (no distractor offered); "la opcion 1" → not found. The same question twice → the same variant; for each answer with variants, questions hitting different variants show identical numbers and units (REQ-28). Capital de Francia → no-match + 4 starters; a near recipe name → did-you-mean. No-match asserts the exact lead (one of the two spec Copy variants), exactly the 4 starter buttons, and no objective or meal name anywhere in the answer. Negative assertion (tests/unit/chat-answer.test.ts): the old fallback texts "No encontré esa información en tu plan activo." and "No encontré esa información en el sistema." never appear. `sweep()` over greeting, no-match and did-you-mean buttons. Red first.
+  - e2e, written (tests/e2e/assistant-edges.spec.ts): through `ask()`, "hola", pollo did-you-mean, pizza not found, the same question twice. Finalize the `sources` test in assistant-api.spec.ts: "¿Qué hago ahora?" → kind `no_match` and `sources` `[]`.
 - [ ] T049 [US4] Builders and variant picker; REQ-29 matching on the whole question minus stop words (src/lib/domain/chat.ts, src/lib/domain/chat-dish.ts)
 
 **Review checkpoint 4a:** tsc + unit.
@@ -297,7 +308,7 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 **Batch 4b: multi-topic, clarifications, missing data**, about 340 lines
 
 - [ ] T050 [US4] Tests REQ-24, REQ-25, REQ-27
-  - Unit (tests/unit/chat-edges.test.ts): "agua, ejercicio y peso" → 2 titled blocks + "Mi peso"; desayunar y cenar → options + "¿Cuál es mi cena?". Clarify answers stand alone; "¿Cuánto llevo?" → 3 buttons; a dish cue with no dish → 3 recipe buttons, or slot buttons when none. REQ-27 cases not tested earlier: no active plan for plan, slot and meals-done questions; "¿Qué puedo cenar?" without cena → "Tu plan no tiene cena." + one button per slot, starters when none; a slot with no options. `sweep()` over clarify, did-you-mean and overflow buttons; none resolves to another question or no-match. Red first.
+  - Unit (tests/unit/chat-edges.test.ts): "agua, ejercicio y peso" → 2 titled blocks + "Mi peso"; desayunar y cenar → options + "¿Cuál es mi cena?". Clarify answers stand alone; "¿Cuánto llevo?" → 3 buttons; a dish cue with no dish → 3 recipe buttons, or slot buttons when none. REQ-27 cases not tested earlier: no active plan for plan, slot and meals-done questions; "¿Qué puedo cenar?" without cena → "Tu plan no tiene cena." + one button per slot, starters when none; a slot with no options; an empty recipe book: "¿Qué recetas tengo?" → lead "Aún no tienes recetas.", no sections, `sources` `[]`. `sweep()` over clarify, did-you-mean and overflow buttons; none resolves to another question or no-match. Red first.
   - e2e, written (tests/e2e/assistant-edges.spec.ts): the multi-topic question and "¿Cuánto llevo?" through `ask()`; one no-active-plan slot question.
 - [ ] T051 [US4] `reply()` 2-block rules: titles, one option block, follow-ups then overflow, a later clarify omitted (src/lib/domain/chat.ts)
 - [ ] T052 [US4] Clarify replies and the missing-data replies tested in T050 only (src/lib/domain/chat-meals.ts, src/lib/domain/chat-metrics.ts)
@@ -398,7 +409,7 @@ Unit = fail-first proof for logic (run every batch). e2e = written with the task
 
 | Requirement | Unit | e2e | Code |
 |---|---|---|---|
-| chat-polish REQ-23 | T005 (hook guard) | T005 (route, log, panel) | T006, T007 |
+| chat-polish REQ-23 | T005 (hook guard: the outside-test-environment criterion, shared with REQ-13, is unit-only in tests/unit/test-hooks.test.ts because the e2e server always runs with `E2E_HOOKS=1`) | T005 (route, log, panel), T013 (503 for the generic copy) | T006, T007 |
 | REQ-1 | T070, T021, T028, T042, T053 | T070 | T018–T020, T022 |
 | REQ-2 | T017, T070 | T070 | T018–T020 |
 | REQ-3 | T026, T031, T034, T048 | T026, T034, T048 | T024, T025, T027, T033 |
