@@ -1,5 +1,5 @@
 import { DEFAULT_MEALS } from "../shared/assistant-fixture";
-import { PARITY_EXPECTED as expected, PARITY_LOGS, PARITY_TODAY, PARITY_WEIGHT_GOAL } from "../shared/progress-fixture";
+import { parityLogs } from "../shared/progress-fixture";
 import { chatUserId, createChatUser, deleteChatUser, expect, seedLogs, seedPlan, setGoals, test } from "./assistant-helpers";
 
 // REQ-16: the weekly numbers of the chat and the dashboard are the same. This file starts with the dashboard baseline
@@ -13,10 +13,15 @@ test.beforeAll(() => {
 });
 test.afterAll(() => deleteChatUser());
 
-// The dashboard reads "today" from the browser clock in the browser's time zone (x-e2e-today only reaches the chat).
-// Noon in Mexico City keeps the same calendar day in any time zone close to it.
+// The dashboard reads "today" from the browser clock in the browser's time zone while the server renders the real date,
+// so the clock is not pinned (the strip would differ between server and client and fail hydration). The fixture is
+// relative to the Monday of the current week in this zone instead: every log sits on Monday, never after today.
 const TIMEZONE = "America/Mexico_City";
 test.use({ timezoneId: TIMEZONE });
+
+const mexicoCityToday = () => new Intl.DateTimeFormat("en-CA", { timeZone: TIMEZONE }).format(new Date());
+const dayIndex = (key: string) => (new Date(`${key}T00:00:00Z`).getUTCDay() + 6) % 7; // Monday = 0
+const mondayOf = (key: string) => new Date(Date.parse(`${key}T00:00:00Z`) - dayIndex(key) * 86_400_000).toISOString().slice(0, 10);
 
 // The fixture names meals by position (m1 is the first slot); the dashboard knows them by their meal type ids.
 const seededId = (id: string) => {
@@ -28,21 +33,24 @@ const seededId = (id: string) => {
 const liters = (value: number) => value.toLocaleString("es-MX", { minimumFractionDigits: 1, maximumFractionDigits: 2 });
 const kg = (value: number) => value.toLocaleString("es-MX", { maximumFractionDigits: 1 });
 
-test("dashboard tiles show the REQ-16 fixture numbers on the pinned day", async ({ chat }) => {
+test("dashboard tiles show the REQ-16 fixture numbers on the current week", async ({ chat }) => {
+  const today = mexicoCityToday();
+  const { logs, weightGoal, exerciseGoalDays, expected } = parityLogs(mondayOf(today));
   seedPlan({ times: "all", fixture: true });
-  seedLogs(PARITY_LOGS.map((log) => ({ ...log, meals_done: log.meals_done?.map(seededId) })));
-  setGoals({ weight: PARITY_WEIGHT_GOAL, days: 3 });
+  seedLogs(logs.map((log) => ({ ...log, meals_done: log.meals_done?.map(seededId) })));
+  setGoals({ weight: weightGoal, days: exerciseGoalDays });
 
-  await chat.clock.setFixedTime(new Date(`${PARITY_TODAY}T12:00:00-06:00`));
   await chat.goto("/");
   await expect(chat.locator(".home-strip.is-ready")).toBeVisible();
 
   await expect(chat.locator(".tone-water .home-tile-value b")).toHaveText(`${liters(expected.weekWaterLiters)} L`);
   await expect(chat.locator(".tone-water .home-tile-value small")).toHaveText(`Meta ${liters(expected.weekWaterGoalLiters)} L`);
   await expect(chat.locator(".tone-meals .home-tile-value b")).toHaveText(`${expected.weekMeals} de ${expected.weekMealsGoal}`);
-  await expect(chat.locator(".tone-activity .home-tile-value b")).toHaveText(`${expected.weekExerciseDays} de 3 días`);
+  await expect(chat.locator(".tone-activity .home-tile-value b")).toHaveText(`${expected.weekExerciseDays} de ${exerciseGoalDays} días`);
+  await expect(chat.locator(".tone-activity li.is-today")).toHaveCount(1);
+  await expect(chat.locator(".tone-activity li.is-future")).toHaveCount(6 - dayIndex(today));
   await expect(chat.locator(".tone-weight .home-tile-value b")).toHaveText(`${kg(expected.weight.latest)} kg`);
-  await expect(chat.locator(".tone-weight .home-tile-value small")).toHaveText(`Meta ${kg(PARITY_WEIGHT_GOAL)} kg`);
+  await expect(chat.locator(".tone-weight .home-tile-value small")).toHaveText(`Meta ${kg(weightGoal)} kg`);
   // The change is -0.4, shown as an absolute value after a minus sign (U+2212).
   await expect(chat.locator(".tone-weight .home-tile-badge")).toHaveText(`−${kg(Math.abs(expected.weight.change))} kg esta semana`);
 });
