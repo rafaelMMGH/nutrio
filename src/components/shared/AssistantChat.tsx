@@ -2,14 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Bot, Loader2, MessageSquarePlus, Mic, Square, X } from "lucide-react";
-import { AssistantTurn, ChipList, type AssistantRequest, type Turn, type TurnChip } from "./AssistantTurn";
+import { AssistantTurn, ButtonList, STARTERS, type Turn } from "./AssistantTurn";
 import { useMediaQuery } from "@/lib/client/useMediaQuery";
 import { PromptInput } from "./PromptInput";
-import { ScopeSwitcher } from "./ScopeSwitcher";
 import { ScrollButton } from "./ScrollButton";
 import { useChatScroll } from "./useChatScroll";
 import { useDictation } from "./useDictation";
-import type { ScopeKey } from "@/lib/assistant";
+import { questionButtonsTurnId } from "@/lib/client/assistant-thread";
 import "./assistant-chat.css";
 
 // Same breakpoint as the sheet rules in assistant-chat.css.
@@ -18,27 +17,23 @@ export const SHEET_QUERY = "(max-width: 640px)";
 type Props = {
   title?: string;
   subtitle: string;
-  suggestions?: TurnChip[];
   turns: Turn[];
   busy: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Where the next typed question is asked, and whether the page is a recipe (which adds "Esta receta"). */
-  scope: ScopeKey;
-  recipe: boolean;
-  onScopeChange: (scope: ScopeKey) => void;
   /** Changes whenever something outside the panel (the dashboard search bar) asks, so the input takes focus even if the panel is already open. */
   focusRequest: number;
   onSend: (message: string) => void;
-  onSuggest: (request: AssistantRequest) => void;
+  /** A question button: sends its message as a user turn. */
+  onSuggest: (message: string) => void;
   onRetry: (turn: Turn) => void;
   /** Nueva conversación: empties the thread and drops any pending answer. */
   onClear: () => void;
 };
 
 // Floating chat over the RAG endpoint: a FAB in the bottom-right corner opens the panel (kept mounted so the
-// conversation survives closing it). Suggestion chips when empty, one article per turn, pill composer with dictation.
-export function AssistantChat({ title = "Asistente", subtitle, suggestions = [], turns, busy, open, onOpenChange, scope, recipe, onScopeChange, focusRequest, onSend, onSuggest, onRetry, onClear }: Props) {
+// conversation survives closing it). The 4 starters when empty, one article per turn, pill composer with dictation.
+export function AssistantChat({ title = "Asistente", subtitle, turns, busy, open, onOpenChange, focusRequest, onSend, onSuggest, onRetry, onClear }: Props) {
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fabRef = useRef<HTMLButtonElement>(null);
@@ -50,7 +45,7 @@ export function AssistantChat({ title = "Asistente", subtitle, suggestions = [],
     if (open) inputRef.current?.focus();
   }, [open, focusRequest]);
 
-  // Escape closes the panel; a popup inside it (the compact scope menu) takes Escape first by calling preventDefault.
+  // Escape closes the panel; a popup inside it takes Escape first by calling preventDefault.
   // In the modal sheet Tab wraps, because inert on the page alone lets focus escape to the browser's own controls.
   useEffect(() => {
     if (!open) return;
@@ -101,7 +96,7 @@ export function AssistantChat({ title = "Asistente", subtitle, suggestions = [],
   function wrapTab(event: KeyboardEvent) {
     const panel = panelRef.current;
     if (!panel) return;
-    // Only what Tab can really land on: not the display:none switcher variant, not roving tabindex="-1" options, not disabled or hidden.
+    // Only what Tab can really land on: not display:none, not roving tabindex="-1" options, not disabled or hidden.
     const stops = [...panel.querySelectorAll<HTMLElement>("button, textarea, input, a[href], [tabindex]")].filter(
       (node) =>
         node.tabIndex >= 0 &&
@@ -136,14 +131,11 @@ export function AssistantChat({ title = "Asistente", subtitle, suggestions = [],
     inputRef.current?.focus();
   }
 
-  // Chips sit under the latest finished answer. An error as the latest finished turn hides them, and so does a pending
-  // retry (it stands in for its error turn); a pending new question keeps them on screen, disabled.
-  const latest = turns.findLast((turn) => turn.role === "assistant" && turn.status !== "pending");
+  // Question buttons sit under the latest finished answer only; a pending new question keeps them on screen, disabled.
   const lastAssistant = turns.findLast((turn) => turn.role === "assistant");
-  const retrying = lastAssistant?.role === "assistant" && lastAssistant.status === "pending" && lastAssistant.retrying;
-  const chipsTurnId = !retrying && latest?.role === "assistant" && latest.status === "answer" ? latest.id : null;
+  const buttonsTurnId = questionButtonsTurnId(turns);
 
-  // A chip or Reintentar disappears or turns disabled once the request is sent, which would drop focus on <body>. Desktop
+  // A button or Reintentar disappears or turns disabled once the request is sent, which would drop focus on <body>. Desktop
   // goes to the input. The sheet keeps the on-screen keyboard down: focus waits on the log, then moves to the new turn
   // (REQ-22), unless the user has moved it somewhere else meanwhile.
   const followTurn = useRef(false);
@@ -164,9 +156,9 @@ export function AssistantChat({ title = "Asistente", subtitle, suggestions = [],
     if (last && log && document.activeElement === log && log.lastElementChild instanceof HTMLElement) log.lastElementChild.focus({ preventScroll: true });
   }, [turns]);
 
-  const askChip = (request: AssistantRequest) => {
+  const askButton = (message: string) => {
     dictation.stop();
-    onSuggest(request);
+    onSuggest(message);
     keepFocus();
   };
   const retry = (turn: Turn) => {
@@ -207,7 +199,6 @@ export function AssistantChat({ title = "Asistente", subtitle, suggestions = [],
             <h2>{title}</h2>
             <p>{subtitle}</p>
           </div>
-          <ScopeSwitcher value={scope} onChange={onScopeChange} recipe={recipe} sheet={sheet} />
           {turns.length > 0 && (
             <button type="button" className="assistant-chat-new" onClick={startOver} aria-label="Nueva conversación" title="Nueva conversación">
               <MessageSquarePlus size={16} aria-hidden="true" /> <span>Nueva conversación</span>
@@ -220,10 +211,10 @@ export function AssistantChat({ title = "Asistente", subtitle, suggestions = [],
             {turns.length === 0 && (
               <div className="assistant-chat-empty">
                 <p>Pregúntame lo que quieras saber. Respondo con la información de tus planes.</p>
-                <ChipList chips={suggestions} disabled={busy} onAsk={askChip} />
+                <ButtonList buttons={STARTERS} action={{ disabled: busy, onAsk: askButton }} />
               </div>
             )}
-            {turns.map((turn) => <AssistantTurn key={turn.id} turn={turn} chipsAction={turn.id === chipsTurnId ? { disabled: busy, onAsk: askChip } : undefined} onRetry={turn.id === lastAssistant?.id ? retry : undefined} />)}
+            {turns.map((turn) => <AssistantTurn key={turn.id} turn={turn} buttonsAction={turn.id === buttonsTurnId ? { disabled: busy, onAsk: askButton } : undefined} onRetry={turn.id === lastAssistant?.id ? retry : undefined} />)}
           </div>
           <ScrollButton visible={!atBottom} onClick={jumpToLast} />
         </div>

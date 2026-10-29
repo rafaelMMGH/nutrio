@@ -98,17 +98,13 @@ export function AppShell({ user, children }: Props) {
         </AssistantPageProvider>
         <AssistantChat
           subtitle={assistant.context.subtitle}
-          suggestions={assistant.suggestions}
           turns={assistant.turns}
           busy={assistant.busy}
           open={assistant.open}
           onOpenChange={assistant.setOpen}
-          scope={assistant.scope}
-          recipe={Boolean(assistant.context.recipeId)}
-          onScopeChange={assistant.setScope}
           focusRequest={assistant.focusRequest}
           onSend={assistant.send}
-          onSuggest={assistant.sendRequest}
+          onSuggest={assistant.send}
           onRetry={assistant.retry}
           onClear={assistant.clear}
         />
