@@ -49,6 +49,20 @@ test("a multi-word entry compares each word with its own allowance and consumes 
   assert.deepEqual(matchPhrases(words("buenos"), ["buenos dias"]), []);
 });
 
+test("an exact word never fuzzy-matches another phrase's word at the same position, whichever order they are listed", () => {
+  assert.deepEqual(matchPhrases(["me", "llevo"], ["me lleva", "me llevo"]), [{ phrase: "me llevo", from: 0, to: 2 }]);
+  assert.deepEqual(matchPhrases(["me", "lleva"], ["me llevo", "me lleva"]), [{ phrase: "me lleva", from: 0, to: 2 }]);
+  assert.deepEqual(matchPhrases(["me", "lleva"], ["me llevo"]), [{ phrase: "me llevo", from: 0, to: 2 }], "alone, lleva is a typo of llevo");
+  assert.deepEqual(matchPhrases(["como", "pero"], ["como peso"]), [], "a never-fuzzy word stays exact inside a phrase");
+});
+
+test("the same phrase is found twice when the text repeats it", () => {
+  assert.deepEqual(matchPhrases(words("hola hola"), ["hola"]), [
+    { phrase: "hola", from: 0, to: 1 },
+    { phrase: "hola", from: 1, to: 2 }
+  ]);
+});
+
 test("normalizeText: lowercase, no accents, ñ as n, every other character a space", () => {
   assert.equal(normalizeText("  ¿Qué Hay, Mamá?  "), "que hay mama");
   assert.equal(normalizeText("Cuántas piñas"), "cuantas pinas");
