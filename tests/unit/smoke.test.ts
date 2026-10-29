@@ -21,3 +21,10 @@ test("ragAnswer answers on an empty db", () => {
   assert.ok(answer.answer.length > 0);
   assert.equal(answer.kind, "greeting");
 });
+
+test("the chat reaches the cart builder on an empty db", () => {
+  const db = emptyDb();
+  const answer = ragAnswer(db, db.users[0], "¿Qué hay en mi carrito?", "2026-10-28");
+  assert.equal(answer.kind, "answer");
+  assert.equal(answer.answer, "Tu carrito está vacío.");
+});

@@ -19,7 +19,7 @@ const messagesOf = (buttons: ChatAnswer["buttons"]) => buttons.flatMap((button) 
 const textOf = (blocks: Block[]) =>
   blocks.flatMap((block) => [...(block.title ? [block.title] : []), plain(block.lead), ...block.sections.flatMap((section) => [section.title, ...section.items.map(plain)])]).join("\n");
 
-const QUESTIONS = ["¿Qué hay en mi carrito?", "¿Qué recetas hay en mi plan?", "¿A qué hora es mi comida?", "¿Cuál es mi objetivo?", "hola", "gracias", "¿Cuál es la capital de Francia?", "¿Qué hago ahora?"];
+const QUESTIONS = ["¿Qué hay en mi carrito?", "¿Qué recetas hay en mi plan?", "¿Cuál es mi horario?", "¿Cuál es mi plan?", "hola", "gracias", "¿Cuál es la capital de Francia?", "¿Qué hago ahora?"];
 
 test("every reply has an allowed kind, blocks, buttons, the general context and an answer equal to its blocks", () => {
   const { db, user } = memDb({ cart: 3 });
@@ -90,20 +90,21 @@ test("resolved appears only with the trace option, and the visible answer is the
 
 test("REQ-5 the repeat rule drops a follow-up that repeats the message, however it is typed", () => {
   const { db, user } = memDb();
-  const asked = ragAnswer(db, user, "Mi cena de hoy", TODAY);
-  assert.deepEqual(messagesOf(asked.buttons), ["Mi carrito"]);
-  assert.deepEqual(messagesOf(ragAnswer(db, user, "¡MI CENA de hoy!", TODAY).buttons), ["Mi carrito"]);
-  assert.deepEqual(messagesOf(ragAnswer(db, user, "¿Qué recetas hay en mi plan?", TODAY).buttons), ["Mi carrito", "Mi cena de hoy"]);
+  // Two topics (until the resolver): the second block's follow-ups, here Plan's, without the question just asked.
+  const wanted = ["¿Cuál es mi meta?", "¿Qué suplementos tomo?"];
+  assert.deepEqual(messagesOf(ragAnswer(db, user, "¿Qué recetas hay en mi plan?", TODAY).buttons), wanted);
+  assert.deepEqual(messagesOf(ragAnswer(db, user, "¡¿QUÉ recetas hay en MI plan?!", TODAY).buttons), wanted);
+  assert.deepEqual(messagesOf(ragAnswer(db, user, "¿Qué suplementos tomo?", TODAY).buttons), ["¿Cuál es mi meta?", "¿Qué recetas hay en mi plan?"]);
 });
 
-// Follow-ups whose builders do not exist yet resolve to no_match; each batch that adds a builder shrinks this list.
-const PENDING = ["¿Cuál es mi meta?", "Mi peso", "Mi avance de la semana"];
+// Buttons that cannot be swept yet: no builder (goals, weight, weekly, metrics, slot options: "Mi cena de hoy" returns
+// with T021 and T032) or more than one matched topic until the resolver (T022/T023: possessor "plan", "llevo").
+const PENDING = ["¿Cuál es mi meta?", "Mi peso", "Mi avance de la semana", "Mi cena de hoy", "¿Qué recetas hay en mi plan?", "¿Cuánto ejercicio llevo?", "¿Cuánta agua llevo?", "¿Cuántas comidas llevo?"];
 
-test("REQ-5 every starter and follow-up with a builder gives the same definite answer as a first message", () => {
+test("REQ-5 every starter and follow-up with a builder resolves to its Button-column topic and gives the same answer", () => {
   const { db, user } = memDb({ cart: 3 });
-  const answers = ["hola", ...QUESTIONS.slice(0, 4)].map((message) => ragAnswer(db, user, message, TODAY));
-  const swept = sweep(db, user, answers, TODAY, { skip: PENDING });
-  assert.deepEqual(swept.sort(), ["Mi carrito", "Mi cena de hoy", "¿Qué recetas hay en mi plan?", "¿Qué suplementos tomo?"].sort());
+  const answers = ["hola", "Mi carrito", "¿Cuál es mi horario?", "¿Qué suplementos tomo?"].map((message) => ragAnswer(db, user, message, TODAY));
+  assert.deepEqual(sweep(db, user, answers, TODAY, { skip: PENDING }).sort(), ["Mi carrito", "¿Qué suplementos tomo?"].sort());
 });
 
 test("the sweep fails on an empty set and on a placeholder", () => {

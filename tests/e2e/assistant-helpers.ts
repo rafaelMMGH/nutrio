@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import type { Button, ChatAnswer, Rich, Section } from "../../src/lib/assistant";
 import { addOnSpecs, DEFAULT_MEALS, PLAN_NAME, planFixture, slug, TIME_WINDOWS, type SeedLog, type SeedRecipe } from "../shared/assistant-fixture";
+import { BUTTON_TOPICS } from "../shared/assistant-buttons";
 import { sql } from "./database";
 import { expect, test as base, watch } from "./fixtures";
 import { installToolkit } from "./theme-audit";
@@ -320,7 +321,7 @@ const blockText = (blocks: SweepBlock[] = []) =>
  * REQ-5: re-sends the message of every question button in `answers` (top-level and per block) as the first message of a
  * new conversation, twice, and expects status 200 both times, a defined kind that is never clarify, did_you_mean or
  * no_match, a non-empty `blocks` array, the same blocks both times and no D3 placeholder ("Pronto podré responder
- * sobre …") in the answer or the block text. Fails when there is nothing to send or an input answer is itself a
+ * sobre …") in the answer or the block text, and for each button the topic and lead of the Button column map (tests/shared/assistant-buttons.ts), asserted on `resolved`. Fails when there is nothing to send or an input answer is itself a
  * placeholder, so it never passes vacuously. Returns the messages it swept.
  */
 export async function resendSweep(request: APIRequestContext, answers: readonly SweepAnswer[]) {
@@ -332,7 +333,9 @@ export async function resendSweep(request: APIRequestContext, answers: readonly 
   const messages = [...new Set(buttons.flatMap((button) => (button.type === "question" && button.message ? [button.message] : [])))];
   expect(messages.length, "resendSweep found no question buttons to check").toBeGreaterThan(0);
   for (const message of messages) {
-    const first = await ask(request, message);
+    const expected = BUTTON_TOPICS[message];
+    expect(expected, `"${message}" is not in the Button column map`).toBeDefined();
+    const first = await ask(request, message, { trace: true });
     const again = await ask(request, message);
     const body = first.body as unknown as SweepAnswer;
     expect(first.status, message).toBe(200);
@@ -340,6 +343,8 @@ export async function resendSweep(request: APIRequestContext, answers: readonly 
     expect(body.kind, message).toBeDefined();
     expect(["clarify", "did_you_mean", "no_match"], message).not.toContain(body.kind);
     expect(Array.isArray(body.blocks) && body.blocks.length > 0, `${message}: blocks`).toBe(true);
+    expect(first.body.resolved?.map((intent) => intent.topic), `${message}: one topic`).toEqual([expected.topic]);
+    if (expected.lead) expect(plain(body.blocks?.[0]?.lead ?? []), message).toMatch(expected.lead);
     expect(body.answer, message).not.toMatch(PLACEHOLDER);
     expect(blockText(body.blocks), message).not.toMatch(PLACEHOLDER);
     expect((again.body as unknown as SweepAnswer).blocks, message).toEqual(body.blocks);

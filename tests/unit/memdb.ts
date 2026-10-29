@@ -3,6 +3,7 @@ import type { ChatAnswer } from "@/lib/assistant";
 import { ragAnswer } from "@/lib/domain/chat";
 import type { AppDb, AppUser, IngredientUsage, Plan } from "@/lib/types";
 import { emptyDb } from "@/lib/storage/db";
+import { BUTTON_TOPICS } from "../shared/assistant-buttons";
 import { addOnSpecs, DEFAULT_MEALS, PLAN_NAME, planFixture, slug, TIME_WINDOWS, type SeedLog, type SeedRecipe } from "../shared/assistant-fixture";
 
 // An in-memory AppDb with the same ids and fields as the e2e SQL seed (tests/e2e/assistant-helpers.ts: createChatUser,
@@ -177,11 +178,12 @@ export function memDb({
   return { db, user };
 }
 
+const plainOf = (rich: { text: string }[]) => rich.map((span) => span.text).join("");
 const PLACEHOLDER = /Pronto podré responder sobre/;
 
 /**
  * REQ-5: re-asks the message of every question button in `answers` (top level and per block) as the first message of a
- * new conversation, twice, through `ragAnswer`, and expects the same blocks both times and a definite kind (never
+ * new conversation, twice, through `ragAnswer`, and expects the topic and lead of the Button column map (tests/shared/assistant-buttons.ts), the same blocks both times and a definite kind (never
  * clarify, did_you_mean or no_match). Fails on an empty set and on a D3 placeholder, so it never passes vacuously.
  * `skip` lists messages whose builder does not exist yet; each batch that adds one shrinks the list. Returns the swept messages.
  */
@@ -191,7 +193,11 @@ export function sweep(db: AppDb, user: AppUser, answers: ChatAnswer[], today: st
   const messages = [...new Set(buttons.flatMap((button) => (button.type === "question" && !skip.includes(button.message) ? [button.message] : [])))];
   assert.ok(messages.length > 0, "sweep found no question buttons to check");
   for (const message of messages) {
-    const first = ragAnswer(db, user, message, today);
+    const first = ragAnswer(db, user, message, today, { trace: true });
+    const expected = BUTTON_TOPICS[message];
+    assert.ok(expected, `"${message}" is not in the Button column map`);
+    assert.deepEqual(first.resolved?.map((intent) => intent.topic), [expected.topic], `"${message}" must resolve to exactly one topic`);
+    if (expected.lead) assert.match(plainOf(first.blocks[0].lead), expected.lead, message);
     assert.doesNotMatch(first.answer, PLACEHOLDER, `placeholder answer for "${message}"`);
     assert.ok(!["clarify", "did_you_mean", "no_match"].includes(first.kind), `"${message}" gave ${first.kind}`);
     assert.deepEqual(ragAnswer(db, user, message, today).blocks, first.blocks, message);
