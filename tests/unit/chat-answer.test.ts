@@ -209,3 +209,30 @@ test("REQ-24 topics are answered in question order, also when a phrase comes aft
   assert.deepEqual(reply.resolved?.map((intent) => intent.topic), ["water", "identity"]);
   assert.equal(reply.blocks[0].title, "Agua");
 });
+
+// Recipe-list filter words frozen from chat-polish v1.9 (spec Terms): a recipe named after one of them must not be
+// picked by it. "Pollo asado" always matches through "pollo"; "Sopa <word>" must stay out of the list.
+const STOP_WORDS = ["que", "hay", "en", "mi", "mis", "de", "del", "el", "la", "los", "las", "con", "para", "por", "tengo", "cual", "cuales", "como", "cuanto", "es", "un", "una"];
+const ALSO_DROPPED = ["hora", "horas", "horario", "horarios", "cuando", "desayuno", "desayunos", "comida", "comidas", "cena", "cenas", "colacion", "colaciones", "carrito", "carritos", "plan", "planes", "objetivo", "objetivos"];
+// One real word per prefix (compr, receta, ingrediente, prepar, suplement, recomend), and two forms of the first.
+const PREFIXED = ["comprar", "compras", "recetario", "ingredientes", "preparado", "suplementos", "recomendado"];
+
+function recipeBlock(word: string, question: string) {
+  const { db, user } = memDb({ fixture: false });
+  const template = { user_id: user.id, description: "", created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z", deleted_at: null };
+  db.recipes = ["Pollo asado", `Sopa ${word}`].map((name, index) => ({ ...template, id: `r${index}`, name, canonical_hash: `r${index}` }));
+  const block = ragAnswer(db, user, question, TODAY).blocks[0];
+  return { lead: plain(block.lead), items: block.sections.flatMap((section) => section.items.map(plain)) };
+}
+
+for (const word of [...STOP_WORDS, ...ALSO_DROPPED, ...PREFIXED, "ya"]) {
+  test(`REQ-1 the recipe list ignores the frozen filter word "${word}"`, () => {
+    assert.deepEqual(recipeBlock(word, `recetas pollo ${word}`), { lead: "Estas recetas coinciden con tu pregunta.", items: ["Pollo asado"] });
+  });
+}
+
+for (const word of ["peso", "sal"]) {
+  test(`REQ-1 the recipe list still narrows by the word "${word}"`, () => {
+    assert.deepEqual(recipeBlock(word, `recetas ${word}`), { lead: "Estas recetas coinciden con tu pregunta.", items: [`Sopa ${word}`] });
+  });
+}
