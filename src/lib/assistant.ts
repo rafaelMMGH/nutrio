@@ -7,7 +7,7 @@ export const MAX_MESSAGE = 500;
 export const COUNTER_FROM = 450;
 
 /** The starter questions of the empty state, the greeting and the no-match reply (spec Copy, REQ-4). */
-export const STARTERS = ["Mi cena de hoy", "Mi avance de la semana", "Mi peso", "Mi carrito"];
+export const STARTERS = ["Mi cena de hoy", "Mi avance de la semana", "Mi peso", "Mi carrito"] as const;
 
 /**
  * Normalized text (spec Terms): lowercase, accents removed (ñ compares as n), every non-letter, non-digit character
