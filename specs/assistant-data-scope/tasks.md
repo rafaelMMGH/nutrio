@@ -182,26 +182,30 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 
 **Batch 1c1: normalizer and word matcher**, about 380 lines with tests
 
-- [ ] T017 [US1] Unit tests REQ-2 (tests/unit/chat-match.test.ts)
+- [x] T017 [US1] Unit tests REQ-2 (tests/unit/chat-match.test.ts)
   - The full REQ-2 matcher table on `matchWord`, each ✓ and ✗ row (incl. "una planta" ≠ "plan"), plus multi-word phrase consumption and `normalizeText` per spec Terms (ñ→n, punctuation → space). Red first.
-- [ ] T018 [US1] `normalizeText` per spec Terms and `words` (src/lib/assistant.ts)
+- [x] T018 [US1] `normalizeText` per spec Terms and `words` (src/lib/assistant.ts)
   - 1b2b review (L4): make `STARTERS` (src/lib/assistant.ts:10) readonly/`as const` as a tiny separate commit; record "done in 1c1" if tsc allowed, else carry it.
-- [ ] T019 [US1] Matcher (src/lib/domain/chat-match.ts)
+- [x] T019 [US1] Matcher (src/lib/domain/chat-match.ts)
   - OSA distance and length allowance (≤4 exact, 5–7 one edit, ≥8 two); singular/plural (s, es, z→ces); `*` stems exact prefix only.
   - First-letter rule, never-fuzzy words, no fuzzy when the word exactly equals any entry.
   - Multi-word phrases with per-word allowance; the longest phrase consumes its words.
 
 **Review checkpoint 1c1:** tsc + unit (T017 green).
 
+**Batch note 1c1 (done; T017, T018, T019; +136/-10 vs ~380 estimated; reviewer PASS on all three, no HIGH; ~110 independent probe rows incl. the full REQ-2 table, none divergent):** commits 23b5660 (tests/unit/chat-match.test.ts +63, red), 07b3cab (src/lib/domain/chat-match.ts new ~60 lines + test tweaks, +65/-3), 3e441c1 (src/lib/assistant.ts + chat.ts, +10/-9), 488d61f (`STARTERS` readonly tuple `as const`, +1/-1; 1b2b L4 done). T-label swap: the commit messages carry the wrong T ids vs this file (07b3cab says T018 but is T019, the matcher; 3e441c1 and 488d61f say T019 but are T018, normalizer and STARTERS); history not rewritten (needs the user's say). `normalizeText` per spec Terms: NFD, strip `\p{M}`, every non-letter/non-digit run → one space, trim; chat.ts `planSummary` uses it and chat.ts no longer imports `nutrition.normalize`; nutrition.ts and food.ts untouched (persisted fingerprints safe). API: `matchWord(word, entries)` returns the matched entries; `matchPhrases(tokens, phrases)` returns `{ phrase, from, to }`, longest first, consumed words not reused. Plurals live in the matcher (entry, +s, +es, z→ces; allowance computed on the singular length); `*` stems exact prefix only, never fuzzy; never-fuzzy words exact-only as input and as entries; first letter must match; OSA distance (swap = 1 edit); 22 table rows run. Deviation accepted: the test file was edited inside code commit 07b3cab (row-order fix: the original lleva row asserted a non-match of an exact entry). Accepted: `ñ` compares as `n` (spec Terms), so año/ano and caña/cana collide. Decimals split under `normalizeText` ("1,5 L" → "1 5 l"): number and date parsing must not rely on `words` for decimals (noted in T039, T040, T043, T045). Step-splitter move to `normalizeText` deferred to T035 (recipe-steps.ts does not exist yet). Unproven until later batches: chat-match.ts has no caller until T070/T020; stems inside phrases in `matchPhrases` untested.
+
 **Batch 1c2: vocabulary through the answer path**, about 380 lines with tests (incl. the 1a2 sweep fix in T020)
 
 - [ ] T070 [US1] Tests REQ-1, REQ-2
   - Unit (tests/unit/chat-answer.test.ts): through `ragAnswer` on `memDb()`, the REQ-1 Givens whose topic list equals the matched topics in order of first appearance (`resolved` plus answer text for cart, recipes, meal times, plan); the REQ-2 table end to end (each ✓ row resolves to its topic, each ✗ row does not, incl. "una planta" not resolving to Plan); "¿Qué hago ahora?" and "¿Qué cosas tengo?" → `no_match` with the starters; the chat-polish REQ-19 winners table re-created in the new vocabulary. Red first.
+  - 1c1 review, FIRST step of 1c2, red unit test first (tests/unit/chat-match.test.ts, then src/lib/domain/chat-match.ts): (M) `matchPhrases` loses exact-beats-fuzzy between rival phrases: `matchPhrases(["me","llevo"], ["me lleva","me llevo"])` returns `me lleva`; it must return `me llevo`. (L2) missing rows: peso→pero ✗, peso→paso ✗, an 8-letter one-edit ✓ and a 3-edit ✗, a 9-letter 3-edit ✗, "panes"→"pan" ✓. (L3) a rival-phrase ✗ case, "hola hola" returns two matches, and the tie order of equal-length phrases.
   - e2e, written (tests/e2e/assistant-match.spec.ts): through `ask()`, one REQ-1 Given with answer text, one ✓ typo row and one ✗ row of REQ-2.
 - [ ] T020 [US1] Vocabulary (src/lib/domain/chat-topics.ts, src/lib/domain/chat.ts)
   - Every Topics trigger, the frozen recipe-list filter words, the Button/Title/Follow-ups table, the starters.
   - Interim until T023: the intent list is the matched topics in order of first appearance, capped at 2 plus overflow, no REQ-6 rules.
-  - chat.ts drops its `nutrition.normalize` import (plan D6).
+  - chat.ts drops its `nutrition.normalize` import (plan D6; done in 1c1, 3e441c1).
+  - 1c1 review (L5): the matcher does not normalize entries and NEVER_FUZZY is accent-free, so vocabulary entries are listed in the singular and normalized (accent-free) when the vocabulary is built; a unit test asserts every entry equals `normalizeText(entry)`. Known: the `es` form is generated for every entry (contrived inputs like "carritoex" match "carrito"), accepted.
   - 1a2 review (MEDIUM M2, LOW L7), tests first in a separate commit before the code (tests/unit/memdb.ts, tests/unit/chat-answer.test.ts, tests/e2e/assistant-helpers.ts, tests/unit/smoke.test.ts): `sweep` and `resendSweep` today compare two calls of a stateless function, so "same blocks" always passes. Add an expected-topic map built from the Topics "Button" column (message → topic) and, per swept button, assert exactly one `resolved` intent with that topic plus a text or `kind` assertion (lead text, or kind ≠ `no_match`); `resolved` is never the only evidence. Drop "Mi cena de hoy" from the "with a builder" sweep test (chat-answer.test.ts ~102-106) and add it to `skip` until T021. smoke.test.ts also asks "¿Qué hay en mi carrito?" on `emptyDb()` so the chat → cart chain stays exercised.
 
 **Review checkpoint 1c2:** tsc + unit.
@@ -280,6 +284,7 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
   - Split: part 1 (just before T035) = the recipe-steps.test.ts rows and the recipe-page e2e; part 2 (just before T036, Batch 2c2) = the chat-meals.test.ts rows and the remaining e2e.
   - e2e, written (tests/e2e/assistant-meals.spec.ts): the recipe page shows the empty-steps state for the three import notes and keeps the accented split (display unchanged by T035); "Ver receta completa" opens `/recipes/<id>`; one detail answer through `ask()`.
 - [ ] T035 [US2] Shared `recipeSteps(description)` using `normalizeText`, used by the recipe page (no display change) (src/lib/recipe-steps.ts, src/components/recipes/RecipeDetail.tsx)
+  - 1c1: the step-splitter move to `normalizeText` was deferred here from T018.
 **Review checkpoint 2c1:** tsc + unit.
 
 **Batch 2c2: dish detail**, about 340 lines with tests
@@ -316,10 +321,11 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 **Batch 3b1: date parser**, about 420 lines with tests (3a may run beside it)
 
 - [ ] T039 [US3] Tests REQ-13, REQ-14 periods
-  - Unit (tests/unit/chat-dates.test.ts): every REQ-14 phrase → its period bounds with today passed in (cue and period-noun rules); no fallback for "Mi avance de la semana", "¿Cuántos días hice ejercicio?", "a la semana", "en la semana"; "en el mes" = this month. 1a2 review (LOW L4): a pre-2022 summer case, `serverToday(new Date("2022-07-01T05:30:00Z"))` = "2022-07-01" (CDT, UTC−5). Red first.
+  - Unit (tests/unit/chat-dates.test.ts): every REQ-14 phrase → its period bounds with today passed in (cue and period-noun rules); no fallback for "Mi avance de la semana", "¿Cuántos días hice ejercicio?", "a la semana", "en la semana"; "en el mes" = this month. 1a2 review (LOW L4): a pre-2022 summer case, `serverToday(new Date("2022-07-01T05:30:00Z"))` = "2022-07-01" (CDT, UTC−5). 1c1 review: a row with a decimal or comma number in the phrase. Red first.
   - e2e, written (tests/e2e/assistant-progress.spec.ts): the `x-e2e-today` pin moves the period bounds in `resolved`; a pin header without the trace header changes no field shape.
 - [ ] T040 [US3] Date parser: cue and period-noun rules, the phrase table → `Period` (src/lib/domain/chat-dates.ts)
   - 1a2 review (LOW L4): `serverToday` calls `formatToParts` once per call (today once per part, chat-dates.ts:7).
+  - 1c1 review: `normalizeText` splits decimals ("1,5 L" → "1 5 l"); parse numbers from the raw message, not from `words`.
 - [ ] T041 [US3] The route passes the pinned today from `testHooks()` (else `serverToday`); the resolver attaches the period to metric intents (src/app/api/rag/chat/route.ts, src/lib/domain/chat-intent.ts)
 
 **Review checkpoint 3b1:** tsc + unit.
@@ -339,6 +345,7 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
   - e2e, written: extend T066 (tests/e2e/assistant-parity.spec.ts) with the same pin header, chat water week liters and exercise days equal the tiles; through `ask()` with `today` pinned, "¿Cuánta agua tomé hoy?" changes with the pin and one exercise answer (tests/e2e/assistant-progress.spec.ts).
   - Split: part 1 (3c1) = the water rows, REQ-13 future-day log, the label/clamp/fallback rows through water, the water e2e; part 2 (3c2) = the exercise rows, the remaining label rows, the exercise e2e.
 - [ ] T043 [US3] Water and exercise builders on `progress.ts`, `endDay` = today, incl. the 0-with-label empty range (src/lib/domain/chat-metrics.ts). Part 1 (3c1) water, part 2 (3c2) exercise.
+  - 1c1 review: any liters/number read from the message comes from the raw text, not `words` (decimals split under `normalizeText`).
 
 **Review checkpoint 3c1:** tsc + unit.
 
@@ -354,6 +361,7 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
   - Split: part 1 (3d1) = REQ-19, REQ-27 weight rows, weight labels/fallback, the weight e2e and parity; part 2 (3d2) = REQ-20, the meals labels and empty range, the meals parity.
 - [ ] T045 [US3] Weight and meals-done builders, incl. the no-weight-logs reply and empty ranges; the no-active-plan reply for meals done is left to T052 (src/lib/domain/chat-metrics.ts). Part 1 (3d1) weight, which also removes "Mi peso" from the sweep `skip` list; part 2 (3d2) meals done.
   - 3a1 review: the REQ-19 week line needs `weightStats` `latestDate >= monday` and `beforeWeek !== null` (`change` alone is not enough).
+  - 1c1 review: any weight number read from the message (e.g. "66,5") comes from the raw text, not `words` (decimals split under `normalizeText`).
 
 **Review checkpoint 3d1:** tsc + unit.
 
