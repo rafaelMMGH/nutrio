@@ -113,3 +113,77 @@ test("the sweep fails on an empty set and on a placeholder", () => {
   const placeholder: ChatAnswer = { ...bare, answer: "Pronto podré responder sobre Peso.", blocks: [{ title: null, lead: [{ text: "Pronto podré responder sobre Peso." }], sections: [], buttons: [] }] };
   assert.throws(() => sweep(db, user, [placeholder], TODAY), /placeholder answer/);
 });
+
+const topicsOf = (db: ReturnType<typeof memDb>["db"], user: ReturnType<typeof memDb>["user"], message: string) =>
+  ragAnswer(db, user, message, TODAY, { trace: true }).resolved?.map((intent) => intent.topic);
+
+// REQ-1 Givens and the synonym groups of the Topics table. Until the resolver (T023) the topic list is the matched
+// topics in order of first appearance, so only questions with one topic are listed; combinations belong to T021.
+const GIVENS: [string, string, RegExp?][] = [
+  ["¿CUÁNTO PESÉ?", "weight"],
+  ["báscula", "weight"],
+  ["bascula", "weight"],
+  ["¿Cuánto entrené?", "exercise"],
+  ["gym", "exercise"],
+  ["¿Ya tomé agua?", "water"],
+  ["kilos", "weight"],
+  ["gimnasio", "exercise"],
+  ["hidratación", "water"],
+  ["vasos", "water"],
+  ["¿Cuál es mi meta?", "goals"],
+  ["mi avance", "weekly"],
+  ["resumen", "weekly"],
+  ["¿Cuántas comidas llevo?", "mealsDone"],
+  ["¿Cómo me llamo?", "identity"],
+  ["¿Cómo se llama mi plan?", "identity"],
+  ["¿Qué hay en el carrito, por favor?", "cart", /carrito/],
+  ["¿Dónde compro?", "cart", /carrito/],
+  ["¿Cómo preparo el pollo?", "recipes", /Estas recetas coinciden/],
+  ["¿Qué ingrediente me falta?", "recipes", /Estas son tus recetas/],
+  ["¿CUÁL ES MI HORARIO?", "mealTimes", /horarios/],
+  ["¿Qué horarios tengo?", "mealTimes", /horarios/],
+  ["¿Cuándo?", "mealTimes", /horarios/],
+  ["Dame las recomendaciones", "plan", /Tu objetivo/],
+  ["¿Qué suplementos tomo?", "plan", /Tu objetivo/],
+  ["Mis planes", "plan", /Tu objetivo/],
+  ["desayuno", "slotOptions"],
+  ["mi colacion", "slotOptions"],
+  ["¿Qué colaciones tengo?", "slotOptions"]
+];
+
+for (const [message, topic, lead] of GIVENS) {
+  test(`REQ-1 "${message}" resolves to ${topic}`, () => {
+    const { db, user } = memDb({ cart: 2 });
+    assert.deepEqual(topicsOf(db, user, message), [topic]);
+    if (lead) assert.match(ragAnswer(db, user, message, TODAY).answer, lead);
+  });
+}
+
+test("REQ-1 two topics are answered in order of first appearance, titled", () => {
+  const { db, user } = memDb({ cart: 2 });
+  const reply = ragAnswer(db, user, "carrito y horario", TODAY, { trace: true });
+  assert.deepEqual(reply.resolved?.map((intent) => intent.topic), ["cart", "mealTimes"]);
+  assert.deepEqual(reply.blocks.map((block) => block.title), ["Carrito", "Horarios"]);
+  assert.deepEqual(messagesOf(ragAnswer(db, user, "carrito, horario y plan", TODAY).buttons).slice(-1), ["¿Cuál es mi plan?"]);
+});
+
+// REQ-2 table through the answer path: a typo resolves to its topic, a ✗ row to nothing.
+const TYPOS: [string, string][] = [["carito", "cart"], ["carrtio", "cart"], ["recta", "recipes"], ["desayno", "slotOptions"], ["ejersisio", "exercise"], ["horarios", "mealTimes"]];
+const NOT_TOPICS = ["ahora", "ahorita", "pero", "carritito", "garrito", "vasto", "pasar", "lleva", "objeto", "cuanto", "una planta", "¿Qué cosas tengo?", "¿Qué hago ahora?"];
+
+for (const [message, topic] of TYPOS) {
+  test(`REQ-2 "${message}" is a typo of ${topic}`, () => {
+    const { db, user } = memDb();
+    assert.deepEqual(topicsOf(db, user, message), [topic]);
+  });
+}
+
+for (const message of NOT_TOPICS) {
+  test(`REQ-2 "${message}" matches no topic: the no-match reply with the starters`, () => {
+    const { db, user } = memDb();
+    const reply = ragAnswer(db, user, message, TODAY, { trace: true });
+    assert.deepEqual(reply.resolved, []);
+    assert.equal(reply.kind, "no_match");
+    assert.deepEqual(messagesOf(reply.buttons), STARTERS);
+  });
+}
