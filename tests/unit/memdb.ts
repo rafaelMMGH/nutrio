@@ -1,3 +1,6 @@
+import assert from "node:assert/strict";
+import type { ChatAnswer } from "@/lib/assistant";
+import { ragAnswer } from "@/lib/domain/chat";
 import type { AppDb, AppUser, IngredientUsage, Plan } from "@/lib/types";
 import { emptyDb } from "@/lib/storage/db";
 import { addOnSpecs, DEFAULT_MEALS, PLAN_NAME, planFixture, slug, TIME_WINDOWS, type SeedLog, type SeedRecipe } from "../shared/assistant-fixture";
@@ -172,4 +175,26 @@ export function memDb({
     db.dailyLogs.push({ id: `${USER_ID}-log-${date}`, user_id: USER_ID, date, meals_done, water_glasses, weight_kg, exercised, created_at: STAMP, updated_at: STAMP });
   }
   return { db, user };
+}
+
+const PLACEHOLDER = /Pronto podré responder sobre/;
+
+/**
+ * REQ-5: re-asks the message of every question button in `answers` (top level and per block) as the first message of a
+ * new conversation, twice, through `ragAnswer`, and expects the same blocks both times and a definite kind (never
+ * clarify, did_you_mean or no_match). Fails on an empty set and on a D3 placeholder, so it never passes vacuously.
+ * `skip` lists messages whose builder does not exist yet; each batch that adds one shrinks the list. Returns the swept messages.
+ */
+export function sweep(db: AppDb, user: AppUser, answers: ChatAnswer[], today: string, { skip = [] }: { skip?: string[] } = {}): string[] {
+  for (const answer of answers) assert.doesNotMatch(answer.answer, PLACEHOLDER, "placeholder answer in the sweep input");
+  const buttons = answers.flatMap((answer) => [...answer.buttons, ...answer.blocks.flatMap((block) => block.buttons)]);
+  const messages = [...new Set(buttons.flatMap((button) => (button.type === "question" && !skip.includes(button.message) ? [button.message] : [])))];
+  assert.ok(messages.length > 0, "sweep found no question buttons to check");
+  for (const message of messages) {
+    const first = ragAnswer(db, user, message, today);
+    assert.doesNotMatch(first.answer, PLACEHOLDER, `placeholder answer for "${message}"`);
+    assert.ok(!["clarify", "did_you_mean", "no_match"].includes(first.kind), `"${message}" gave ${first.kind}`);
+    assert.deepEqual(ragAnswer(db, user, message, today).blocks, first.blocks, message);
+  }
+  return messages;
 }

@@ -307,17 +307,27 @@ export function serverLog() {
 }
 
 type SweepButton = { type: string; message?: string };
-type SweepAnswer = { answer: string; kind: string; blocks?: { buttons?: SweepButton[] }[]; buttons?: SweepButton[] };
+type SweepBlock = { title?: string | null; lead?: Rich; sections?: Section[]; buttons?: SweepButton[] };
+type SweepAnswer = { answer: string; kind: string; blocks?: SweepBlock[]; buttons?: SweepButton[] };
+
+const PLACEHOLDER = /Pronto podré responder sobre/;
+
+/** Every visible string of the blocks (titles, leads, section titles and items), for the placeholder check. */
+const blockText = (blocks: SweepBlock[] = []) =>
+  blocks.flatMap((block) => [block.title ?? "", plain(block.lead ?? []), ...(block.sections ?? []).flatMap((section) => [section.title, ...section.items.map(plain)])]).join("\n");
 
 /**
  * REQ-5: re-sends the message of every question button in `answers` (top-level and per block) as the first message of a
- * new conversation, twice, and expects status 200, the same blocks both times, a definite kind (never clarify,
- * did_you_mean or no_match) and no D3 placeholder ("Pronto podré responder sobre …"). Fails when there is nothing to
- * send or an input answer is itself a placeholder, so it never passes vacuously. Returns the messages it swept.
+ * new conversation, twice, and expects status 200 both times, a defined kind that is never clarify, did_you_mean or
+ * no_match, a non-empty `blocks` array, the same blocks both times and no D3 placeholder ("Pronto podré responder
+ * sobre …") in the answer or the block text. Fails when there is nothing to send or an input answer is itself a
+ * placeholder, so it never passes vacuously. Returns the messages it swept.
  */
 export async function resendSweep(request: APIRequestContext, answers: readonly SweepAnswer[]) {
-  const placeholder = /Pronto podré responder sobre/;
-  for (const answer of answers) expect(answer.answer, "placeholder answer in the sweep input").not.toMatch(placeholder);
+  for (const answer of answers) {
+    expect(answer.answer, "placeholder answer in the sweep input").not.toMatch(PLACEHOLDER);
+    expect(blockText(answer.blocks), "placeholder block in the sweep input").not.toMatch(PLACEHOLDER);
+  }
   const buttons = answers.flatMap((answer) => [...(answer.buttons ?? []), ...(answer.blocks ?? []).flatMap((block) => block.buttons ?? [])]);
   const messages = [...new Set(buttons.flatMap((button) => (button.type === "question" && button.message ? [button.message] : [])))];
   expect(messages.length, "resendSweep found no question buttons to check").toBeGreaterThan(0);
@@ -326,8 +336,12 @@ export async function resendSweep(request: APIRequestContext, answers: readonly 
     const again = await ask(request, message);
     const body = first.body as unknown as SweepAnswer;
     expect(first.status, message).toBe(200);
-    expect(body.answer, message).not.toMatch(placeholder);
+    expect(again.status, message).toBe(200);
+    expect(body.kind, message).toBeDefined();
     expect(["clarify", "did_you_mean", "no_match"], message).not.toContain(body.kind);
+    expect(Array.isArray(body.blocks) && body.blocks.length > 0, `${message}: blocks`).toBe(true);
+    expect(body.answer, message).not.toMatch(PLACEHOLDER);
+    expect(blockText(body.blocks), message).not.toMatch(PLACEHOLDER);
     expect((again.body as unknown as SweepAnswer).blocks, message).toEqual(body.blocks);
   }
   return messages;
