@@ -402,7 +402,7 @@ const plain = (rich: Rich) => rich.map((span) => span.text).join("");
 export function buildAnswer(parts: { kind?: ChatAnswer["kind"]; lead: Rich; body?: string | null; sections?: Section[]; sources?: string[]; follow_ups?: ChatAnswer["follow_ups"]; context_used?: string }): ChatAnswer {
   const { kind = "answer", lead, body = null, sections = [], sources = [], follow_ups = [], context_used = "Todo el sistema" } = parts;
   const lines = [plain(lead), ...(body ? [body] : []), ...sections.flatMap((section) => [section.title, ...section.items.map(plain)])];
-  return { answer: lines.join("\n"), context_used, sources, kind, lead, body, sections, follow_ups };
+  return { answer: lines.join("\n"), context_used, sources, kind, blocks: [], buttons: [], lead, body, sections, follow_ups };
 }
 
 export const UNKNOWN_LEAD = "No encontré eso en tu información.";

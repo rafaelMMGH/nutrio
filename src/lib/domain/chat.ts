@@ -15,7 +15,7 @@ const plain = (rich: Rich) => rich.map((span) => span.text).join("");
 /** The response with its plain-text `answer`: the lead, then the body or each section's title line and one line per item (contract). */
 function reply(scope: string, { kind, lead, body, sections = [], sources = [], follow_ups = [] }: Reply): ChatAnswer {
   const lines = [plain(lead), ...(body ? [body] : []), ...sections.flatMap((section) => [section.title, ...section.items.map(plain)])];
-  return { answer: lines.join("\n"), context_used: scope === "auto" ? "Todo el sistema" : scope, sources, kind, lead, body: body ?? null, sections, follow_ups };
+  return { answer: lines.join("\n"), context_used: scope === "auto" ? "Todo el sistema" : scope, sources, kind, blocks: [], buttons: [], lead, body: body ?? null, sections, follow_ups };
 }
 
 const textLead = (text: string): Rich => [{ text }];

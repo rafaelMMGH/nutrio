@@ -45,6 +45,9 @@ export function chipsFor(answer: ChatAnswer, request: AssistantRequest, suggesti
       return [{ label: "Preguntar en Todo", request: { message: request.message, scope: "auto" } }, ...fresh(suggestions, 2)];
     case "missing_recipe":
       return fresh(dashboardSuggestions(), 3);
+    default:
+      // The kinds of the scope-free server (T010); the client is rewritten in T012-T015.
+      return fresh(suggestions, 3);
   }
 }
 

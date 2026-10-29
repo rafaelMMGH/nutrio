@@ -49,15 +49,34 @@ export function messageLength(value: string): number {
 // Response of POST /api/rag/chat (contracts/chat-api.md). `answer`, `context_used` and `sources` are the original fields.
 export type Span = { text: string; highlight?: true };
 export type Rich = Span[];
-export type ReplyKind = "answer" | "overview" | "unknown" | "out_of_scope" | "missing_recipe";
+/** Kinds of the scope-based server. Nothing emits them any more; they stay in the type only so the old client compiles, until T016. */
+type LegacyReplyKind = "overview" | "unknown" | "out_of_scope" | "missing_recipe";
+export type ReplyKind = "answer" | "options" | "detail" | "clarify" | "did_you_mean" | "greeting" | "no_match" | "empty" | LegacyReplyKind;
 export type FollowUp = { text: string; scope: ScopeKey };
 export type Section = { title: string; items: Rich[] };
+
+/** A button the server sends (the client derives none): a question that is sent as a user turn, or an in-app link ("/", "/plans", "/recipes/<id>"). */
+export type Button =
+  | { type: "question"; label: string; message: string; layout?: "option" }
+  | { type: "link"; label: string; href: string };
+
+/** One titled part of an answer: options, paging and navigation buttons belong to the block. */
+export type Block = { title: string | null; lead: Rich; sections: Section[]; buttons: Button[] };
+
+/** What the resolver found in a question; only the test trace (`resolved`) exposes it. Fields are filled as the resolver learns them. */
+export type Intent = { topic: string; slot?: string; recipeIds?: string[]; option?: number; page?: number; period?: string };
 
 export type ChatAnswer = {
   answer: string;
   context_used: string;
   sources: string[];
   kind: ReplyKind;
+  blocks: Block[];
+  /** Follow-ups then overflow, or the starters or clarify choices. */
+  buttons: Button[];
+  /** Only with the `x-e2e-trace: 1` test hook (plan D2); never in production. */
+  resolved?: Intent[];
+  // Scope-era fields, kept only so the old client compiles; removed in T016.
   lead: Rich;
   body: string | null;
   sections: Section[];
