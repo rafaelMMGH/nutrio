@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import type { ChatAnswer, Rich, ScopeKey, Section } from "../../src/lib/assistant";
 import { addOnSpecs, DEFAULT_MEALS, PLAN_NAME, planFixture, slug, TIME_WINDOWS, type SeedLog, type SeedRecipe } from "../shared/assistant-fixture";
@@ -294,7 +295,7 @@ export async function pinToday(context: BrowserContext, date: string) {
 }
 
 // From this file, not the cwd, so the log is found wherever Playwright is started.
-const SERVER_LOG = path.join(__dirname, ".server.log");
+const SERVER_LOG = path.join(path.dirname(fileURLToPath(import.meta.url)), ".server.log");
 
 /** Marks the end of the e2e server's log now: `since()` returns the text appended after that point (a missing file counts as empty). */
 export function serverLog() {
