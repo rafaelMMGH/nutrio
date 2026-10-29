@@ -129,6 +129,8 @@ test("REQ-4 the subtitle is a label only: the same question gives the same visib
   const groceries = await visible("/groceries");
   expect(recipe.subtitle).not.toBe(groceries.subtitle);
   expect(recipe.text).toBe(groceries.text);
+  // A non-empty list, so the equality below cannot pass on [] == [].
+  expect(recipe.buttons.length).toBeGreaterThan(0);
   expect(recipe.buttons).toEqual(groceries.buttons);
 });
 
