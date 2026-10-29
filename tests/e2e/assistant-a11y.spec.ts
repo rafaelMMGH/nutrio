@@ -1,8 +1,8 @@
 import type { Locator, Page } from "@playwright/test";
 import { expectIssues } from "./fixtures";
-import { auditNow, installToolkit, visit } from "./theme-audit";
+import { auditNow, visit } from "./theme-audit";
 import { canvasColor, contrast, effectiveBackground, toRgb, type Rgba, type Theme } from "./theme-helpers";
-import { assistantUi, buildAnswer, cartAnswer, createChatUser, deleteChatUser, expect, focusWalk, mockChat, openAssistant, test } from "./assistant-helpers";
+import { assistantUi, cartAnswer, createChatUser, deleteChatUser, expect, focusWalk, mockChat, openAssistant, test } from "./assistant-helpers";
 
 // The assistant as a phone sheet. Spec assistant-chat-polish, US5: REQ-15 (geometry, touch targets, safe areas, the
 // on-screen keyboard, long tokens), REQ-14 at 360 px (backdrop, focus rings), REQ-17 (turn names, live region) and REQ-22
@@ -14,7 +14,8 @@ test.afterAll(() => deleteChatUser());
 const QUESTION = "¿Qué tengo en mi carrito?";
 const FAILED_500 = [/POST \/api\/rag\/chat → 500/, /Failed to load resource.*500/];
 const PHONE = { width: 360, height: 740 };
-const ERROR_TEXT = "No pude responder en este momento.";
+// HTTP 500 has its own copy (chat-polish REQ-23).
+const SERVER_ERROR_TEXT = "Algo salió mal al responder. Intenta de nuevo.";
 
 /** The browser reports no SpeechRecognition on this build: stub it so the mic (a target to measure) is rendered. */
 async function withMic(page: Page) {
@@ -132,18 +133,7 @@ test.describe("REQ-15: the sheet at 360 px", () => {
     expect((await boxOf(ui.input)).height).toBeGreaterThanOrEqual(44);
   });
 
-  test("the scope button and every menu option are 44 px targets that do not overlap", async ({ chat }) => {
-    await chat.goto("/");
-    const ui = await openSheet(chat);
-    const button = ui.panel.getByRole("button", { name: "Alcance: Todo" });
-    await expectTargets({ "×": ui.close, "Alcance": button });
-    await button.click();
-    const options = ui.panel.getByRole("listbox", { name: "Alcance" }).getByRole("option");
-    await expect(options).toHaveCount(4);
-    await expectTargets({ "×": ui.close, "Alcance": button, option: options });
-  });
-
-  test("with a thread: Nueva conversación and Ir al último mensaje too, and the header takes two rows", async ({ chat }) => {
+  test("with a thread: Nueva conversación and Ir al último mensaje too, and the header is one row", async ({ chat }) => {
     await withMic(chat);
     await mockChat(chat, cartAnswer(8));
     await chat.goto("/");
@@ -169,13 +159,14 @@ test.describe("REQ-15: the sheet at 360 px", () => {
     await expect(visibleChips.first()).toBeVisible();
     await expectTargets({ "×": ui.close, "Nueva conversación": chat.getByRole("button", { name: "Nueva conversación" }), chips: visibleChips, send: ui.send });
 
-    // Row 1: title and ×. Row 2: the scope line and Nueva conversación (the scope button sits on it too).
+    // Row 1 holds the title, Nueva conversación and ×; there is no second row (assistant-data-scope REQ-4).
     const title = await boxOf(ui.panel.getByRole("heading", { name: "Asistente" }));
     const close = await boxOf(ui.close);
     const fresh = await boxOf(chat.getByRole("button", { name: "Nueva conversación" }));
-    expect(Math.abs(title.y + title.height / 2 - (close.y + close.height / 2))).toBeLessThan(title.height);
-    expect(fresh.y).toBeGreaterThanOrEqual(close.y + close.height - 1);
-    expect(fresh.x + fresh.width).toBeLessThanOrEqual(PHONE.width - 8);
+    const middle = (box: Box) => box.y + box.height / 2;
+    expect(Math.abs(middle(title) - middle(close))).toBeLessThan(title.height);
+    expect(Math.abs(middle(fresh) - middle(close))).toBeLessThan(fresh.height / 2);
+    expect(fresh.x + fresh.width).toBeLessThanOrEqual(close.x + 0.5);
   });
 
   test.describe("an error", () => {
@@ -366,8 +357,7 @@ test.describe("REQ-17: turns and the live region", () => {
     for (const item of ["Ingrediente 01 · 1 g", "Ingrediente 02 · 2 g", "Ingrediente 03 · 3 g"]) await expect(ui.live).toContainText(item);
     const region = (await ui.live.textContent()) ?? "";
     expect(region).not.toContain(QUESTION);
-    expect(region).not.toContain((await ui.labels.first().textContent()) ?? "unreachable");
-    for (const [name, locator] of Object.entries({ "user turn": ui.userTurns, label: ui.labels, chips: ui.chips.first() })) {
+    for (const [name, locator] of Object.entries({ "user turn": ui.userTurns, chips: ui.chips.first() })) {
       expect(await inLiveRegion(locator.first()), `${name} is outside the region`).toBe(false);
     }
     expect(region).not.toContain((await ui.chips.first().textContent()) ?? "unreachable");
@@ -382,7 +372,7 @@ test.describe("REQ-17: turns and the live region", () => {
       const ui = await openSheet(chat);
       await ask(chat, QUESTION);
       await expect(ui.assistantTurns).toHaveCount(1);
-      await expect(ui.live).toHaveText(ERROR_TEXT);
+      await expect(ui.live).toHaveText(SERVER_ERROR_TEXT);
       const retry = ui.panel.getByRole("button", { name: "Reintentar" });
       expect(await inLiveRegion(retry)).toBe(false);
       const turn = ui.assistantTurns.first();
@@ -455,21 +445,6 @@ test.describe("REQ-22: desktop is non-modal", () => {
     await expect(ui.input).toBeFocused();
     mock.release();
     await expect(ui.assistantTurns).toHaveCount(1);
-    await expect(ui.input).toBeFocused();
-  });
-
-  test("Preguntar en Todo leaves focus in the input", async ({ chat }) => {
-    await mockChat(chat, buildAnswer({ kind: "out_of_scope", lead: [{ text: "Eso no está en este alcance." }] }));
-    await chat.goto("/");
-    const ui = await openSheet(chat);
-    await ask(chat, QUESTION);
-    await expect(ui.assistantTurns).toHaveCount(1);
-    const second = await mockChat(chat, cartAnswer(3), { hold: true });
-    await chat.getByRole("button", { name: "Preguntar en Todo" }).click();
-    await expect(ui.pending).toHaveCount(1);
-    await expect(ui.input).toBeFocused();
-    second.release();
-    await expect(ui.assistantTurns).toHaveCount(2);
     await expect(ui.input).toBeFocused();
   });
 
@@ -578,20 +553,20 @@ test.describe("REQ-22: the sheet at 360 px is modal", () => {
       await chat.keyboard.press("Shift+Tab");
       expect(await inside(), `Shift+Tab ${press + 1}`).toBe(true);
     }
-    // The ends: Enviar is the last control, the first one is the scope button (the desktop group is hidden at this width).
-    expect([...seen]).toEqual(expect.arrayContaining(["Cerrar asistente", "Enviar", "Nueva conversación", "Pregunta", "Alcance: Todo"]));
-    const scope = ui.panel.getByRole("button", { name: "Alcance: Todo" });
+    // The ends: Enviar is the last control, the first one is Nueva conversación (first in the header, once the thread has a turn).
+    expect([...seen]).toEqual(expect.arrayContaining(["Cerrar asistente", "Enviar", "Nueva conversación", "Pregunta"]));
+    const fresh = ui.panel.getByRole("button", { name: "Nueva conversación" });
     await ui.send.focus();
     await chat.keyboard.press("Tab");
-    await expect(scope).toBeFocused();
+    await expect(fresh).toBeFocused();
     await chat.keyboard.press("Shift+Tab");
     await expect(ui.send).toBeFocused();
-    await scope.focus();
+    await fresh.focus();
     await chat.keyboard.press("Shift+Tab");
     await expect(ui.send).toBeFocused();
   });
 
-  test("with an empty thread the walk still stays in the sheet, skips the hidden desktop group and wraps at the scope button", async ({ chat }) => {
+  test("with an empty thread the walk still stays in the sheet and wraps at the close button", async ({ chat }) => {
     await chat.goto("/");
     const ui = await openSheet(chat);
     const inside = () => chat.evaluate(() => Boolean(document.activeElement?.closest("#assistant-chat-panel")));
@@ -601,17 +576,15 @@ test.describe("REQ-22: the sheet at 360 px is modal", () => {
       expect(await inside(), `Tab ${press + 1}`).toBe(true);
       visited.push(await chat.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? document.activeElement?.textContent?.trim() ?? ""));
     }
-    // Every stop is on screen: the display:none group's buttons are never visited, and the walk wraps around the real ones.
-    expect(visited).toEqual(expect.arrayContaining(["Alcance: Todo", "Cerrar asistente", "Pregunta"]));
-    for (const option of ["Todo", "Plan activo", "Recetario", "Carrito"]) expect(visited).not.toContain(option);
-    // The wrap itself: Shift+Tab on the scope button, the first stop, lands on the last one.
-    const scope = ui.panel.getByRole("button", { name: "Alcance: Todo" });
-    await scope.focus();
+    // The close button is the first stop with no turn yet; the 4 starters sit between it and the input.
+    expect(visited).toEqual(expect.arrayContaining(["Cerrar asistente", "Mi cena de hoy", "Mi avance de la semana", "Mi peso", "Mi carrito", "Pregunta"]));
+    // The wrap itself: Shift+Tab on the close button, the first stop, lands on the last one.
+    await ui.close.focus();
     await chat.keyboard.press("Shift+Tab");
     await expect(ui.panel.locator(":focus")).toHaveCount(1);
     const last = await chat.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? document.activeElement?.textContent?.trim() ?? "");
-    // The walk went round more than once, so a later visit of the scope button is preceded by the last stop.
-    const again = visited.lastIndexOf("Alcance: Todo");
+    // The walk went round more than once, so a later visit of the close button is preceded by the last stop.
+    const again = visited.lastIndexOf("Cerrar asistente");
     expect(again, `visited ${visited.join(" | ")}`).toBeGreaterThan(0);
     expect(last).toBe(visited[again - 1]);
     for (let press = 0; press < 12; press++) {
@@ -665,14 +638,14 @@ test.describe("REQ-22: the sheet at 360 px is modal", () => {
     await expect(ui.assistantTurns.last()).toHaveAttribute("tabindex", "-1");
   });
 
-  test("a chip under an answer and Preguntar en Todo do the same", async ({ chat }) => {
-    await mockChat(chat, buildAnswer({ kind: "out_of_scope", lead: [{ text: "Eso no está en este alcance." }] }));
+  test("a chip under an answer focuses the log while pending and the new turn after, answer after answer", async ({ chat }) => {
+    await mockChat(chat, cartAnswer(3));
     await chat.goto("/");
     const ui = await openSheet(chat);
     await ask(chat, QUESTION);
     await expect(ui.assistantTurns).toHaveCount(1);
     const second = await mockChat(chat, cartAnswer(3), { hold: true });
-    await chat.getByRole("button", { name: "Preguntar en Todo" }).click();
+    await ui.chips.filter({ visible: true }).first().click();
     await expect(ui.pending).toHaveCount(1);
     await expect(ui.log).toBeFocused();
     second.release();
@@ -712,7 +685,7 @@ test.describe("REQ-22: the sheet at 360 px is modal", () => {
       await expect(ui.log).toBeFocused();
       mock.release();
       await expect(ui.assistantTurns).toHaveCount(1);
-      await expect(ui.live).toHaveText(ERROR_TEXT);
+      await expect(ui.live).toHaveText(SERVER_ERROR_TEXT);
       await expect(ui.assistantTurns.first()).toBeFocused();
       await expect(ui.assistantTurns.first()).toHaveAttribute("tabindex", "-1");
       await chat.keyboard.press("Tab");
@@ -762,41 +735,6 @@ for (const theme of ["light", "dark"] as Theme[]) {
       result = await auditNow(chat, { scope: ".assistant-chat", tab: false, hover: true });
       expect(result.violations, "answers").toEqual([]);
       expect(await focusWalk(chat, theme)).toEqual([]);
-    });
-
-    test("the open compact menu passes contrast and its options and button show a focus ring", async ({ chat }) => {
-      test.setTimeout(120_000);
-      await visit(chat, "/", theme);
-      const ui = await openSheet(chat);
-      const button = ui.panel.getByRole("button", { name: "Alcance: Todo" });
-      await button.click();
-      const list = ui.panel.getByRole("listbox", { name: "Alcance" });
-      await expect(list).toBeVisible();
-      // The menu is inside .assistant-chat, so this audits its text, fills and edges. The shared hover list has no
-      // [role="option"], so each option is hovered here and audited on its own (the --brand-50 hover background).
-      const result = await auditNow(chat, { scope: ".assistant-chat", tab: false, hover: true });
-      expect(result.violations, "open menu").toEqual([]);
-      for (const name of ["Todo", "Plan activo", "Recetario", "Carrito"]) {
-        await list.getByRole("option", { name, exact: true }).hover();
-        const hovered = await auditNow(chat, { scope: ".assistant-chat", tab: false, hover: false });
-        expect(hovered.violations, `option ${name} hovered`).toEqual([]);
-      }
-
-      const failures: string[] = [];
-      await chat.evaluate(installToolkit);
-      await chat.keyboard.press("Shift");
-      for (const name of ["Todo", "Plan activo", "Recetario", "Carrito"]) {
-        const option = list.getByRole("option", { name, exact: true });
-        await option.focus();
-        await expect(option).toBeFocused();
-        const focus = await chat.evaluate(() => window.__audit.focus());
-        if (!focus.ok) failures.push(`${theme} option ${name} ${focus.ratio.toFixed(2)}:1`);
-      }
-      await chat.keyboard.press("Escape");
-      await expect(button).toBeFocused();
-      const focus = await chat.evaluate(() => window.__audit.focus());
-      if (!focus.ok) failures.push(`${theme} button ${focus.ratio.toFixed(2)}:1`);
-      expect(failures).toEqual([]);
     });
   });
 }

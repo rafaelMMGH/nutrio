@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
-import type { ChatAnswer, Rich, Section } from "../../src/lib/assistant";
+import type { Button, ChatAnswer, Rich, Section } from "../../src/lib/assistant";
 import { addOnSpecs, DEFAULT_MEALS, PLAN_NAME, planFixture, slug, TIME_WINDOWS, type SeedLog, type SeedRecipe } from "../shared/assistant-fixture";
 import { sql } from "./database";
 import { expect, test as base, watch } from "./fixtures";
@@ -398,25 +398,34 @@ export async function openAssistant(page: Page) {
 
 const plain = (rich: Rich) => rich.map((span) => span.text).join("");
 
-/** A contract-valid answer: `answer` is derived from the lead, body and sections the way the server builds it. */
-export function buildAnswer(parts: { kind?: ChatAnswer["kind"]; lead: Rich; body?: string | null; sections?: Section[]; sources?: string[]; follow_ups?: ChatAnswer["follow_ups"]; context_used?: ChatAnswer["context_used"] }): ChatAnswer {
-  const { kind = "answer", lead, body = null, sections = [], sources = [], follow_ups = [], context_used = "Todo el sistema" } = parts;
-  const lines = [plain(lead), ...(body ? [body] : []), ...sections.flatMap((section) => [section.title, ...section.items.map(plain)])];
-  return { answer: lines.join("\n"), context_used, sources, kind, blocks: [], buttons: [], lead, body, sections, follow_ups };
+/** What a mocked answer carries: the wire model without the scope-era top-level fields (removed from `ChatAnswer` in T016). */
+export type MockAnswer = Pick<ChatAnswer, "answer" | "context_used" | "sources" | "kind" | "blocks" | "buttons">;
+
+const question = (message: string): Button => ({ type: "question", label: message, message });
+
+/**
+ * A contract-valid answer of one untitled block: `answer` is derived from the lead and sections the way the server builds
+ * it. `buttons` are the answer-level buttons (follow-ups, starters); the block itself carries none.
+ */
+export function buildAnswer(parts: { kind?: ChatAnswer["kind"]; lead: Rich; sections?: Section[]; sources?: string[]; buttons?: Button[] }): MockAnswer {
+  const { kind = "answer", lead, sections = [], sources = [], buttons = [] } = parts;
+  const lines = [plain(lead), ...sections.flatMap((section) => [section.title, ...section.items.map(plain)])];
+  return { answer: lines.join("\n"), context_used: "Todo el sistema", sources, kind, blocks: [{ title: null, lead, sections, buttons: [] }], buttons };
 }
 
-export const UNKNOWN_LEAD = "No encontré eso en tu información.";
-export const CAPABILITY_LINE = "Puedo ayudarte con tu plan de comidas y horarios, tus recetas e ingredientes, y tu lista de compras.";
-
-export const UNKNOWN_ANSWER = buildAnswer({ kind: "unknown", lead: [{ text: UNKNOWN_LEAD }], body: CAPABILITY_LINE });
+/** The "no match" reply (spec Copy): its lead and the 4 starters as question buttons. */
+export const NO_MATCH_LEAD = "No entendí tu pregunta. Puedo ayudarte con:";
+export const NO_MATCH_ANSWER = buildAnswer({
+  kind: "no_match",
+  lead: [{ text: NO_MATCH_LEAD }],
+  buttons: ["Mi cena de hoy", "Mi avance de la semana", "Mi peso", "Mi carrito"].map(question)
+});
 
 /** A cart answer with `count` items, quantities highlighted, capped like the server does (8 items plus "y <n> más"). */
-export function cartAnswer(count = 3): ChatAnswer {
-  const follow_ups: ChatAnswer["follow_ups"] = [
-    { text: "¿Qué recetas hay en mi plan?", scope: "Recetario" },
-    { text: "¿A qué hora es mi comida?", scope: "Plan activo" }
-  ];
-  if (count === 0) return buildAnswer({ lead: [{ text: "Tu carrito está vacío." }], follow_ups });
+export function cartAnswer(count = 3): MockAnswer {
+  // The Cart row of the spec's Topics table.
+  const buttons = ["¿Qué recetas hay en mi plan?", "Mi cena de hoy"].map(question);
+  if (count === 0) return buildAnswer({ lead: [{ text: "Tu carrito está vacío." }], buttons });
   const shown = Math.min(count, 8);
   const items: Rich[] = Array.from({ length: shown }, (_, index) => [{ text: `Ingrediente ${String(index + 1).padStart(2, "0")} · ` }, { text: `${index + 1} g`, highlight: true }]);
   if (count > 8) items.push([{ text: `y ${count - 8} más` }]);
@@ -424,7 +433,7 @@ export function cartAnswer(count = 3): ChatAnswer {
     lead: [{ text: "Esto es lo que tienes en tu carrito." }],
     sections: [{ title: "Ingredientes", items }],
     sources: ["Carrito actual"],
-    follow_ups
+    buttons
   });
 }
 
@@ -441,7 +450,7 @@ export type MockOptions = {
 
 export type ChatMock = {
   /** Bodies of the requests that reached the route, in order. */
-  requests: { message: string; scope?: string; recipe_id?: string }[];
+  requests: { message: string }[];
   /** Answers every held request. */
   release: () => void;
 };
@@ -450,12 +459,12 @@ export type ChatMock = {
  * Intercepts POST /api/rag/chat. `answer` may be a function of the request body. A mocked failure is still an issue for
  * the zero-undeclared-issues check, so the test must declare it with `expectIssues`.
  */
-export async function mockChat(page: Page, answer: ChatAnswer | ((body: { message: string; scope?: string; recipe_id?: string }) => ChatAnswer), options: MockOptions = {}): Promise<ChatMock> {
+export async function mockChat(page: Page, answer: MockAnswer | ((body: { message: string }) => MockAnswer), options: MockOptions = {}): Promise<ChatMock> {
   let release!: () => void;
   const released = new Promise<void>((resolve) => (release = resolve));
   const mock: ChatMock = { requests: [], release };
   await page.route(/\/api\/rag\/chat$/, async (route) => {
-    const body = route.request().postDataJSON() as { message: string; scope?: string; recipe_id?: string };
+    const body = route.request().postDataJSON() as { message: string };
     mock.requests.push(body);
     if (options.hold) await released;
     if (options.delayMs) await new Promise((resolve) => setTimeout(resolve, options.delayMs));
@@ -476,7 +485,7 @@ export async function mockChat(page: Page, answer: ChatAnswer | ((body: { messag
 export async function focusWalk(page: Page, theme: Theme) {
   await page.evaluate(installToolkit);
   await page.keyboard.press("Shift");
-  // The first one on screen: the switcher's other variant is display:none and cannot take focus.
+  // The first visible control of the header.
   await page.locator("#assistant-chat-panel header button:visible").first().focus();
   const failures: string[] = [];
   let stops = 0;

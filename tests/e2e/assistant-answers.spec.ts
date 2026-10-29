@@ -2,25 +2,18 @@ import type { Locator, Page } from "@playwright/test";
 import { expectIssues } from "./fixtures";
 import { auditNow, visit } from "./theme-audit";
 import { contrast, effectiveBackground, toRgb } from "./theme-helpers";
-import { UNKNOWN_ANSWER, assistantUi, buildAnswer, cartAnswer, createChatUser, deleteChatUser, expect, mockChat, openAssistant, seedCart, seedPlan, seedRecipes, test } from "./assistant-helpers";
+import { NO_MATCH_ANSWER, NO_MATCH_LEAD, assistantUi, buildAnswer, cartAnswer, createChatUser, deleteChatUser, expect, mockChat, openAssistant, seedPlan, test } from "./assistant-helpers";
 
-// UI tests of what an answer turn shows. Spec assistant-chat-polish: REQ-4 (scope label) and the REQ-12 defaults
-// (the scope a typed question is asked in on each page), and the structured content of a turn (REQ-2, REQ-3, REQ-18 UI).
+// UI tests of what an answer turn shows. Spec assistant-chat-polish: the structured content of a turn (REQ-2, REQ-3,
+// REQ-18 UI) and the error copy (REQ-8, REQ-23). There are no scopes (assistant-data-scope REQ-4), so nothing here
+// asserts a scope label or a scope in the request.
 
-let recipeId = "";
-let otherRecipeId = "";
+const SERVER_ERROR_COPY = "Algo salió mal al responder. Intenta de nuevo.";
+const REQUEST_ERROR_COPY = "No pude responder en este momento.";
 
 test.beforeAll(() => {
   createChatUser("answers");
-  const ids = seedRecipes([
-    { name: "Pollo asado", ingredients: [{ name: "Pechuga de pollo", quantity: 200, category: "Proteínas" }] },
-    // The Recetario list shows only dishes with more than one ingredient.
-    { name: "Ensalada verde", ingredients: [{ name: "Lechuga", quantity: 100 }, { name: "Aguacate", quantity: 50 }] }
-  ]);
-  recipeId = ids["Pollo asado"];
-  otherRecipeId = ids["Ensalada verde"];
   seedPlan({ times: "all" });
-  seedCart(3);
 });
 test.afterAll(() => deleteChatUser());
 
@@ -31,82 +24,32 @@ async function typeQuestion(page: Page, message: string) {
   await ui.send.click();
 }
 
-/** The label of every finished assistant turn, in thread order. */
-async function labelsOf(page: Page) {
-  const ui = assistantUi(page);
-  await expect(ui.pending).toHaveCount(0);
-  return ui.assistantTurns.locator(".assistant-turn-label").allTextContents();
-}
+test.describe("a failed request", () => {
+  test.use({ expectedIssues: expectIssues(/POST \/api\/rag\/chat → (500|503)/, /Failed to load resource.*(500|503)/) });
 
-test.describe("REQ-4: the answer is labelled with the scope it was asked in", () => {
-  test("a Recetario answer is labelled Recetario and the earlier label is kept", async ({ chat }) => {
+  test("a 500 gives an error turn with the server-error copy and no label (REQ-23)", async ({ chat }) => {
+    await mockChat(chat, NO_MATCH_ANSWER, { status: 500 });
     await chat.goto("/");
     const ui = await openAssistant(chat);
-    // The dashboard suggestion "¿Qué recetas hay en mi plan?" is asked in Recetario, whatever the default scope is.
-    const request = chat.waitForRequest(/\/api\/rag\/chat$/);
-    await ui.panel.getByRole("button", { name: "¿Qué recetas hay en mi plan?" }).click();
-    expect((await request).postDataJSON()).toMatchObject({ scope: "Recetario" });
-    await expect(ui.assistantTurns).toHaveCount(1);
-    expect(await labelsOf(chat)).toEqual(["Recetario"]);
-
-    const typed = chat.waitForRequest(/\/api\/rag\/chat$/);
     await typeQuestion(chat, "¿Qué tengo en mi carrito?");
-    expect((await typed).postDataJSON()).toMatchObject({ scope: "auto" });
-    await expect(ui.assistantTurns).toHaveCount(2);
-    expect(await labelsOf(chat)).toEqual(["Recetario", "Todo"]);
-  });
 
-  test("a search-bar question with Carrito is labelled Carrito", async ({ chat }) => {
-    await chat.goto("/");
-    await chat.getByRole("button", { name: "Buscar en: Todo" }).click();
-    await chat.getByRole("menuitemradio", { name: "Carrito" }).click();
-    const search = chat.getByRole("search").getByLabel("Preguntar al asistente");
-    await search.fill("¿Qué tengo en mi carrito?");
-    const request = chat.waitForRequest(/\/api\/rag\/chat$/);
-    await search.press("Enter");
-    expect((await request).postDataJSON()).toMatchObject({ scope: "Carrito" });
-
-    const ui = assistantUi(chat);
     await expect(ui.assistantTurns).toHaveCount(1);
-    expect(await labelsOf(chat)).toEqual(["Carrito"]);
+    await expect(ui.assistantTurns.locator(".assistant-turn-live")).toHaveText(SERVER_ERROR_COPY);
+    await expect(ui.labels).toHaveCount(0);
+    await expect(ui.userTurns).toHaveText("¿Qué tengo en mi carrito?");
   });
 
-  test.describe("a failed request", () => {
-    test.use({ expectedIssues: expectIssues(/POST \/api\/rag\/chat → 500/, /Failed to load resource.*500/) });
+  test("a 503 keeps the generic copy (REQ-8: any non-2xx other than 500)", async ({ chat }) => {
+    await mockChat(chat, NO_MATCH_ANSWER, { status: 503 });
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await typeQuestion(chat, "¿Qué tengo en mi carrito?");
 
-    test("gives an error turn with no label", async ({ chat }) => {
-      await mockChat(chat, UNKNOWN_ANSWER, { status: 500 });
-      await chat.goto("/");
-      const ui = await openAssistant(chat);
-      await typeQuestion(chat, "¿Qué tengo en mi carrito?");
-
-      await expect(ui.assistantTurns).toHaveCount(1);
-      await expect(ui.assistantTurns.locator(".assistant-turn-live")).toHaveText("No pude responder en este momento.");
-      await expect(ui.labels).toHaveCount(0);
-      await expect(ui.userTurns).toHaveText("¿Qué tengo en mi carrito?");
-    });
+    await expect(ui.assistantTurns).toHaveCount(1);
+    await expect(ui.assistantTurns.locator(".assistant-turn-live")).toHaveText(REQUEST_ERROR_COPY);
+    await expect(ui.assistantTurns).not.toContainText(SERVER_ERROR_COPY);
+    await expect(ui.labels).toHaveCount(0);
   });
-});
-
-test.describe("REQ-12: a typed question is asked in the page's default scope", () => {
-  const pages = [
-    { name: "the dashboard", path: () => "/", label: "Todo", scope: "auto", recipe: () => undefined },
-    { name: "groceries", path: () => "/groceries/cart", label: "Carrito", scope: "Carrito", recipe: () => undefined },
-    { name: "a recipe page", path: () => `/recipes/${recipeId}`, label: "Esta receta", scope: "Receta", recipe: () => recipeId }
-  ];
-  for (const { name, path, label, scope, recipe } of pages) {
-    test(`on ${name} the label is ${label}`, async ({ chat }) => {
-      await chat.goto(path());
-      const ui = await openAssistant(chat);
-      const request = chat.waitForRequest(/\/api\/rag\/chat$/);
-      await typeQuestion(chat, "¿Qué tengo en mi carrito?");
-      const body = (await request).postDataJSON();
-      expect(body.scope).toBe(scope);
-      expect(body.recipe_id).toBe(recipe());
-      await expect(ui.assistantTurns).toHaveCount(1);
-      expect(await labelsOf(chat)).toEqual([label]);
-    });
-  }
 });
 
 test.describe("REQ-2, REQ-3, REQ-18: an answer shows exactly its structure", () => {
@@ -158,15 +101,16 @@ test.describe("REQ-2, REQ-3, REQ-18: an answer shows exactly its structure", () 
     expect(await ratioOf(sources)).toBeLessThan(await ratioOf(lead));
   });
 
-  test("no 'Basado en' line without sources or on the unknown reply", async ({ chat }) => {
+  test("no 'Basado en' line without sources or on the no-match reply, which shows the 4 starters", async ({ chat }) => {
     const empty = await answerTurn(chat, buildAnswer({ lead: [{ text: "Tu carrito está vacío." }] }));
     await expect(empty).not.toContainText("Basado en");
     await expect(empty.getByRole("heading")).toHaveCount(0);
     await expect(empty.getByRole("listitem")).toHaveCount(0);
 
-    const unknown = await answerTurn(chat, UNKNOWN_ANSWER);
-    await expect(unknown).not.toContainText("Basado en");
-    await expect(unknown.getByRole("paragraph")).toHaveText(["No encontré eso en tu información.", "Puedo ayudarte con tu plan de comidas y horarios, tus recetas e ingredientes, y tu lista de compras."]);
+    const noMatch = await answerTurn(chat, NO_MATCH_ANSWER);
+    await expect(noMatch).not.toContainText("Basado en");
+    await expect(noMatch.getByRole("paragraph")).toHaveText([NO_MATCH_LEAD]);
+    await expect(noMatch.getByRole("button")).toHaveText(["Mi cena de hoy", "Mi avance de la semana", "Mi peso", "Mi carrito"]);
   });
 
   test("meal times show one item per meal with highlighted times (real API)", async ({ chat }) => {
@@ -178,54 +122,6 @@ test.describe("REQ-2, REQ-3, REQ-18: an answer shows exactly its structure", () 
     await expect(turn.getByRole("listitem")).toHaveText(["Desayuno · Entre 7 a 8 am", "Colación · Entre 10 a 11 am", "Comida · Entre 2 a 3 pm", "Cena · Entre 8 a 9 pm"]);
     await expect(turn.locator("strong")).toHaveText(["Entre 7 a 8 am", "Entre 10 a 11 am", "Entre 2 a 3 pm", "Entre 8 a 9 pm"]);
     await expect(turn).toContainText("Basado en: Plan activo:");
-  });
-});
-
-test.describe("REQ-12 on navigation: a typed question follows the page it is asked on (in-app links)", () => {
-  /** Sends a typed question from the current page and returns the body of the request it caused. */
-  async function typedRequest(chat: Page, mock: Awaited<ReturnType<typeof mockChat>>) {
-    const before = mock.requests.length;
-    await typeQuestion(chat, "¿Qué tengo en mi carrito?");
-    await expect.poll(() => mock.requests.length).toBe(before + 1);
-    await expect(assistantUi(chat).pending).toHaveCount(0);
-    return mock.requests[before];
-  }
-
-  test("recipe page to dashboard sends auto and no recipe_id", async ({ chat }) => {
-    const mock = await mockChat(chat, cartAnswer());
-    await chat.goto(`/recipes/${recipeId}`);
-    await openAssistant(chat);
-    expect((await typedRequest(chat, mock)).scope).toBe("Receta");
-    await chat.getByRole("link", { name: "Hoy" }).click();
-    await expect(chat).toHaveURL(/\/$/);
-    const body = await typedRequest(chat, mock);
-    expect(body.scope).toBe("auto");
-    expect(body.recipe_id).toBeUndefined();
-  });
-
-  test("recipe page to groceries sends Carrito", async ({ chat }) => {
-    const mock = await mockChat(chat, cartAnswer());
-    await chat.goto(`/recipes/${recipeId}`);
-    await openAssistant(chat);
-    await chat.getByRole("link", { name: "Compras" }).click();
-    await expect(chat).toHaveURL(/\/groceries/);
-    // The page tells the panel its scope once it has rendered; the subtitle shows that it did.
-    await expect(assistantUi(chat).panel.getByText("Sobre tus compras")).toBeVisible();
-    const body = await typedRequest(chat, mock);
-    expect(body.scope).toBe("Carrito");
-    expect(body.recipe_id).toBeUndefined();
-  });
-
-  test("recipe A to recipe B sends B's recipe_id", async ({ chat }) => {
-    const mock = await mockChat(chat, cartAnswer());
-    await chat.goto(`/recipes/${recipeId}`);
-    await openAssistant(chat);
-    expect((await typedRequest(chat, mock)).recipe_id).toBe(recipeId);
-    await chat.getByRole("link", { name: "Recetario" }).first().click();
-    await chat.getByRole("link", { name: /Ensalada verde/ }).first().click();
-    await expect(chat).toHaveURL(new RegExp(`/recipes/${otherRecipeId}`));
-    const body = await typedRequest(chat, mock);
-    expect(body).toMatchObject({ scope: "Receta", recipe_id: otherRecipeId });
   });
 });
 
@@ -248,7 +144,7 @@ test.describe("REQ-17: the live region", () => {
 });
 
 test.describe("REQ-14: an answered turn meets contrast in the light theme", () => {
-  test("lead, section, highlight, sources, scope label and chips", async ({ chat }) => {
+  test("lead, section, highlight, sources and buttons", async ({ chat }) => {
     test.setTimeout(120_000);
     await mockChat(chat, { ...cartAnswer(3), sources: ["Carrito actual"] });
     await visit(chat, "/", "light");
