@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { mealsDoneOn, mondayOf, waterGoalGlasses, weekDays, weekExercise, weekMeals, weekWater, weightStats, type ProgressLog } from "@/lib/progress";
-import { PARITY_EXPECTED as expected, PARITY_LOGS, PARITY_MONDAY, PARITY_SLOTS, PARITY_SUNDAY, PARITY_TODAY, PARITY_WEIGHT_GOAL } from "../shared/progress-fixture";
+import { PARITY_EXPECTED as expected, PARITY_LOGS, PARITY_MONDAY, PARITY_SLOTS, PARITY_SUNDAY, PARITY_TODAY, PARITY_WEIGHT_GOAL, parityLogs } from "../shared/progress-fixture";
 
 const byDate = new Map(PARITY_LOGS.map((log) => [log.date, log]));
 const getLog = (date: string): ProgressLog => {
@@ -121,5 +121,43 @@ describe("progress.ts edges", () => {
     near(weightStats([["2026-10-20", 60], ["2026-10-27", 62]], PARITY_TODAY, PARITY_MONDAY, 66).ratio, 1 / 3);
     near(weightStats([["2026-10-20", 67], ["2026-10-27", 68]], PARITY_TODAY, PARITY_MONDAY, 63).ratio, -0.25);
     near(weightStats([["2026-10-20", 67], ["2026-10-27", 62]], PARITY_TODAY, PARITY_MONDAY, 63).ratio, 1.25);
+  });
+});
+
+describe("progress.ts dashboard baseline (T066 fixture, relative to a Monday)", () => {
+  // The e2e dashboard test seeds this same fixture on the real Monday of the current week; the numbers do not depend on the weekday.
+  const monday = "2026-10-26";
+  const { logs, slots, waterGlasses, weightGoal, expected: want } = parityLogs(monday);
+  const logOf = new Map(logs.map((log) => [log.date, log]));
+  const getBaseLog = (date: string): ProgressLog => {
+    const log = logOf.get(date);
+    return { meals_done: log?.meals_done ?? [], water_glasses: log?.water_glasses ?? 0, exercised: log?.exercised ?? false };
+  };
+  const entries = logs.map((log): [string, number | null] => [log.date, log.weight_kg ?? null]);
+
+  it("gives the expected tile numbers whatever weekday it is", () => {
+    for (const endDay of [monday, "2026-10-28", "2026-11-01"]) {
+      assert.equal(weekWater(getBaseLog, monday, endDay, waterGlasses), want.weekWaterLiters);
+      assert.equal(weekMeals(getBaseLog, slots, monday, endDay), want.weekMeals);
+      assert.equal(weekExercise(getBaseLog, monday, endDay), want.weekExerciseDays);
+    }
+    assert.equal(waterGlasses * 0.25 * 7, want.weekWaterGoalLiters);
+    assert.equal(slots.length * 7, want.weekMealsGoal);
+  });
+
+  it("weightStats on Monday gives latest, change and ratio", () => {
+    const stats = weightStats(entries, monday, monday, weightGoal);
+    assert.equal(stats.start, want.weight.start);
+    assert.equal(stats.latest, want.weight.latest);
+    assert.equal(stats.latestDate, monday);
+    assert.equal(stats.beforeWeek, want.weight.beforeWeek);
+    assert.ok(Math.abs(stats.change! - want.weight.change) < 1e-9);
+    assert.ok(Math.abs(stats.ratio - want.weight.ratio) < 1e-9);
+  });
+
+  it("change is 0 when the latest weight is the one before Monday", () => {
+    const stats = weightStats(entries.slice(0, -1), monday, monday, weightGoal);
+    assert.equal(stats.latest, want.weight.beforeWeek);
+    assert.equal(stats.change, 0);
   });
 });

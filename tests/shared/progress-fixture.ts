@@ -39,3 +39,32 @@ export const PARITY_EXPECTED = {
   // the progress toward 63 is (67 - 66.2) / (67 - 63) = 0.2.
   weight: { start: 67, latest: 66.2, latestDate: "2026-10-28", beforeWeek: 66.6, change: -0.4, ratio: 0.2 }
 };
+
+const addDays = (key: string, days: number) => {
+  const [year, month, day] = key.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days)).toISOString().slice(0, 10);
+};
+
+// The dashboard baseline (T066) must run on any weekday, and the dashboard reads the real date, so it cannot pin one.
+// Every log of the week sits on Monday, which is never after today; the weights before the week go earlier. Worked by
+// hand: water 6 glasses = 1.5 L of 8 glasses × 0.25 L × 7 = 14 L; meals m1, m2 (not "gone") = 2 of 4 slots × 7 = 28;
+// one exercise day; weight 66.2 vs 66.6 before Monday = -0.4, progress (67 - 66.2) / (67 - 63) = 0.2.
+export const parityLogs = (monday: string) => ({
+  logs: [
+    { date: addDays(monday, -8), weight_kg: 67 },
+    { date: addDays(monday, -3), weight_kg: 66.6 },
+    { date: monday, water_glasses: 6, meals_done: ["m1", "m2", "gone"], exercised: true, weight_kg: 66.2 }
+  ] as SeedLog[],
+  slots: PARITY_SLOTS,
+  waterGlasses: 8,
+  weightGoal: PARITY_WEIGHT_GOAL,
+  exerciseGoalDays: 3,
+  expected: {
+    weekWaterLiters: 1.5,
+    weekWaterGoalLiters: 14,
+    weekMeals: 2,
+    weekMealsGoal: 28,
+    weekExerciseDays: 1,
+    weight: { start: 67, latest: 66.2, beforeWeek: 66.6, change: -0.4, ratio: 0.2 }
+  }
+});
