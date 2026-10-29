@@ -50,22 +50,22 @@ const plainOf = (rich: { text: string }[]) => rich.map((span) => span.text).join
 
 /** The text of the first section called `title`, one string per item. */
 function items(body: ChatAnswer, title: string) {
-  const section = body.sections.find((entry) => entry.title === title);
+  const section = body.blocks[0].sections.find((entry) => entry.title === title);
   expect(section, `section "${title}"`).toBeDefined();
   return section!.items.map(plainOf);
 }
 
-/** Asks as the test user; the builder replies of this file are plain answers on a 200. */
+/** Asks as the test user; the builder replies of this file are plain answers on a 200 with one block. */
 async function answer(chatContext: BrowserContext, message: string) {
   const { status, body } = await ask(chatContext.request, message);
   expect(status, message).toBe(200);
   expect(body.kind, message).toBe("answer");
-  return { body };
+  return body;
 }
 
 test.describe("plan summary", () => {
   test("REQ-6 a plan-topic question returns the plan summary", async ({ chatContext }) => {
-    const { body } = await answer(chatContext, "¿Cuál es mi objetivo?");
+    const body = await answer(chatContext, "¿Cuál es mi objetivo?");
     expect(body.answer).toContain(OBJECTIVE);
   });
 });
@@ -88,7 +88,7 @@ test.describe("input limits (REQ-10 server)", () => {
   test("a message of 500 characters plus surrounding spaces is answered", async ({ chatContext }) => {
     const response = await post(chatContext, `  ${"a".repeat(500)}  `);
     expect(response.status()).toBe(200);
-    expect(((await response.json()) as ChatAnswer).lead.length).toBeGreaterThan(0);
+    expect(((await response.json()) as ChatAnswer).blocks[0].lead.length).toBeGreaterThan(0);
   });
 
   test("the length is the trimmed one: 501 characters after trimming is rejected, 500 is the limit", async ({ chatContext }) => {
@@ -105,24 +105,24 @@ test.describe("input limits (REQ-10 server)", () => {
 test.describe("builders", () => {
   test("REQ-1 an empty cart is a lead with no sections and no sources", async ({ chatContext }) => {
     seedCart(0);
-    const { body } = await answer(chatContext, "¿Qué tengo en mi carrito?");
-    expect(plainOf(body.lead)).toBe("Tu carrito está vacío.");
-    expect(body.sections).toEqual([]);
+    const body = await answer(chatContext, "¿Qué tengo en mi carrito?");
+    expect(plainOf(body.blocks[0].lead)).toBe("Tu carrito está vacío.");
+    expect(body.blocks[0].sections).toEqual([]);
     expect(body.sources).toEqual([]);
     expect(body.answer).toBe("Tu carrito está vacío.");
   });
 
   test("REQ-1 no active plan: the lead says so, with no sections and no sources", async ({ chatContext }) => {
     clearPlan();
-    const { body } = await answer(chatContext, "¿Cuál es el objetivo de mi plan?");
-    expect(plainOf(body.lead)).toBe("No tienes un plan activo.");
-    expect(body.sections).toEqual([]);
+    const body = await answer(chatContext, "¿Cuál es el objetivo de mi plan?");
+    expect(plainOf(body.blocks[0].lead)).toBe("No tienes un plan activo.");
+    expect(body.blocks[0].sections).toEqual([]);
     expect(body.sources).toEqual([]);
   });
 
   test("REQ-1 a 40-ingredient cart shows 8 items and a last item 'y 32 más'", async ({ chatContext }) => {
     seedCart(40);
-    const { body } = await answer(chatContext, "¿Qué tengo en mi carrito?");
+    const body = await answer(chatContext, "¿Qué tengo en mi carrito?");
     const list = items(body, "Ingredientes");
     expect(list).toHaveLength(9);
     expect(list[8]).toBe("y 32 más");
@@ -131,8 +131,8 @@ test.describe("builders", () => {
   });
 
   test("REQ-1 the cart lists one item per ingredient with the quantity highlighted", async ({ chatContext }) => {
-    const { body } = await answer(chatContext, "¿Qué tengo en mi carrito?");
-    const section = body.sections[0];
+    const body = await answer(chatContext, "¿Qué tengo en mi carrito?");
+    const section = body.blocks[0].sections[0];
     expect(section.title).toBe("Ingredientes");
     expect(section.items).toHaveLength(3);
     expect(section.items.map(plainOf)).toEqual(["Ingrediente 01 · 1 g", "Ingrediente 02 · 2 g", "Ingrediente 03 · 3 g"]);
@@ -141,17 +141,17 @@ test.describe("builders", () => {
 
   test("REQ-1 the recipe list lists all recipes, or only those matching a word of the question", async ({ chatContext }) => {
     const all = await answer(chatContext, "¿Qué recetas hay en mi plan?");
-    expect(plainOf(all.body.lead)).toBe("Estas son tus recetas.");
-    expect(items(all.body, "Recetas")).toEqual(["Quesadillas", "Ensalada", "Pollo asado"]);
+    expect(plainOf(all.blocks[0].lead)).toBe("Estas son tus recetas.");
+    expect(items(all, "Recetas")).toEqual(["Quesadillas", "Ensalada", "Pollo asado"]);
 
     const filtered = await answer(chatContext, "¿Qué recetas hay con pollo?");
-    expect(plainOf(filtered.body.lead)).toBe("Estas recetas coinciden con tu pregunta.");
-    expect(items(filtered.body, "Recetas")).toEqual(["Pollo asado"]);
+    expect(plainOf(filtered.blocks[0].lead)).toBe("Estas recetas coinciden con tu pregunta.");
+    expect(items(filtered, "Recetas")).toEqual(["Pollo asado"]);
   });
 
   test("REQ-1 a filter word that matches no recipe lists all of them", async ({ chatContext }) => {
-    const { body } = await answer(chatContext, "¿Qué recetas hay con pescado?");
-    expect(plainOf(body.lead)).toBe("Estas son tus recetas.");
+    const body = await answer(chatContext, "¿Qué recetas hay con pescado?");
+    expect(plainOf(body.blocks[0].lead)).toBe("Estas son tus recetas.");
     expect(items(body, "Recetas")).toHaveLength(3);
   });
 
@@ -163,15 +163,15 @@ test.describe("builders", () => {
       { name: "Ensalada", ingredients: [{ name: "Lechuga" }] }
     ]);
     for (const question of ["¿Qué recetas hay con queso?", "¿Qué recetas hay para el desayuno?"]) {
-      const { body } = await answer(chatContext, question);
-      expect(plainOf(body.lead), question).toBe("Estas son tus recetas.");
+      const body = await answer(chatContext, question);
+      expect(plainOf(body.blocks[0].lead), question).toBe("Estas son tus recetas.");
       expect(items(body, "Recetas"), question).toEqual(["Tacos con carne", "Desayuno ranchero", "Ensalada"]);
     }
   });
 
   test("REQ-1 in Todo the recipe list uses the same builder and caps at 8 recipes", async ({ chatContext }) => {
     seedRecipes(Array.from({ length: 10 }, (_, index) => ({ name: `Receta ${String(index + 1).padStart(2, "0")}`, ingredients: [{ name: "Sal" }] })));
-    const { body } = await answer(chatContext, "¿Qué recetas tengo?");
+    const body = await answer(chatContext, "¿Qué recetas tengo?");
     const list = items(body, "Recetas");
     expect(list).toHaveLength(9);
     expect(list[8]).toBe("y 2 más");
@@ -179,9 +179,9 @@ test.describe("builders", () => {
 
   test("REQ-27 an empty recipe book is a lead with no sections and no sources", async ({ chatContext }) => {
     seedRecipes([]);
-    const { body } = await answer(chatContext, "¿Qué recetas tengo?");
-    expect(plainOf(body.lead)).toBe("Aún no tienes recetas.");
-    expect(body.sections).toEqual([]);
+    const body = await answer(chatContext, "¿Qué recetas tengo?");
+    expect(plainOf(body.blocks[0].lead)).toBe("Aún no tienes recetas.");
+    expect(body.blocks[0].sections).toEqual([]);
     expect(body.sources).toEqual([]);
   });
 
@@ -191,25 +191,25 @@ test.describe("builders", () => {
       { name: "Ensalada", ingredients: [{ name: "Lechuga" }] }
     ]);
     softDeleteRecipe(ids["Ensalada"]);
-    const { body } = await answer(chatContext, "¿Qué recetas tengo?");
+    const body = await answer(chatContext, "¿Qué recetas tengo?");
     expect(items(body, "Recetas")).toEqual(["Quesadillas"]);
   });
 
   test("REQ-1 the plan lists the meals, plus supplements and recommendations only when the question names them", async ({ chatContext }) => {
     const plain = await answer(chatContext, "¿Cuál es mi objetivo?");
-    expect(plainOf(plain.body.lead)).toBe(`Tu objetivo: ${OBJECTIVE}`);
-    expect(plain.body.sections.map((section) => section.title)).toEqual(["Comidas"]);
-    expect(items(plain.body, "Comidas")).toEqual(MEALS);
+    expect(plainOf(plain.blocks[0].lead)).toBe(`Tu objetivo: ${OBJECTIVE}`);
+    expect(plain.blocks[0].sections.map((section) => section.title)).toEqual(["Comidas"]);
+    expect(items(plain, "Comidas")).toEqual(MEALS);
 
     const both = await answer(chatContext, "¿Qué suplementos y recomendaciones tengo en mi plan?");
-    expect(both.body.sections.map((section) => section.title)).toEqual(["Comidas", "Suplementos", "Recomendaciones"]);
-    expect(items(both.body, "Suplementos")).toEqual(["Vitamina D"]);
-    expect(items(both.body, "Recomendaciones")).toEqual(["Tomar agua durante el día"]);
+    expect(both.blocks[0].sections.map((section) => section.title)).toEqual(["Comidas", "Suplementos", "Recomendaciones"]);
+    expect(items(both, "Suplementos")).toEqual(["Vitamina D"]);
+    expect(items(both, "Recomendaciones")).toEqual(["Tomar agua durante el día"]);
   });
 
   test("T006 REQ-1 recommendations get one item per non-empty line and the answer matches", async ({ chatContext }) => {
     seedPlan({ times: "all", recommendations: "Tomar agua\n\nDormir 8 horas\nCaminar a diario\n" });
-    const { body } = await answer(chatContext, "¿Qué recomendaciones tengo?");
+    const body = await answer(chatContext, "¿Qué recomendaciones tengo?");
     expect(items(body, "Recomendaciones")).toEqual(["Tomar agua", "Dormir 8 horas", "Caminar a diario"]);
     expect(body.answer).toBe(
       [`Tu objetivo: ${OBJECTIVE}`, "Comidas", ...MEALS, "Recomendaciones", "Tomar agua", "Dormir 8 horas", "Caminar a diario"].join("\n")
@@ -219,48 +219,51 @@ test.describe("builders", () => {
   test("T006 REQ-1 ten recommendation lines show 8 items and a last item 'y 2 más'", async ({ chatContext }) => {
     const lines = Array.from({ length: 10 }, (_, index) => `Recomendación ${index + 1}`);
     seedPlan({ times: "all", recommendations: lines.join("\n") });
-    const { body } = await answer(chatContext, "¿Qué recomendaciones tengo?");
+    const body = await answer(chatContext, "¿Qué recomendaciones tengo?");
     expect(items(body, "Recomendaciones")).toEqual([...lines.slice(0, 8), "y 2 más"]);
     expect(body.answer).toContain(`Recomendaciones\n${[...lines.slice(0, 8), "y 2 más"].join("\n")}`);
   });
 
   test("REQ-1 blank recommendations omit the section and the lead stays", async ({ chatContext }) => {
     seedPlan({ times: "all", recommendations: " \n  " });
-    const { body } = await answer(chatContext, "¿Qué recomendaciones tengo?");
-    expect(plainOf(body.lead)).toBe(`Tu objetivo: ${OBJECTIVE}`);
-    expect(body.sections.map((section) => section.title)).toEqual(["Comidas"]);
+    const body = await answer(chatContext, "¿Qué recomendaciones tengo?");
+    expect(plainOf(body.blocks[0].lead)).toBe(`Tu objetivo: ${OBJECTIVE}`);
+    expect(body.blocks[0].sections.map((section) => section.title)).toEqual(["Comidas"]);
     expect(body.answer).not.toContain("Recomendaciones");
   });
 
   test("REQ-1 a plan with zero meals omits the Comidas section in the plan and meal-times answers, and the lead stays", async ({ chatContext }) => {
     seedPlan({ times: "all", meals: [] });
     const plan = await answer(chatContext, "¿Cuál es mi objetivo?");
-    expect(plainOf(plan.body.lead)).toBe(`Tu objetivo: ${OBJECTIVE}`);
-    expect(plan.body.sections).toEqual([]);
-    expect(plan.body.answer).toBe(`Tu objetivo: ${OBJECTIVE}`);
+    expect(plainOf(plan.blocks[0].lead)).toBe(`Tu objetivo: ${OBJECTIVE}`);
+    expect(plan.blocks[0].sections).toEqual([]);
+    expect(plan.answer).toBe(`Tu objetivo: ${OBJECTIVE}`);
 
     const times = await answer(chatContext, "¿A qué hora es mi comida?");
-    expect(plainOf(times.body.lead)).toBe("Tu plan no tiene horarios para tus comidas.");
-    expect(times.body.sections).toEqual([]);
-    expect(times.body.answer).not.toContain("Comidas");
+    expect(plainOf(times.blocks[0].lead)).toBe("Tu plan no tiene horarios para tus comidas.");
+    expect(times.blocks[0].sections).toEqual([]);
+    expect(times.answer).not.toContain("Comidas");
   });
 
   test("REQ-1 a plan with no supplements says so", async ({ chatContext }) => {
     seedPlan({ times: "all", supplements: false });
-    const { body } = await answer(chatContext, "¿Qué suplementos tomo?");
+    const body = await answer(chatContext, "¿Qué suplementos tomo?");
     expect(items(body, "Suplementos")).toEqual(["Sin suplementos registrados"]);
   });
 
   test("REQ-3 sources list only the data used, and none on unknown or empty-state replies", async ({ chatContext }) => {
-    const sourcesOf = async (message: string) => (await ask(chatContext.request, message)).body.sources;
+    const sourcesOf = async (message: string) => {
+      const { body } = await ask(chatContext.request, message);
+      return body.sources;
+    };
     expect(await sourcesOf("¿Qué hay en mi carrito?")).toEqual(["Carrito actual"]);
     expect(await sourcesOf("¿Cuál es mi objetivo?")).toEqual([`Plan activo: ${PLAN_NAME}`]);
     expect(await sourcesOf("¿A qué hora es la cena?")).toEqual([`Plan activo: ${PLAN_NAME}`]);
     expect(await sourcesOf("¿Qué recetas hay en mi plan?")).toEqual(["Recetario"]);
 
-    const nothing = await ask(chatContext.request, "¿Qué hago ahora?");
-    expect(nothing.body.kind).toBe("no_match");
-    expect(nothing.body.sources).toEqual([]);
+    const { body: nothing } = await ask(chatContext.request, "¿Qué hago ahora?");
+    expect(nothing.kind).toBe("no_match");
+    expect(nothing.sources).toEqual([]);
 
     seedCart(0);
     clearPlan();
@@ -271,11 +274,11 @@ test.describe("builders", () => {
   });
 
   test("REQ-18 with an active plan and times, there is one item per meal and each time is highlighted", async ({ chatContext }) => {
-    const { body } = await answer(chatContext, "¿A qué hora es la cena?");
-    expect(plainOf(body.lead)).toBe("Estos son los horarios de tus comidas.");
-    expect(body.sections.map((section) => section.title)).toEqual(["Comidas"]);
+    const body = await answer(chatContext, "¿A qué hora es la cena?");
+    expect(plainOf(body.blocks[0].lead)).toBe("Estos son los horarios de tus comidas.");
+    expect(body.blocks[0].sections.map((section) => section.title)).toEqual(["Comidas"]);
     expect(items(body, "Comidas")).toEqual(["Desayuno · Entre 7 a 8 am", "Colación · Entre 10 a 11 am", "Comida · Entre 2 a 3 pm", "Cena · Entre 8 a 9 pm"]);
-    expect(body.sections[0].items.map((item) => item.filter((span) => span.highlight).map((span) => span.text))).toEqual([
+    expect(body.blocks[0].sections[0].items.map((item) => item.filter((span) => span.highlight).map((span) => span.text))).toEqual([
       ["Entre 7 a 8 am"],
       ["Entre 10 a 11 am"],
       ["Entre 2 a 3 pm"],
@@ -285,23 +288,23 @@ test.describe("builders", () => {
 
   test("REQ-18 with only some times, every meal is listed and only those with a time are highlighted", async ({ chatContext }) => {
     seedPlan({ times: "some" });
-    const { body } = await answer(chatContext, "¿Cuál es mi horario?");
+    const body = await answer(chatContext, "¿Cuál es mi horario?");
     expect(items(body, "Comidas")).toEqual(["Desayuno · Entre 7 a 8 am", "Colación", "Comida · Entre 2 a 3 pm", "Cena"]);
-    expect(body.sections[0].items.map((item) => item.some((span) => span.highlight))).toEqual([true, false, true, false]);
+    expect(body.blocks[0].sections[0].items.map((item) => item.some((span) => span.highlight))).toEqual([true, false, true, false]);
   });
 
   test("REQ-18 without meal times the lead says so and the meals are listed without highlights", async ({ chatContext }) => {
     seedPlan({ times: "none" });
-    const { body } = await answer(chatContext, "¿Cuándo desayuno?");
-    expect(plainOf(body.lead)).toBe("Tu plan no tiene horarios para tus comidas.");
+    const body = await answer(chatContext, "¿Cuándo desayuno?");
+    expect(plainOf(body.blocks[0].lead)).toBe("Tu plan no tiene horarios para tus comidas.");
     expect(items(body, "Comidas")).toEqual(MEALS);
-    expect(body.sections[0].items.flat().some((span) => span.highlight)).toBe(false);
+    expect(body.blocks[0].sections[0].items.flat().some((span) => span.highlight)).toBe(false);
   });
 
   test("REQ-18 without an active plan the lead says so, and there are no sections", async ({ chatContext }) => {
     clearPlan();
-    const { body } = await answer(chatContext, "¿Cuál es mi horario?");
-    expect(plainOf(body.lead)).toBe("No tienes un plan activo.");
-    expect(body.sections).toEqual([]);
+    const body = await answer(chatContext, "¿Cuál es mi horario?");
+    expect(plainOf(body.blocks[0].lead)).toBe("No tienes un plan activo.");
+    expect(body.blocks[0].sections).toEqual([]);
   });
 });
