@@ -1,6 +1,6 @@
 # Plan: Assistant data scope
 
-**Spec:** [spec.md](spec.md) (v1.6) · **Contract:** [contracts/chat-api.md](contracts/chat-api.md) · **Checklist:** [checklists/ux.md](checklists/ux.md) · **Also:** chat-polish REQ-23 ([assistant-chat-polish/spec.md](../assistant-chat-polish/spec.md) v1.9) · **Revision 6** (2026-10-29): unit-first test cadence (spec v1.6).
+**Spec:** [spec.md](spec.md) (v1.6) · **Contract:** [contracts/chat-api.md](contracts/chat-api.md) · **Checklist:** [checklists/ux.md](checklists/ux.md) · **Also:** chat-polish REQ-23 ([assistant-chat-polish/spec.md](../assistant-chat-polish/spec.md) v1.9) · **Revision 7** (2026-10-29): batches re-estimated with tests after 1a2 and split at ~450 (revision 6: unit-first cadence, spec v1.6).
 
 **User asks (nothing else needs a yes):** (1) `npm install fuse.js@7.5.0 --save-exact` (T025; yes already given in the spec); (2) the one snapshot refresh at the end of Batch E (T057); (3) the manual ≤1 s check on real data before merge (T065); (4) push and PR.
 
@@ -82,9 +82,9 @@ Unit tests first (spec v1.6 NFR Testability, D10); e2e tests are still written w
 
 - **Unit (logic, fail-first proof):** every check that needs no browser, DB or server: `normalizeText`/`matchWord` and the REQ-2 table, `testHooks`, `serverToday`, `chatSchema` stripping, the date parser and labels (REQ-14 table with today passed in), `progress.ts` metrics, the resolver (REQ-6), the dish matcher (REQ-3 table on `memDb()`), slots, ordinals, option paging and labels, detail, `recipeSteps`, metric builders and copy (pluralization, units, empty ranges), variants (REQ-28), greeting/no-match/did-you-mean, multi-topic and clarify, identity, missing data. Each is shown red (unit run) before its code. The REQ-2/3/14 tables live only in unit tests.
 - **e2e (written per task, run in Batch E):** UI (rendering, buttons, bubbles, avatar, typing, live region, focus, keyboard, nav closing, 360 px layout, snapshots), API contract over HTTP (400/500/log, `{ message }` only, `resolved` absent without the header, the pin header), REQ-16 chat-vs-dashboard parity (needs the dashboard), and per logic REQ one or two representative rows through `ask()`, so every REQ keeps an e2e test (spec v1.6).
-- **tsc rule:** `npx tsc --noEmit` covers `tests/`, so it must pass at each task's final commit and at every batch checkpoint. A red tests-only commit (tests importing a module or signature not yet written) is exempt, but is never left as the batch tip or a worktree's merge tip.
+- **tsc rule:** `npx tsc --noEmit` covers `tests/`, so it must pass at each task's final commit and at every batch checkpoint. A red tests-only commit (tests importing a module or signature not yet written) is exempt, but is never left as the batch tip or a worktree's merge tip. Since 1a2, each code task's red tests are committed immediately before that task's code (one-commit red window), never all up front.
 - **Harness (T004) and fixture (T074):** the deterministic fixture (19 generic names, "Pollo asado", "Ensalada de pollo", "Sándwich de atún"; distractors "Sopa de lima", "Atole de avena", "Chilaquiles verdes", "Tacos de frijol") lives in tests/shared/assistant-fixture.ts; `seedPlan` inserts it over SQL, `memDb()` builds it in memory. Real recipe names are used only in the T024 spike, in a scratch copy outside the repo.
-- **Button sweeps (REQ-5):** unit `sweep(db, answers, today)` re-asks every question button through `ragAnswer` and compares blocks; it fails on an empty set or a D3 placeholder. Each story extends it (T072, T021, T026, T028, T031, T034, T046, T048, T050). The e2e `resendSweep` runs in T072 (partial) and T063 (final, every reply kind).
+- **Button sweeps (REQ-5):** unit `sweep(db, answers, today)` re-asks every question button through `ragAnswer` and compares blocks; it fails on an empty set or a D3 placeholder. Since T020 (1a2 review M2) it also checks each button against an expected-topic map from the Topics "Button" column: exactly one `resolved` intent with that topic plus a text or `kind` assertion, since comparing two calls of a stateless function alone always passes; its `skip` list of pending builders shrinks as they land. Each story extends it (T072, T021, T026, T028, T031, T034, T046, T048, T050). The e2e `resendSweep` runs in T072 (partial) and T063 (final, every reply kind).
 - **Parity (REQ-16), e2e only:** T066 records the dashboard tiles for seeded logs (`timezoneId: "America/Mexico_City"`, `page.clock`); T042, T044 and T046 extend it to the chat. Run once, targeted, at the 3a2 merge (Batch gate exception), then first in Batch E. Before that, T075 pins `progress.ts` to the same hand-computed numbers in unit tests; logs and expected numbers live once in tests/shared/progress-fixture.ts, used by T066 and T075.
 - **NFR (T064):** synthetic dataset (32 recipes, 69 meals, 365 daily_logs, goals, name, add-ons) over HTTP, one question per topic after a warm-up; no 500, ≤5 s, timings logged. Manual ≤1 s check on real data by the user (T065).
 - **Old-UI specs:** not run until Batch E (no red window). T008, T013, T016 and T069 still prune or rewrite them so they compile and match the new behavior; grep gates replace the runs.
@@ -94,29 +94,32 @@ Unit tests first (spec v1.6 NFR Testability, D10); e2e tests are still written w
 
 ## Batches
 
-Sizes are changed lines including tests. Target ≤ ~300. Worktrees only where marked; everything else is sequential because chat.ts, chat-intent.ts, chat-meals.ts and chat-metrics.ts are shared.
+Sizes are changed lines including tests (revision 7: the earlier estimates left tests out; 1a2 came in at ~557 vs ~360, tests ~64%, so remaining estimates are the old ones × ~1.6, except batches that were already mostly tests). Cap ≤ ~450. A batch whose running count passes its estimate by > ~50 lines stops at the next task boundary and is reported. Where one test task covers two code tasks, a split divides the test task by the code it covers (`part 1`/`part 2`, each committed just before its code). Worktrees only where marked; everything else is sequential because chat.ts, chat-intent.ts, chat-meals.ts and chat-metrics.ts are shared.
 
 | Batch | Tasks | Lines | Parallel |
 |---|---|---|---|
-| F1a harness | T003, T004 | done | — |
-| U0 unit runner and fixture | T073, T074 | ~200 | — |
-| F1b hooks, 500 path | T005–T007 | ~250 | worktree with 1a1 (disjoint files), both from the U0 tip |
-| 1a1 assistant-api pruning | T008 | ~390 (80% deletions) | with F1b |
-| 1a2 wire model, scope-free server | T072, T009–T011 | ~360 | — (after F1b: route.ts) |
-| 1b1 client state, renderer, pages | T012, T014, T015, T069 | ~390 (45% deletions) | — |
-| 1b2 test churn, leftovers | T013, T016 | ~300 | — |
-| 1c1 / 1c2 / 1d / 1e | T017–T019 / T070, T020 / T021–T023 / T024–T027 | ~240 / ~220 / ~310 / ~190 | 3a1–3a2 may run beside them |
-| 2a / 2b / 2c | T028–T030 / T031–T033 / T034–T036 | ~310 / ~300 / ~320 | idem |
-| 3a1 progress.ts / 3a2 dashboard refactor | T075, T037 / T066, T038 | ~200 / ~170 | one worktree from the 1b2 tip; merged before 3c |
-| 3b1 / 3b2 | T039–T041 / T067, T068 | ~260 / ~220 | idem (3a beside) |
-| 3c / 3d / 3e | T042, T043 / T044, T045 / T046, T047 | ~320 / ~320 / ~270 | — |
-| 4a / 4b | T048, T049 / T050–T052 | ~290 / ~340 | — |
-| 5 identity | T053, T054 | ~150 | — |
-| 6a / 6b / 6c | T055, T056 / T058–T060 / T061, T062 | ~320 / ~300 / ~220 | — |
-| E stabilization | T076, T077, T057 | ≤ ~300 per fix round; T077 commits nothing | — |
-| Final | T063–T065 | ~140 | — |
+| F1a, U0, F1b, 1a1, 1a2 | T003–T011, T072–T074 | done (1a1 +46/-390; 1a2 +449/-108) | F1b beside 1a1 |
+| 1b1a / 1b1b | T012, T014, T015 / T069 | ~430 / ~190 | — |
+| 1b2 test churn, leftovers | T013, T016 | ~360 | — |
+| 1c1 / 1c2 | T017–T019 / T070, T020 | ~380 / ~380 | 3a1–3a2 may run beside 1c1–3b2 |
+| 1d1 / 1d2 | T021 pt 1, T022 / T021 pt 2, T023 | ~330 / ~170 | idem |
+| 1e | T024–T027 | ~300 | idem |
+| 2a1 / 2a2 | T028 pt 1, T029 / T028 pt 2, T030 | ~330 / ~170 | idem |
+| 2b1 / 2b2 | T031 pt 1, T032 / T031 pt 2, T033 | ~300 / ~180 | idem |
+| 2c1 / 2c2 | T034 pt 1, T035 / T034 pt 2, T036 | ~170 / ~340 | idem |
+| 3a1 progress.ts / 3a2 dashboard refactor | T075, T037 / T066, T038 | ~320 / ~270 | one worktree from the 1b2 tip; merged before 3c |
+| 3b1 / 3b2 | T039–T041 / T067, T068 | ~420 / ~350 | idem (3a beside) |
+| 3c1 water / 3c2 exercise | T042, T043 pt 1 / pt 2 | ~260 / ~250 | — |
+| 3d1 weight / 3d2 meals done | T044, T045 pt 1 / pt 2 | ~310 / ~200 | — |
+| 3e | T046, T047 | ~430 | — |
+| 4a / 4b1 / 4b2 | T048, T049 / T050 pt 1, T051 / T050 pt 2, T052 | ~460 / ~250 / ~290 | — |
+| 5 identity | T053, T054 | ~240 | — |
+| 6a1 / 6a2 | T055 (e2e, not run) / T056 | ~250 / ~260 | — |
+| 6b1 / 6b2 / 6c | T058 / T059, T060 / T061, T062 | ~110 / ~370 / ~350 | — |
+| E stabilization | T076, T077, T057 | ≤ ~450 per fix round incl. tests; T077 commits nothing | — |
+| Final | T063–T065 | ~200 | — |
 
-29 batches (F1a done, 28 to go). Over ~300, accepted by the user 2026-10-29: 1a1, 1a2, 1b1, 4b, and at ~320: 2c, 3c, 3d, 6a.
+39 batches (5 done, 34 to go). The user accepted 1a1, 1a2, 1b1, 4b, 2c, 3c, 3d, 6a over the old ~300 target (2026-10-29); 1b1, 1d, 2a, 2b, 2c, 3c, 3d, 4b, 6a, 6b are now split (conservative). 4a (~460) has no clean split and sits at the cap.
 
 **Worktree rules:** created from the current feature-branch tip; only write code and run tsc and unit tests (never e2e); path-limited per-task commits; each worktree needs `node_modules` (a symlink to the main checkout's is fine) for tsc and unit tests. Merged back by the orchestrator by cherry-pick or `git merge --no-ff` (a fast-forward is impossible once the main line has advanced), which then reruns tsc and `npm run test:unit` on the merged tip. T025 changes package.json after the 3a worktree is created, so the merged tip runs `npm ci` (or at least tsc) before the unit run. If a parallel batch finds it must edit a file the other batch owns, it stops and the two run sequentially.
 
@@ -137,6 +140,7 @@ Sizes are changed lines including tests. Target ≤ ~300. Worktrees only where m
 | `next dev` dies mid-run behind `\| tee` (D5, no `pipefail`) | Exit status is tee's; the run fails with a less clear message | Accepted; read tests/e2e/.server.log first. |
 | Typing changes height after scroll decisions | Jumpy scroll (chat-polish REQ-11) | Lay out the full lead invisibly and type into an overlay. |
 | tee log flaky, or orphan `next`/clone after teardown | REQ-23 log assertion fails; :3200 busy | Poll up to 2 s with the D5 fallback; T076 first-run orphan check. |
+| Batch estimates leave out tests (1a2: ~557 vs ~360) | Long review rounds | Revision 7 counts tests (× ~1.6) and caps at ~450; running-estimate stop at +50 lines (tasks.md Global rules). |
 | Shared files across stories | Mixed-concern commits, worktree conflicts | Commit each task before the next touches the same file; worktrees only where the Batches table allows. |
 
 ## Constitution check
@@ -147,4 +151,4 @@ Sizes are changed lines including tests. Target ≤ ~300. Worktrees only where m
 - [x] 4 Dependencies: only fuse.js 7.5.0 (user's yes on record). The unit runner adds a script, not a package.
 - [x] 5 No secrets: hooks use a non-secret env flag; `.env.local` untouched.
 - [x] 6 Errors: the 500 path logs route, user id, message length and stack; invalid input is 400 without an error log.
-- [x] 7 Small changes: per-task path-limited commits; batch sizes in the Batches table; the overs (1a1, 1a2, 1b1, 4b, 2c, 3c, 3d, 6a) are accepted by the user 2026-10-29.
+- [x] 7 Small changes: per-task path-limited commits; batch sizes (tests included) in the Batches table, cap ~450 after the revision 7 re-estimate; done overs 1a1 (~436) and 1a2 (~557) accepted by the user 2026-10-29; the other accepted overs (1b1, 2c, 3c, 3d, 4b, 6a) are now split; 4a sits at ~460.

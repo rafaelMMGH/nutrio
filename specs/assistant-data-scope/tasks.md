@@ -1,6 +1,6 @@
 # Tasks: Assistant data scope
 
-**Spec:** [spec.md](spec.md) (v1.6) · **Plan:** [plan.md](plan.md) (revision 6) · **Contract:** [contracts/chat-api.md](contracts/chat-api.md)
+**Spec:** [spec.md](spec.md) (v1.6) · **Plan:** [plan.md](plan.md) (revision 7) · **Contract:** [contracts/chat-api.md](contracts/chat-api.md)
 
 Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with other `[P]` tasks in the same batch (different files, no shared dependency). IDs T066–T068 were added in plan revision 2; T069–T070 in revision 3; T071 in revision 4 (removed in revision 6, ID kept); T072 in revision 5; T073–T077 in revision 6 (unit-first cadence, spec v1.6). They sit where they run.
 
@@ -12,12 +12,14 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 - **Unit first.** Every logic check (no browser, DB or server needed) is a unit test in `tests/unit/*.test.ts` (flat directory, plan D10), shown red before its code; that red unit run is the fail-first proof. Unit tests import only the pure modules listed in plan D10 and build data with `memDb()`.
 - **e2e still written, not run.** Each task writes its e2e tests (UI, HTTP contract, a11y, focus, typing, navigation, chat-vs-dashboard parity, and one or two representative rows per logic REQ through `ask()`). They must type-check per the tsc rule below. They run first in Batch E (single exception: `npx playwright test assistant-parity.spec.ts -g "dashboard"` once at the 3a2 merge, user decision 2026-10-29; see Review checkpoint 3a2); UI-only and HTTP-only behavior gets its fail-first proof there (T077).
 - **While iterating, run only what you touch:** `npx tsx --test tests/unit/<file>.test.ts` for the unit files of the code being changed. The full `npm run test:unit` runs once per batch, at the checkpoint.
-- **Batch size ≤ ~300 changed lines** so review rounds stay short. Over and accepted by the user: 1a1 (~390, mostly deletions), 1a2 (~360), 1b1 (~390, ~45% deletions), 4b (~340), and at ~320: 2c, 3c, 3d, 6a (all accepted by the user 2026-10-29). A batch growing past its estimate by more than ~50 lines is split at a task boundary and reported.
+- **Batch size ≤ ~450 changed lines including tests** (≈ the old ~300 src-only target; in 1a2 tests were ~64% of the lines: +330/-26 tests vs +119/-82 src, 557 total vs 360 planned). Estimates in the batch headers and plan Batches count tests (revision 7: previous src-only estimates × ~1.6). Done over the old target and accepted by the user 2026-10-29: 1a1 (~436), 1a2 (~557). Splits proposed in revision 7 are conservative (plan Batches).
+- **Running estimate:** when a batch's running count (tests included) passes its estimate by more than ~50 lines, the implementer stops at the next task boundary, commits, and reports; the rest becomes a follow-on batch.
+- **Split test tasks:** where a batch is split between two code tasks that one test task covers, the test task is split by the code task its rows cover ("part 1", "part 2"); each part is committed just before its code, so every batch tip is tsc- and unit-green.
 - **Worktrees only where the plan marks batches independent:** F1b beside 1a1 (from the U0 tip), and 3a1–3a2 beside 1c1–3b2 (from the 1b2 tip, merged before 3c). Worktrees are created from the current feature-branch tip, only write code and run tsc and unit tests (never e2e), commit path-limited per task, need `node_modules` (a symlink is fine), and are merged back by the orchestrator by cherry-pick or `git merge --no-ff` (no fast-forward once the main line advanced), which reruns tsc and `npm run test:unit` on the merged tip (after `npm ci`, or at least tsc, when T025 changed package.json since the worktree was created; plan Worktree rules). If one side must edit a file the other owns, both run sequentially instead. Everything else is sequential: chat.ts, chat-intent.ts, chat-meals.ts and chat-metrics.ts are shared.
 - **e2e runs** (Batch E and Final only) are sequential and in the foreground (one cloned DB, port 3200); never two at once, never in the background, nothing else running.
-- **tsc rule:** `npx tsc --noEmit` must pass at each task's final commit and at every batch checkpoint. A red tests-only commit is exempt but is never left as the batch tip or a worktree's merge tip (plan Testing strategy).
+- **tsc rule:** `npx tsc --noEmit` must pass at each task's final commit and at every batch checkpoint. A red tests-only commit is exempt but is never left as the batch tip or a worktree's merge tip (plan Testing strategy). **Red window (decided after 1a2):** red tests are committed per code task, immediately before that task's code, so the tsc-red window is one commit; a batch does not commit all its red tests up front (1a2 did: db42b49 left tsc red until 1b3be66).
 - **Grep gates over old specs:** gates that look for removed names search `src` plus the old specs only: tests/e2e/assistant-{api,answers,next-step,a11y,composer,look}.spec.ts, tests/e2e/assistant-scope.spec.ts (until T013 deletes it), tests/e2e/theme-palette.spec.ts and tests/e2e/assistant-helpers.ts. The new negative-assertion files tests/e2e/assistant-noscope.spec.ts and tests/unit/chat-answer.test.ts are excluded explicitly; negative assertions on removed names live only there.
-- Commits are path-limited and per task, tests first then code; messages cite US, T and REQ IDs. Commit a task before the next task touches the same file; never `git add -A`. No `specs/` in commits unless the user asks.
+- Commits are path-limited and per task, tests first then code, the test commit separate from and just before its code commit (red window rule above); messages cite US, T and REQ IDs. Commit a task before the next task touches the same file; never `git add -A`. No `specs/` in commits unless the user asks.
 - Never run `next build` in place, never add packages other than T025, no migrations.
 - Copy is verbatim from spec Copy (es-MX).
 - `resolved` (test-only, plan D2) may be asserted while a builder is pending, but no REQ is covered by it alone; each REQ's text assertion is listed in the Coverage table.
@@ -87,27 +89,33 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 
 **Batch note 1a1 (done; T008, commit babeb85, worktree branch worktree-agent-ab226b2ae9a589034, +46/-390):** about 50 generated tests deleted, each mapped to its superseding task (supersession list in T008); a single commit because tsc must pass. `ask(request, message, { today, fail, trace })` has no legacy string form; `fixture` stays opt-in; an `answer()` helper replaces `expectTopic`. Edited in task X: theme-palette.spec.ts:82-91 → T069; assistant-helpers.ts `buildAnswer`/`mockChat`/cart literals → T013; old-UI assertions in assistant-scope, -answers, -next-step, -a11y, -look → T013. False positives: assistant-helpers.ts:64 "scoped to the user", the `auditNow` `scope` option (theme-login, theme-audit), `.user-chip`.
 
-**Batch 1a2: wire model and scope-free server**, about 360 lines. After F1b (both touch route.ts).
+**Batch 1a2: wire model and scope-free server**, about 360 lines planned, ~557 actual. After F1b (both touch route.ts).
 
-- [ ] T072 [US1] Tests REQ-4 (API), REQ-5, REQ-13 clock
+- [x] T072 [US1] Tests REQ-4 (API), REQ-5, REQ-13 clock
   - First commit of the batch (these hold on the current server; tests/e2e/assistant-api.spec.ts): two e2e tests: (1) empty recipe book: `seedRecipes([])`, then `answer(chatContext, "¿Qué recetas tengo?")` asserts the lead "Aún no tienes recetas.", sections `[]` and sources `[]`; (2) soft-deleted recipe: `softDeleteRecipe` on one seeded recipe, then it is missing from the "Recetas" list. 1a1 review cleanups (LOW) in the same commit: drop the redundant `expect(body.kind).toBe("answer")` in the two REQ-18 tests (`answer()` already checks it), the double blank line after the header comment (~19-20), and reword or drop the stale comment at ~104 ("They need the builders of Batch 2b, so this group stays red until then"). F1b review cleanups in tests/e2e/assistant-errors.spec.ts, same commit: (a, MEDIUM) "Reintentar works" (~94-97) also asserts the panel does not contain `REQUEST_ERROR_COPY`, the Reintentar button has count 0, and the live region is non-empty (or matches the known answer text once T048 fixes it); (b, LOW) `expectNoErrorLog` (~29-32) drops the 2 s sleep: after the 400, send `ask(request, "x", { fail: true })` as a sentinel, wait with `logWith(log, INJECTED)`, then assert `LOG_MARK` occurs exactly once in `log.since()`; (c, LOW) rename "without the hook header the question is answered" (~50) so it no longer claims REQ-23's outside-test-environment criterion (that guard is unit-covered; see Coverage).
   - Unit (tests/unit/chat-answer.test.ts, tests/unit/schemas.test.ts, tests/unit/chat-dates.test.ts): over `memDb()`, `ragAnswer(db, user, message, today)` returns a `kind` in the allowed `ReplyKind` set (plan Interfaces), asserted against that set rather than the removed names; `context_used` = "Todo el sistema"; `blocks` and `buttons` present; `answer` equals the concatenated blocks; `resolved` only with the trace option. The server repeat rule on follow-ups. Add `sweep(db, user, answers, today)` to tests/unit/memdb.ts (plan Testing strategy) and sweep the starters and follow-ups whose builders exist (cart, recipes, meal times, plan); it fails on placeholders or an empty set. `chatSchema.parse({ message, scope, recipe_id })` deep-equals `{ message }`. `serverToday(new Date("2026-10-29T03:00Z"))` = "2026-10-28". Red first.
   - e2e, written (tests/e2e/assistant-noscope.spec.ts): the same answer with and without `scope` and `recipe_id` (incl. "Receta" + a recipe id) via raw `request.post`; `resolved` absent without the trace header; `resendSweep` over the starters. First fix `resendSweep` against vacuous passes (assistant-helpers.ts): per message assert `again.status` is 200, `body.kind` is defined, `first.body.blocks` is a non-empty array before the equality, and run the placeholder check over each input's block text too. REQ-5 is claimed only after T063.
-- [ ] T009 [US1] Wire types `Button`, `Block`, new `ReplyKind`, `Intent`, optional `resolved`. Keep old top-level fields so the old client compiles (src/lib/assistant.ts)
-- [ ] T010 [US1] Server answer (src/lib/domain/chat.ts, src/lib/domain/chat-topics.ts)
+- [x] T009 [US1] Wire types `Button`, `Block`, new `ReplyKind`, `Intent`, optional `resolved`. Keep old top-level fields so the old client compiles (src/lib/assistant.ts)
+- [x] T010 [US1] Server answer (src/lib/domain/chat.ts, src/lib/domain/chat-topics.ts)
   - `ragAnswer(db, user, message, today)` with no scope; `reply()` builds blocks, buttons and `answer`.
   - Follow-ups become question buttons per the Topics table; server repeat rule; the 4 Topics starters.
   - `resolved` filled only when the route passes `trace`; topics with no builder use the D3 placeholder.
   - Update tests/unit/smoke.test.ts in the same commit: the new `ragAnswer(db, user, message, today)` call, and "hola" → `greeting` instead of `kind === "unknown"`. Revisit the `sources` test in assistant-api.spec.ts: `sourcesOf("¿Qué hago ahora?")` stays `[]` once it becomes `no_match`, and the test also asserts that kind (finalized in T048).
   - F1b review (LOW): when the route's `ragAnswer` call changes, type `let body;` (src/app/api/rag/chat/route.ts:13) as `z.infer<typeof chatSchema>`.
-- [ ] T011 [US1] Request, loading, today (src/lib/validation/schemas.ts, src/lib/domain/queries.ts, src/lib/domain/chat-dates.ts, src/app/api/rag/chat/route.ts)
+- [x] T011 [US1] Request, loading, today (src/lib/validation/schemas.ts, src/lib/domain/queries.ts, src/lib/domain/chat-dates.ts, src/app/api/rag/chat/route.ts)
   - `chatSchema` = `{ message }`; `needs.chat`; the route uses `loadFor(user, "chat")`.
   - `serverToday(now)` via `Intl` in America/Mexico_City; the route passes `serverToday(new Date())` and `trace` from `testHooks()`.
   - F1b review (LOW; src/lib/server/test-hooks.ts:24-25, tests/unit/test-hooks.test.ts): with hooks enabled, an `x-e2e-today` that is present but not a real day `console.warn`s once (or throws so the test fails loudly); still ignored in production. Unit test first.
 
 **Review checkpoint 1a2:** tsc + unit. The old client still compiles (old top-level fields kept until T016).
 
-**Batch 1b1: scope-free client state, button renderer and pages**, about 390 lines (about 45% deletions; code added ≤ ~220)
+**Batch note 1a2 (done; T072, T009–T011, commits 3a83c8a, db42b49, 606cf91, d7f42d5, 1b3be66; +449/-108, ~557 lines vs ~360 planned, tests ~64%):** reviewer PASS (HIGH none); findings folded into T020, T021, T039, T040, T048, T050, the smoke-test note in T017/T020 and the Global rules (running estimate, red window). Accepted implementer judgment calls: legacy kinds kept in `ReplyKind` until T016; `chipsFor` default branch; `follow_ups` derived from question buttons with scope "auto"; `context_used` literal; the TOPICS titles/follow-ups table done ahead (T020 owns triggers); minimal exact-word greeting/thanks (T049 owns variants and fuzzy); `answer` option-label lines left for T032; `x-e2e-today` parsed but unused until T041.
+- **Order (LOW L2):** T011's warn test was committed with its code (d7f42d5), so its fail-first order is unproven; future tasks keep "test first, separate commit". db42b49 committed all red tests up front (tsc red until 1b3be66); from 1b1 on the red-window rule applies.
+- **Expected red (MEDIUM M3):** assistant-noscope.spec.ts "REQ-5 every starter button…" stays red until the US3 builders (weight T045, weekly progress T047) and T021/T029–T032 ("Mi cena de hoy" → cena options) land. Batch E triage must not read it as a regression.
+- **Interim UI until 1b1 (LOW L3):** the old client renders server follow-ups that now lead to `no_match` (e.g. Plan → "¿Cuál es mi meta?"), and `no_match` shows the page suggestions instead of the starters (assistant.tsx:48).
+- **Unproven until Batch E:** noscope REQ-4 and REQ-13 `resolved`-over-HTTP tests; the two assistant-api tests that should hold today (empty recipe book, soft-deleted recipe); the `sources` test's `no_match` kind; assistant-errors sentinel check and Reintentar proof; the tee log path; the dev Proxy over `needs.chat`. Old-UI specs that contradict the new server are T013's, not regressions.
+
+**Batch 1b1a: scope-free client state and button renderer**, about 430 lines with tests (revision 7 split of 1b1; ~45% deletions)
 
 - [ ] T012 [US1] Tests REQ-4 UI, REQ-5 client, e2e only, written (tests/e2e/assistant-noscope.spec.ts)
   - On a recipe page, "¿Qué hay en mi carrito?" gives the cart answer.
@@ -122,14 +130,18 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
   - The `AssistantChat`/`ScopeSwitcher` props stay optional or are still passed by AppShell until T015 removes them, or T014 and T015 land as one commit.
 - [ ] T015 [US1] Renderer and header (src/components/shared/AssistantTurn.tsx, src/components/shared/AssistantChat.tsx, src/components/shared/assistant-chat.css; delete src/components/shared/ScopeSwitcher.tsx)
   - Render blocks (title, lead, sections, block buttons) and answer buttons; question buttons only under the latest answer; links (`next/link`) on every answer. Header row 2 removed.
+
+**Review checkpoint 1b1a:** tsc + unit.
+
+**Batch 1b1b: pages**, about 190 lines with tests
 - [ ] T069 [US1] Pages (src/components/dashboard/DashboardView.tsx, src/components/dashboard/home.css, src/components/recipes/RecipeDetail.tsx, src/components/groceries/GroceriesChat.tsx, src/components/app/assistant.tsx, src/components/app/AppShell.tsx, tests/e2e/theme-palette.spec.ts)
   - Search bar: scope menu, filter button and their CSS removed; fixed placeholder and aria name (spec Copy); `onAsk(message)`.
   - In the same commit as the CSS removal: delete the `sharedUi` entry "home scope menu" in tests/e2e/theme-palette.spec.ts (~82-91; it feeds the sweeps at ~336 and ~406). Named in the batch note.
   - RecipeDetail and GroceriesChat register a subtitle label only. Then drop the temporary optional parameters from T014.
 
-**Review checkpoint 1b1:** tsc + unit; `grep -rEn "home-search-filter|home-scope" src tests/e2e --exclude=assistant-noscope.spec.ts` returns nothing (old-spec grep rule in Global rules).
+**Review checkpoint 1b1b:** tsc + unit; `grep -rEn "home-search-filter|home-scope" src tests/e2e --exclude=assistant-noscope.spec.ts` returns nothing (old-spec grep rule in Global rules).
 
-**Batch 1b2: test churn and leftovers**, about 300 lines (mostly test rewrites and deletions)
+**Batch 1b2: test churn and leftovers**, about 360 lines with tests (mostly test rewrites and deletions, already counted)
 
 - [ ] T013 [US1] Test churn (tests/e2e/*.spec.ts, tests/e2e/assistant-helpers.ts)
   - Delete tests/e2e/assistant-scope.spec.ts. Move `buildAnswer`/`mockChat` to the new shape; replace `UNKNOWN_LEAD`/`UNKNOWN_ANSWER`/`CAPABILITY_LINE` and every `follow_ups` use.
@@ -143,7 +155,7 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 
 **Review checkpoint 1b2:** tsc + unit; `grep -rEn "ScopeKey|SCOPE_LABEL|FollowUp|follow_ups|chipsFor|out_of_scope|missing_recipe|Preguntar en Todo" src tests/e2e --exclude=assistant-noscope.spec.ts` returns nothing (src plus the old specs; tests/unit and the new negative-assertion files excluded per Global rules). The 3a worktree may start from this tip.
 
-**Batch 1c1: normalizer and word matcher**, about 240 lines
+**Batch 1c1: normalizer and word matcher**, about 380 lines with tests
 
 - [ ] T017 [US1] Unit tests REQ-2 (tests/unit/chat-match.test.ts)
   - The full REQ-2 matcher table on `matchWord`, each ✓ and ✗ row (incl. "una planta" ≠ "plan"), plus multi-word phrase consumption and `normalizeText` per spec Terms (ñ→n, punctuation → space). Red first.
@@ -155,7 +167,7 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 
 **Review checkpoint 1c1:** tsc + unit (T017 green).
 
-**Batch 1c2: vocabulary through the answer path**, about 220 lines
+**Batch 1c2: vocabulary through the answer path**, about 380 lines with tests (incl. the 1a2 sweep fix in T020)
 
 - [ ] T070 [US1] Tests REQ-1, REQ-2
   - Unit (tests/unit/chat-answer.test.ts): through `ragAnswer` on `memDb()`, the REQ-1 Givens whose topic list equals the matched topics in order of first appearance (`resolved` plus answer text for cart, recipes, meal times, plan); the REQ-2 table end to end (each ✓ row resolves to its topic, each ✗ row does not, incl. "una planta" not resolving to Plan); "¿Qué hago ahora?" and "¿Qué cosas tengo?" → `no_match` with the starters; the chat-polish REQ-19 winners table re-created in the new vocabulary. Red first.
@@ -164,22 +176,28 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
   - Every Topics trigger, the frozen recipe-list filter words, the Button/Title/Follow-ups table, the starters.
   - Interim until T023: the intent list is the matched topics in order of first appearance, capped at 2 plus overflow, no REQ-6 rules.
   - chat.ts drops its `nutrition.normalize` import (plan D6).
+  - 1a2 review (MEDIUM M2, LOW L7), tests first in a separate commit before the code (tests/unit/memdb.ts, tests/unit/chat-answer.test.ts, tests/e2e/assistant-helpers.ts, tests/unit/smoke.test.ts): `sweep` and `resendSweep` today compare two calls of a stateless function, so "same blocks" always passes. Add an expected-topic map built from the Topics "Button" column (message → topic) and, per swept button, assert exactly one `resolved` intent with that topic plus a text or `kind` assertion (lead text, or kind ≠ `no_match`); `resolved` is never the only evidence. Drop "Mi cena de hoy" from the "with a builder" sweep test (chat-answer.test.ts ~102-106) and add it to `skip` until T021. smoke.test.ts also asks "¿Qué hay en mi carrito?" on `emptyDb()` so the chat → cart chain stays exercised.
 
 **Review checkpoint 1c2:** tsc + unit.
 
-**Batch 1d: resolution order**, about 310 lines
+**Batch 1d1: resolver**, about 330 lines with tests (revision 7 split of 1d)
 
 - [ ] T021 [US1] Tests REQ-6
-  - Unit (tests/unit/chat-intent.test.ts): the REQ-1 Givens left out of T070; via `resolved` and answer text where a builder exists: ingredientes + desayuno, cuándo/hora + compro, ingredientes + comprar, meta de peso, recetas + plan, the button "¿Qué recetas hay en mi plan?", nombre de mi plan, cuántas comidas llevo, qué lleva la cena, cuánto llevo. Every Topics Button, Follow-up and starter of topics that exist at 1d resolves to exactly its topic; `sweep()` extended to them. "<Slot ref>" buttons move to T028, "¿Qué lleva <receta>?" to T026. Red first.
+  - Unit (tests/unit/chat-intent.test.ts): the REQ-1 Givens left out of T070; via `resolved` and answer text where a builder exists: ingredientes + desayuno, cuándo/hora + compro, ingredientes + comprar, meta de peso, recetas + plan, the button "¿Qué recetas hay en mi plan?", nombre de mi plan, cuántas comidas llevo, qué lleva la cena, cuánto llevo. Every Topics Button, Follow-up and starter of topics that exist at 1d resolves to exactly its topic; `sweep()` extended to them, each with the T020 expected-topic and text/kind assertion. "Mi cena de hoy" returns to the sweep here (resolves to the cena slot; its options text lands with T032), and the `skip` list (PENDING: "¿Cuál es mi meta?", "Mi peso", "Mi avance de la semana") shrinks as each builder lands (T021, then T045, T047). "<Slot ref>" buttons move to T028, "¿Qué lleva <receta>?" to T026. Red first.
+  - Split (Global rules "Split test tasks"): part 1, committed just before T022, holds the rows asserted on `resolve()` directly (chat-intent.test.ts); part 2, committed just before T023, holds the `ragAnswer`-level rows, the sweep and the e2e.
   - e2e, written (tests/e2e/assistant-match.spec.ts): two REQ-6 Givens with answer text through `ask()`.
 - [ ] T022 [US1] Resolver (src/lib/domain/chat-intent.ts)
   - REQ-6 steps 1–8, with hooks for step 2 (US2) and step 4 (T027); phrase consumption.
   - Combinations: time + slot, goal + metric, "plan" possessor, Plan only when alone, ingredientes + cart, a time word without a slot ignored. At most 2 topics plus overflow.
+**Review checkpoint 1d1:** tsc + unit.
+
+**Batch 1d2: resolver wiring**, about 170 lines with tests
+
 - [ ] T023 [US1] Wire the resolver into `ragAnswer`, replacing T020's first-appearance list (src/lib/domain/chat.ts)
 
-**Review checkpoint 1d:** tsc + unit.
+**Review checkpoint 1d2:** tsc + unit.
 
-**Batch 1e: dish matcher (fuse.js)**, about 190 lines
+**Batch 1e: dish matcher (fuse.js)**, about 300 lines with tests
 
 - [ ] T024 [US1] Spike, outside the repo
   - Copy the project to the session scratchpad as a real copy (excluding node_modules and .next*), then `npm ci` and `npm install fuse.js@7.5.0 --save-exact` inside the copy. **Never symlink node_modules** here.
@@ -195,42 +213,57 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 
 ## Phase 4: US2 (P1) Meal detail
 
-**Batch 2a: slots and times**, about 310 lines
+**Batch 2a1: slots and times**, about 330 lines with tests (revision 7 split of 2a)
 
 - [ ] T028 [US2] Tests REQ-7, REQ-8, REQ-11 (duplicates)
   - Unit (tests/unit/chat-meals.test.ts): REQ-7 almuerzo question and buttons (1 or 2), merienda/snack → colación, not in plan; REQ-8 one slot's time highlighted, a slot without a time, all slots; REQ-11 two colaciones → 2 buttons with "(<time>)", "colación 2" and "segunda colacion", 11 slots → "Colación 11", masculine ordinals; `sweep()` over every "<Slot ref>" and almuerzo-clarify button; answer text for the slot Givens of REQ-1 and REQ-6. Red first.
   - e2e, written (tests/e2e/assistant-meals.spec.ts): an almuerzo question and the duplicate-colación buttons through `ask()`; one REQ-8 slot-time row through `ask()` covering a single slot's time highlighted, a slot without a time, and all slots.
+  - Split: part 1 (just before T029) = REQ-7, REQ-8 and the REQ-11 labels/ordinals on the slot builders; part 2 (just before T030) = typed ordinals, "colación 2", "segunda colacion", the sweep and the e2e.
 - [ ] T029 [US2] Slots (src/lib/domain/chat-meals.ts)
   - Slot list from `activeSchedule`, word-to-slot mapping, almuerzo/merienda/snack rules.
   - Slot refs and ordinals (feminine/masculine, >10), slot buttons (times vs options message); slot times builder and variants.
+**Review checkpoint 2a1:** tsc + unit.
+
+**Batch 2a2: slot resolution**, about 170 lines with tests
+
 - [ ] T030 [US2] Resolver: slot words, typed ordinals and "<slot> <n>" for duplicated slots (src/lib/domain/chat-intent.ts)
 
-**Review checkpoint 2a:** tsc + unit.
+**Review checkpoint 2a2:** tsc + unit.
 
-**Batch 2b: options, paging, selection**, about 300 lines
+**Batch 2b1: options builder**, about 300 lines with tests (revision 7 split of 2b)
 
 - [ ] T031 [US2] Tests REQ-9, REQ-10, REQ-11 (option buttons)
   - Unit (tests/unit/chat-meals.test.ts): 5 options → 3 + "Ver más opciones"; page 2 → 4–5 + "Opciones anteriores"; 7 options → page 3 shows option 7 with "Opciones anteriores" only; page 9 → last page. Labels: "Opción 2: Pollo, Arroz, Brócoli…" (4 ingredients), exactly 3 → no "…", 0 → "Opción <n>". "cena opción 2", "cena opcion 2", "la 2 de la cena" equal; "cena opción 7" → "Tu cena tiene 4 opciones." + first page. REQ-11: "Segunda colación" lists the second slot's options with buttons sending "Segunda colación, opción <n>". REQ-3 row "la comida opcion 1": option selection, comida, option 1, `kind` neither `did_you_mean` nor `no_match`. `sweep()` over option and paging buttons. Red first.
   - e2e, written (tests/e2e/assistant-meals.spec.ts): one UI flow tapping through the pages (the user turn shows the sent message); "cena opción 2" through `ask()`.
+  - Split: part 1 (just before T032) = page contents, labels and the out-of-range lead on the builder; part 2 (just before T033) = the selection/paging message rows, the REQ-3 row, the sweep and the e2e.
 - [ ] T032 [US2] Options builder: lead variants, `layout: "option"` buttons in plan order, labels, paging messages, out-of-range (src/lib/domain/chat-meals.ts)
+**Review checkpoint 2b1:** tsc + unit.
+
+**Batch 2b2: option selection and paging**, about 180 lines with tests
+
 - [ ] T033 [US2] Resolver step 2: option selection and paging, incl. page 1 and no number = page 2 (src/lib/domain/chat-intent.ts)
 
-**Review checkpoint 2b:** tsc + unit.
+**Review checkpoint 2b2:** tsc + unit.
 
-**Batch 2c: dish detail**, about 320 lines
+**Batch 2c1: shared step splitter**, about 170 lines with tests (revision 7 split of 2c)
 
 - [ ] T034 [US2] Tests REQ-12, REQ-11 (single option), REQ-3 text
   - Unit (tests/unit/recipe-steps.test.ts): `recipeSteps` returns no steps for "Extraído de plan.pdf", "EXTRAÍDO DE plan.pdf" and "Extraido de plan.pdf"; "¿Listo? Ásalo. Él sirve." keeps its split. Red first.
   - Unit (tests/unit/chat-meals.test.ts): 12 ingredients all shown; steps 1–2 equal `recipeSteps(description)` 1–2, plus the "Ver receta completa" link to `/recipes/<id>`; "Extraído de plan.pdf" → the no-preparation item; complement "Agua natural · 1 vaso", none → no heading; by dish name, complements only if the recipe is in exactly one slot; ingredient formats with no unit and with neither; a generic-name lead; a single-option slot goes straight to the detail; a recipe with zero ingredients and zero steps still gets a detail answer (lead, no empty headings); every detail answer's `sources` equals `["Receta: <name>"]` (contract keeps `sources`); REQ-3 text: each found row shows the detail lead and "la comida opcion 1" shows comida option 1's detail; end-of-US2 `sweep()` over every existing Topics, slot, option, paging and "¿Qué lleva <receta>?" button.
+  - Split: part 1 (just before T035) = the recipe-steps.test.ts rows and the recipe-page e2e; part 2 (just before T036, Batch 2c2) = the chat-meals.test.ts rows and the remaining e2e.
   - e2e, written (tests/e2e/assistant-meals.spec.ts): the recipe page shows the empty-steps state for the three import notes and keeps the accented split (display unchanged by T035); "Ver receta completa" opens `/recipes/<id>`; one detail answer through `ask()`.
 - [ ] T035 [US2] Shared `recipeSteps(description)` using `normalizeText`, used by the recipe page (no display change) (src/lib/recipe-steps.ts, src/components/recipes/RecipeDetail.tsx)
+**Review checkpoint 2c1:** tsc + unit.
+
+**Batch 2c2: dish detail**, about 340 lines with tests
+
 - [ ] T036 [US2] Detail builder: lead, uncapped "Ingredientes", "Preparación" (2 steps + link), "Acompaña con" from the slot's add-ons and `add_on` usages (src/lib/domain/chat-meals.ts)
 
 **Checkpoint:** US2 code complete (REQ-7 to REQ-12), unit-green; e2e in Batch E.
 
 ## Phase 5: US3 (P2) Weekly goals and date-based data
 
-**Batch 3a1: shared progress math**, about 200 lines. Worktree from the 1b2 tip, beside 1c1–3b2; touches only the files below.
+**Batch 3a1: shared progress math**, about 320 lines with tests. Worktree from the 1b2 tip, beside 1c1–3b2; touches only the files below.
 
 - [ ] T075 [US3] Unit tests for progress.ts (tests/shared/progress-fixture.ts, tests/unit/progress.test.ts)
   - tests/shared/progress-fixture.ts: the parity log rows (both sides of Monday, a capped water day, none after today) and their hand-computed expected numbers for today 2026-10-28; T066 uses the same file.
@@ -241,7 +274,7 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 
 **Review checkpoint 3a1:** tsc + unit.
 
-**Batch 3a2: dashboard refactor**, about 170 lines. Same worktree; merged before 3c.
+**Batch 3a2: dashboard refactor**, about 270 lines with tests. Same worktree; merged before 3c.
 
 - [ ] T066 [US3] e2e, written: dashboard baseline for REQ-16 (tests/e2e/assistant-parity.spec.ts)
   - The chat user's dashboard with `timezoneId: "America/Mexico_City"` and `page.clock.setFixedTime` (2026-10-28), logs from tests/shared/progress-fixture.ts; tile numbers (exercise days, water liters with a capped day, meals D de N, weight change) equal its expected values. First spec run in Batch E.
@@ -249,17 +282,18 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 
 **Review checkpoint 3a2:** tsc + unit. Reviewer reads the T038 diff for identical inputs, rounding and `endDay` = Sunday (plan Risks). At the merge into the feature branch, the orchestrator runs `npx playwright test assistant-parity.spec.ts -g "dashboard"` once (the only e2e run before Batch E; user decision 2026-10-29): needs the e2e config from T003 (already in) and a T066 test title containing "dashboard"; one server start, one DB clone, nothing else running, foreground; afterwards `lsof -i :3200` is empty and `psql -l` shows no `*-e2e` DB. A failure blocks this checkpoint and is fixed in 3a2. The result is recorded in the 3a2 batch note.
 
-**Batch 3b1: date parser**, about 260 lines (3a may run beside it)
+**Batch 3b1: date parser**, about 420 lines with tests (3a may run beside it)
 
 - [ ] T039 [US3] Tests REQ-13, REQ-14 periods
-  - Unit (tests/unit/chat-dates.test.ts): every REQ-14 phrase → its period bounds with today passed in (cue and period-noun rules); no fallback for "Mi avance de la semana", "¿Cuántos días hice ejercicio?", "a la semana", "en la semana"; "en el mes" = this month. Red first.
+  - Unit (tests/unit/chat-dates.test.ts): every REQ-14 phrase → its period bounds with today passed in (cue and period-noun rules); no fallback for "Mi avance de la semana", "¿Cuántos días hice ejercicio?", "a la semana", "en la semana"; "en el mes" = this month. 1a2 review (LOW L4): a pre-2022 summer case, `serverToday(new Date("2022-07-01T05:30:00Z"))` = "2022-07-01" (CDT, UTC−5). Red first.
   - e2e, written (tests/e2e/assistant-progress.spec.ts): the `x-e2e-today` pin moves the period bounds in `resolved`; a pin header without the trace header changes no field shape.
 - [ ] T040 [US3] Date parser: cue and period-noun rules, the phrase table → `Period` (src/lib/domain/chat-dates.ts)
+  - 1a2 review (LOW L4): `serverToday` calls `formatToParts` once per call (today once per part, chat-dates.ts:7).
 - [ ] T041 [US3] The route passes the pinned today from `testHooks()` (else `serverToday`); the resolver attaches the period to metric intents (src/app/api/rag/chat/route.ts, src/lib/domain/chat-intent.ts)
 
 **Review checkpoint 3b1:** tsc + unit.
 
-**Batch 3b2: period labels, clamp, fallback**, about 220 lines
+**Batch 3b2: period labels, clamp, fallback**, about 350 lines with tests
 
 - [ ] T067 [US3] Unit tests REQ-14 labels (tests/unit/chat-dates.test.ts)
   - Every REQ-14 row → its label (es-MX); year suffix; future-day cut; "últimos 400 días" → 366 days plus the clamp flag; fallback for "hace dos semanas", "31 de febrero", "el mes anterior". Red first. (e2e for REQ-14 text: T042.)
@@ -267,57 +301,73 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 
 **Review checkpoint 3b2:** tsc + unit. The 3a worktree is merged before 3c starts.
 
-**Batch 3c: water and exercise**, about 320 lines
+**Batch 3c1: water**, about 260 lines with tests (revision 7 split of 3c; no clean task boundary, so T042 and T043 are split by metric)
 
 - [ ] T042 [US3] Tests REQ-15, REQ-17, REQ-18, REQ-13/14 text, REQ-16
   - Unit (tests/unit/chat-metrics.test.ts, `memDb({ logs })`, today passed in): water today plus the week line; "hoy" only; "ayer" only; uncapped 10 glasses with the week line counting 2 litros; range totals, average and days met. Exercise: week remaining with singular "Te falta 1 día", the met line, today yes/no, another single day, full week vs other ranges. Every REQ-14 label row through water or exercise answers; the clamp line ("Solo puedo revisar hasta 366 días; te muestro los últimos 366.") and the fallback line ("No entendí la fecha; te muestro <periodo>."). REQ-13: a log dated after today leaves "Esta semana (…)" liters unchanged. REQ-27 empty ranges: 0 with the period label. Metric Givens of REQ-1 and REQ-6. Red first.
   - e2e, written: extend T066 (tests/e2e/assistant-parity.spec.ts) with the same pin header, chat water week liters and exercise days equal the tiles; through `ask()` with `today` pinned, "¿Cuánta agua tomé hoy?" changes with the pin and one exercise answer (tests/e2e/assistant-progress.spec.ts).
-- [ ] T043 [US3] Water and exercise builders on `progress.ts`, `endDay` = today, incl. the 0-with-label empty range (src/lib/domain/chat-metrics.ts)
+  - Split: part 1 (3c1) = the water rows, REQ-13 future-day log, the label/clamp/fallback rows through water, the water e2e; part 2 (3c2) = the exercise rows, the remaining label rows, the exercise e2e.
+- [ ] T043 [US3] Water and exercise builders on `progress.ts`, `endDay` = today, incl. the 0-with-label empty range (src/lib/domain/chat-metrics.ts). Part 1 (3c1) water, part 2 (3c2) exercise.
 
-**Review checkpoint 3c:** tsc + unit.
+**Review checkpoint 3c1:** tsc + unit.
 
-**Batch 3d: weight and meals done**, about 320 lines
+**Batch 3c2: exercise**, about 250 lines with tests: T042 part 2, then T043 part 2.
+
+**Review checkpoint 3c2:** tsc + unit.
+
+**Batch 3d1: weight**, about 310 lines with tests (revision 7 split of 3d; T044 and T045 split by metric)
 
 - [ ] T044 [US3] Tests REQ-19, REQ-20, REQ-14 text, REQ-16 (meals, weight), REQ-27 (weight)
   - Unit (tests/unit/chat-metrics.test.ts): REQ-19 exact sentence; no week line without a record this week; "sin cambio"; "meta alcanzada"; no goal → "Fijar mi meta"; last record over 7 days → the line + "Registrar mi peso"; range min/max. REQ-20: today 3 de 5, week ×7, a range with %. REQ-14 range labels and the fallback line in weight and meals answers. REQ-27: no weight logs → "Aún no registras tu peso." + "Registrar mi peso" (/); an empty weight range → "<Periodo>: no registraste tu peso."; an empty meals range → 0 with the label. Red first.
   - e2e, written: extend T066 (meals done D de N, weight change) (tests/e2e/assistant-parity.spec.ts); the T012 search-bar question shows the weight copy (tests/e2e/assistant-noscope.spec.ts); no weight logs through `ask()` (tests/e2e/assistant-progress.spec.ts).
-- [ ] T045 [US3] Weight and meals-done builders, incl. the no-weight-logs reply and empty ranges; the no-active-plan reply for meals done is left to T052 (src/lib/domain/chat-metrics.ts)
+  - Split: part 1 (3d1) = REQ-19, REQ-27 weight rows, weight labels/fallback, the weight e2e and parity; part 2 (3d2) = REQ-20, the meals labels and empty range, the meals parity.
+- [ ] T045 [US3] Weight and meals-done builders, incl. the no-weight-logs reply and empty ranges; the no-active-plan reply for meals done is left to T052 (src/lib/domain/chat-metrics.ts). Part 1 (3d1) weight, which also removes "Mi peso" from the sweep `skip` list; part 2 (3d2) meals done.
 
-**Review checkpoint 3d:** tsc + unit.
+**Review checkpoint 3d1:** tsc + unit.
 
-**Batch 3e: goals, weekly progress**, about 270 lines
+**Batch 3d2: meals done**, about 200 lines with tests: T044 part 2, then T045 part 2.
+
+**Review checkpoint 3d2:** tsc + unit.
+
+**Batch 3e: goals, weekly progress**, about 430 lines with tests
 
 - [ ] T046 [US3] Tests REQ-21, REQ-22, REQ-16
   - Unit (tests/unit/chat-metrics.test.ts): REQ-21 bare goals, narrowed water goal, no active plan; a plan of 1 L → "Tu meta de agua es **4 vasos** (1 litro) al día."; 4 L → "**12 vasos** (4 litros)". REQ-22: 4 items / 3 without a weight change / no plan. `sweep()` over metric follow-ups ("Fijar mi meta"/"Subir mi plan" are links, excluded). Red first.
   - e2e, written: parity of the goals answer's exercise and water goals and every weekly-progress item with the tiles under the T066 pin (tests/e2e/assistant-parity.spec.ts); one goals answer through `ask()` (tests/e2e/assistant-progress.spec.ts).
-- [ ] T047 [US3] Goals and weekly-progress builders, incl. the no-plan line and "Subir mi plan" (src/lib/domain/chat-metrics.ts)
+- [ ] T047 [US3] Goals and weekly-progress builders, incl. the no-plan line and "Subir mi plan"; removes "¿Cuál es mi meta?" and "Mi avance de la semana" from the sweep `skip` list (src/lib/domain/chat-metrics.ts)
 
 **Checkpoint:** US3 code complete (REQ-13 to REQ-22), unit-green; parity (REQ-16) proven in Batch E.
 
 ## Phase 6: US4 (P2) Chat-like edge cases
 
-**Batch 4a: greeting, variants, no-match, did-you-mean**, about 290 lines
+**Batch 4a: greeting, variants, no-match, did-you-mean**, about 460 lines with tests (no clean task boundary; at the ~450 cap)
 
 - [ ] T048 [US4] Tests REQ-23, REQ-26, REQ-28, REQ-29, REQ-3 text
-  - Unit (tests/unit/chat-edges.test.ts): "hola" → greeting + 4 buttons; thanks; "Hola, ¿cuánto peso?" → weight. Pizza not-found quotes "pizza"; pollo → did-you-mean with 2 buttons (no distractor offered); "la opcion 1" → not found. The same question twice → the same variant; for each answer with variants, questions hitting different variants show identical numbers and units (REQ-28). Capital de Francia → no-match + 4 starters; a near recipe name → did-you-mean. No-match asserts the exact lead (one of the two spec Copy variants), exactly the 4 starter buttons, and no objective or meal name anywhere in the answer. Negative assertion (tests/unit/chat-answer.test.ts): the old fallback texts "No encontré esa información en tu plan activo." and "No encontré esa información en el sistema." never appear. `sweep()` over greeting, no-match and did-you-mean buttons. Red first.
+  - Unit (tests/unit/chat-edges.test.ts): "hola" → greeting + 4 buttons; thanks; "Hola, ¿cuánto peso?" → weight. Pizza not-found quotes "pizza"; pollo → did-you-mean with 2 buttons (no distractor offered); "la opcion 1" → not found. The same question twice → the same variant; for each answer with variants, questions hitting different variants show identical numbers and units (REQ-28). Capital de Francia → no-match + 4 starters; a near recipe name → did-you-mean. No-match asserts the exact lead (one of the two spec Copy variants), exactly the 4 starter buttons, and no objective or meal name anywhere in the answer. 1a2 review (LOW L6): starters are not filtered by the repeat rule: greeting and no_match list all 4 starters even when the message equals a starter-like text. Negative assertion (tests/unit/chat-answer.test.ts): the old fallback texts "No encontré esa información en tu plan activo." and "No encontré esa información en el sistema." never appear. `sweep()` over greeting, no-match and did-you-mean buttons. Red first.
   - e2e, written (tests/e2e/assistant-edges.spec.ts): through `ask()`, "hola", pollo did-you-mean, pizza not found, the same question twice. Finalize the `sources` test in assistant-api.spec.ts: "¿Qué hago ahora?" → kind `no_match` and `sources` `[]`.
 - [ ] T049 [US4] Builders and variant picker; REQ-29 matching on the whole question minus stop words (src/lib/domain/chat.ts, src/lib/domain/chat-dish.ts)
 
 **Review checkpoint 4a:** tsc + unit.
 
-**Batch 4b: multi-topic, clarifications, missing data**, about 340 lines
+**Batch 4b1: multi-topic**, about 250 lines with tests (revision 7 split of 4b)
 
 - [ ] T050 [US4] Tests REQ-24, REQ-25, REQ-27
   - Unit (tests/unit/chat-edges.test.ts): "agua, ejercicio y peso" → 2 titled blocks + "Mi peso"; desayunar y cenar → options + "¿Cuál es mi cena?". Clarify answers stand alone; "¿Cuánto llevo?" → 3 buttons; a dish cue with no dish → 3 recipe buttons, or slot buttons when none. REQ-27 cases not tested earlier: no active plan for plan, slot and meals-done questions; "¿Qué puedo cenar?" without cena → "Tu plan no tiene cena." + one button per slot, starters when none; a slot with no options; an empty recipe book: "¿Qué recetas tengo?" → lead "Aún no tienes recetas.", no sections, `sources` `[]`. `sweep()` over clarify, did-you-mean and overflow buttons; none resolves to another question or no-match. Red first.
   - e2e, written (tests/e2e/assistant-edges.spec.ts): the multi-topic question and "¿Cuánto llevo?" through `ask()`; one no-active-plan slot question.
+  - 1a2 review (LOW L5): once 2-block answers exist (T051), one literal assertion of a 2-block plain `answer` string (both blocks concatenated, D7); applies to T048–T050 wherever a 2-block answer is first produced.
+  - Split: part 1 (just before T051) = the multi-topic rows and the literal 2-block `answer`; part 2 (just before T052, Batch 4b2) = clarify, REQ-27 rows, the sweep and the e2e.
 - [ ] T051 [US4] `reply()` 2-block rules: titles, one option block, follow-ups then overflow, a later clarify omitted (src/lib/domain/chat.ts)
+**Review checkpoint 4b1:** tsc + unit.
+
+**Batch 4b2: clarifications and missing data**, about 290 lines with tests
+
 - [ ] T052 [US4] Clarify replies and the missing-data replies tested in T050 only (src/lib/domain/chat-meals.ts, src/lib/domain/chat-metrics.ts)
 
 **Checkpoint:** US4 code complete (REQ-23 to REQ-29), unit-green.
 
 ## Phase 7: US5 (P3) Identity
 
-**Batch 5: identity**, about 150 lines
+**Batch 5: identity**, about 240 lines with tests
 
 - [ ] T053 [US5] Tests REQ-30, REQ-31
   - Unit (tests/unit/chat-identity.test.ts): "Te llamas Rafael." highlighted; a blank name; "Plan octubre.PDF" → "Plan octubre"; the plan summary lead has the name; no plan → REQ-27; answer text for the identity Givens of REQ-6. Red first.
@@ -330,7 +380,7 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 
 UI-only: e2e tests are written here and proven in Batch E (T076 run, T077 breakage demo).
 
-**Batch 6a: bubbles, avatar, button variants**, about 320 lines
+**Batch 6a1: UI tests, written**, about 250 lines (revision 7 split of 6a; e2e only, not run, so a tests-only batch is green on tsc + unit)
 
 - [ ] T055 [US6] e2e, written: REQ-32, REQ-34, REQ-35 visuals (tests/e2e/assistant-look.spec.ts, tests/e2e/assistant-a11y.spec.ts)
   - Sides and avatar (32 px `Bot`, aria-hidden, also on errors).
@@ -340,22 +390,30 @@ UI-only: e2e tests are written here and proven in Batch E (T076 run, T077 breaka
   - Visible focus ring on option buttons and nav links, both themes. Bubbles are not keyboard-focusable: no tabindex, skipped by Tab.
   - Only the last answer has question buttons; `aria-disabled` while pending (focusable, sends nothing); links work on old answers.
   - The arrow icon is aria-hidden; the accessible name equals the label.
+**Review checkpoint 6a1:** tsc + unit.
+
+**Batch 6a2: bubbles, avatar, button variants**, about 260 lines
+
 - [ ] T056 [US6] Single button component with `option` and `link` variants (`ArrowUpRight`); bubbles and avatar with theme tokens only (src/components/shared/PromptSuggestion.tsx, src/components/shared/AssistantTurn.tsx, src/components/shared/assistant-chat.css)
 
-**Review checkpoint 6a:** tsc + unit.
+**Review checkpoint 6a2:** tsc + unit.
 
-**Batch 6b: typing and live region**, about 300 lines
+**Batch 6b1: response stream**, about 110 lines (revision 7 split of 6b)
 
 - [ ] T058 [US6] Fetch https://prompt-kit.com/c/response-stream.json into the scratchpad (no install); adapt it with attribution (src/components/shared/ResponseStream.tsx)
+**Review checkpoint 6b1:** tsc + unit.
+
+**Batch 6b2: typing and live region**, about 370 lines with tests
+
 - [ ] T059 [US6] e2e, written: REQ-33 (tests/e2e/assistant-look.spec.ts, tests/e2e/assistant-a11y.spec.ts)
   - A long lead completes within 1 s; buttons appear only after it; tapping completes it; reduced motion → immediate.
   - The live region changes once and includes "3 opciones" and the labels.
   - No replay after close/reopen or navigation; the scroll uses the final height.
 - [ ] T060 [US6] Type the first lead only (precomputed full-height layout); fades ≤200 ms; reduced motion; typed-once flag; hidden option count in the live region (src/components/shared/AssistantTurn.tsx, src/components/shared/assistant-chat.css)
 
-**Review checkpoint 6b:** tsc + unit.
+**Review checkpoint 6b2:** tsc + unit.
 
-**Batch 6c: keyboard, focus, navigation**, about 220 lines
+**Batch 6c: keyboard, focus, navigation**, about 350 lines with tests
 
 - [ ] T061 [US6] e2e, written: REQ-35, REQ-34 navigation close (tests/e2e/assistant-a11y.spec.ts)
   - Tab order, Enter/Space.
@@ -388,7 +446,7 @@ UI-only: e2e tests are written here and proven in Batch E (T076 run, T077 breaka
 
 ## Phase 10: Final verification
 
-**Batch Final**, about 140 lines
+**Batch Final**, about 200 lines with tests
 
 - [ ] T063 [setup] Coverage audit and merge preconditions (tests/unit/chat-answer.test.ts, tests/e2e/assistant-api.spec.ts)
   - Every REQ-1 to REQ-35 and chat-polish REQ-23 maps to a passing unit and/or e2e test that asserts answer text, kind or buttons; no REQ is covered by `resolved` alone (table below).
@@ -414,7 +472,7 @@ Unit = fail-first proof for logic (run every batch). e2e = written with the task
 | REQ-2 | T017, T070 | T070 | T018–T020 |
 | REQ-3 | T026, T031, T034, T048 | T026, T034, T048 | T024, T025, T027, T033 |
 | REQ-4 | T072 (schema, no scope) | T072, T012 | T010, T011, T014–T016, T069 |
-| REQ-5 | T072, T021, T028, T031, T034, T046, T048, T050, T063 (sweeps) | T072, T012, T063 (final) | T010, T014 |
+| REQ-5 | T072, T020 (expected-topic sweep), T021, T028, T031, T034, T046, T048, T050, T063 (sweeps) | T072, T012, T063 (final) | T010, T014 |
 | REQ-6 | T021, T028, T042, T053 | T021 | T022, T023, T027 |
 | REQ-7, REQ-8 | T028 | T028 | T029, T030 |
 | REQ-9, REQ-10 | T031 | T031 | T032, T033 |
