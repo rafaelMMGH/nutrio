@@ -35,7 +35,16 @@ const TABLE: { word: string; entries: string[]; matches: boolean; why: string }[
   { word: "ejrcisia", entries: ["ejercicio"], matches: false, why: "three edits, 9 letters" },
   { word: "panes", entries: ["pan"], matches: true, why: "plain es plural" },
   { word: "planta", entries: ["plan"], matches: false, why: "a prefix is not a stem match" },
-  { word: "prepararse", entries: ["prepar"], matches: false, why: "no star, no prefix" }
+  { word: "prepararse", entries: ["prepar"], matches: false, why: "no star, no prefix" },
+  { word: "comprimir", entries: ["compr*"], matches: true, why: "stem prefix" },
+  { word: "recomprar", entries: ["compr*"], matches: false, why: "a stem matches a prefix, not the middle of a word" },
+  { word: "descomprimir", entries: ["compr*"], matches: false, why: "a stem matches a prefix, not the middle of a word" },
+  { word: "ahora", entries: ["ahorro"], matches: false, why: "never-fuzzy word, 5 letters, one edit from a 6-letter entry" },
+  { word: "ahorita", entries: ["ahorito"], matches: false, why: "never-fuzzy word, one edit from a 7-letter entry" },
+  { word: "pero", entries: ["perro"], matches: false, why: "never-fuzzy word, one edit from a 5-letter entry" },
+  { word: "paso", entries: ["pasto"], matches: false, why: "never-fuzzy word, one edit from a 5-letter entry" },
+  { word: "ahroa", entries: ["ahora"], matches: false, why: "never-fuzzy entry (a swap would be one edit of 5 letters)" },
+  { word: "ahorit", entries: ["ahorita"], matches: false, why: "never-fuzzy entry (one edit of 7 letters)" }
 ];
 
 for (const { word, entries, matches, why } of TABLE) {
@@ -63,6 +72,12 @@ test("an exact word never fuzzy-matches another phrase's word at the same positi
   assert.deepEqual(matchPhrases(["me", "lleva"], ["me llevo", "me lleva"]), [{ phrase: "me lleva", from: 0, to: 2 }]);
   assert.deepEqual(matchPhrases(["me", "lleva"], ["me llevo"]), [{ phrase: "me llevo", from: 0, to: 2 }], "alone, lleva is a typo of llevo");
   assert.deepEqual(matchPhrases(["como", "pero"], ["como peso"]), [], "a never-fuzzy word stays exact inside a phrase");
+});
+
+test("equal-length phrases that match the same words: the one listed first wins", () => {
+  // "cumplid" is a typo of both "cumplido" (1 edit) and "cumpli" (1 edit).
+  assert.deepEqual(matchPhrases(["comida", "cumplid"], ["comida cumpli", "comida cumplido"]), [{ phrase: "comida cumpli", from: 0, to: 2 }]);
+  assert.deepEqual(matchPhrases(["comida", "cumplid"], ["comida cumplido", "comida cumpli"]), [{ phrase: "comida cumplido", from: 0, to: 2 }]);
 });
 
 test("the same phrase is found twice when the text repeats it", () => {
