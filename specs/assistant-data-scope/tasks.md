@@ -292,20 +292,24 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 
 **Batch 3a1: shared progress math**, about 320 lines with tests. Worktree from the 1b2 tip, beside 1c1–3b2; touches only the files below.
 
-- [ ] T075 [US3] Unit tests for progress.ts (tests/shared/progress-fixture.ts, tests/unit/progress.test.ts)
+- [x] T075 [US3] Unit tests for progress.ts (tests/shared/progress-fixture.ts, tests/unit/progress.test.ts)
   - tests/shared/progress-fixture.ts: the parity log rows (both sides of Monday, a capped water day, none after today) and their hand-computed expected numbers for today 2026-10-28; T066 uses the same file.
   - `mondayOf`, `weekDays`, `waterGoalGlasses` (clamp 4–12, 2 L default), `weekWater` (capped), `mealsDoneOn` (filtered to slot ids, clamped), `weekMeals`, `weekExercise` with `endDay` = Sunday and = today (D9), `weightStats` (latest, before Monday, change, goal ratio) equal the expected numbers. Red first (module missing).
-- [ ] T037 [US3] Pure module (src/lib/progress.ts)
+- [x] T037 [US3] Pure module (src/lib/progress.ts)
   - UTC date-key helpers, `mondayOf`, `weekDays`, `waterGoalGlasses(liters)`.
   - `weekWater`, `mealsDoneOn`, `weekMeals`, `weekExercise`, each with `endDay`; `weightStats`.
 
 **Review checkpoint 3a1:** tsc + unit.
 
+**Batch note 3a1 (done; T075, T037; +206/-0 vs ~320 estimated; reviewer PASS on both, no HIGH):** commits c3cc859 (tests/shared/progress-fixture.ts +41, tests/unit/progress.test.ts +92; red, tests only) and 64aa494 (src/lib/progress.ts +73) on worktree branch worktree-agent-a3363d28dbb97f395, to be cherry-picked onto the feature branch by the orchestrator after 1c1 finishes. progress.ts: `weekDays(monday, endDay)` = Monday..endDay (≤7); `weekWater`/`weekMeals`/`weekExercise` take `endDay` (dashboard passes Sunday, chat passes today); water capped per day at the goal; `waterGoalGlasses` clamps 4–12 with a 2 L default, liters = glasses × 0.25; `mealsDoneOn` counts slot ids and clamps to the slot count; `weightStats(entries, today, monday, goal)` → `{ start, latest, latestDate, beforeWeek, change, ratio }`, `change` null when no weight before Monday (like the dashboard) and 0 only when the latest weight is itself the one before Monday; date-key math in UTC (independent of the machine timezone). Fixture expected values hand-derived from the dashboard rules: water 16 glasses = 4 L of 14 L; meals 8 of 28; exercise 1; weight start 67, latest 66.2, before-week 66.6, change −0.4, ratio 0.2. Exercise is now windowed to `endDay` like water/meals (the dashboard counted all 7 days); safe because the UI cannot log future exercise/weight (ActivityTile/WeightTile act on today only; water/meals disabled for future days), but the server schema does not reject future dates: client-side guarantee only, already an Assumption. Reviewer ran progress.test.ts under TZ America/Mexico_City, Pacific/Auckland, Pacific/Kiritimati and UTC: all pass; 11 mutations, 8 caught (gaps go to the 3a2 first step in T066). Accepted (L7): `mondayOf`/`addDays` have no guard against malformed keys (callers pass pinned or validated keys). Unproven until the 3a2 targeted run: the dashboard's rendered tiles vs these numbers (T066/T038), local-time vs UTC date handling, weight-tile rounding and kg()/liters() formatting (they stay in DashboardView).
+
 **Batch 3a2: dashboard refactor**, about 270 lines with tests. Same worktree; merged before 3c.
 
 - [ ] T066 [US3] e2e, written: dashboard baseline for REQ-16 (tests/e2e/assistant-parity.spec.ts)
-  - The chat user's dashboard with `timezoneId: "America/Mexico_City"` and `page.clock.setFixedTime` (2026-10-28), logs from tests/shared/progress-fixture.ts; tile numbers (exercise days, water liters with a capped day, meals D de N, weight change) equal its expected values. First spec run in Batch E.
+  - First commit of 3a2 (3a1 review M1, tests first; tests/shared/progress-fixture.ts, tests/unit/progress.test.ts): `mealsDoneOn` with `["m1","gone"]` → 1 (slot filter) and `["m1","m1","m1","m1","m1"]` → 4 (clamp); a weight exactly on Monday (pins `date < monday`, not `<=`); a latest weight before Monday (`latestDate < monday`, change per the 3a1 batch note); a goal above the start weight (gaining) and a ratio < 0 or > 1; `weekDays` with `endDay` before Monday = `[]`. Keep T066's expected numbers consistent.
+  - The chat user's dashboard with `timezoneId: "America/Mexico_City"` and `page.clock.setFixedTime` (2026-10-28), logs from tests/shared/progress-fixture.ts, mapping the positional fixture meal ids m1..m4/"gone" to the seeded meal ids (3a1 review L6); tile numbers (exercise days, water liters with a capped day, meals D de N, weight change) equal its expected values. The test title contains "dashboard" (the 3a2 targeted run filters `-g "dashboard"`). First spec run in Batch E.
 - [ ] T038 [US3] DashboardView uses `progress.ts` with `endDay` = Sunday and identical output (src/components/dashboard/DashboardView.tsx)
+  - 3a1 review M4: also delete the duplicate `WATER_GOAL_LITERS`/`WATER_GLASS_LITERS` in src/components/dashboard/food.ts:15-16 and import them from `@/lib/progress`; delete the local `waterGlasses` clamp (DashboardView.tsx ~131) and the local week math (`mondayOf` ~645) where progress.ts covers them; keep `dateKey`/`addDays` (browser local time) and `kg()`/`liters()` formatting in the dashboard.
 
 **Review checkpoint 3a2:** tsc + unit. Reviewer reads the T038 diff for identical inputs, rounding and `endDay` = Sunday (plan Risks). At the merge into the feature branch, the orchestrator runs `npx playwright test assistant-parity.spec.ts -g "dashboard"` once (the only e2e run before Batch E; user decision 2026-10-29): needs the e2e config from T003 (already in) and a T066 test title containing "dashboard"; one server start, one DB clone, nothing else running, foreground; afterwards `lsof -i :3200` is empty and `psql -l` shows no `*-e2e` DB. A failure blocks this checkpoint and is fixed in 3a2. The result is recorded in the 3a2 batch note.
 
@@ -349,6 +353,7 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
   - e2e, written: extend T066 (meals done D de N, weight change) (tests/e2e/assistant-parity.spec.ts); the T012 search-bar question shows the weight copy (tests/e2e/assistant-noscope.spec.ts); no weight logs through `ask()` (tests/e2e/assistant-progress.spec.ts).
   - Split: part 1 (3d1) = REQ-19, REQ-27 weight rows, weight labels/fallback, the weight e2e and parity; part 2 (3d2) = REQ-20, the meals labels and empty range, the meals parity.
 - [ ] T045 [US3] Weight and meals-done builders, incl. the no-weight-logs reply and empty ranges; the no-active-plan reply for meals done is left to T052 (src/lib/domain/chat-metrics.ts). Part 1 (3d1) weight, which also removes "Mi peso" from the sweep `skip` list; part 2 (3d2) meals done.
+  - 3a1 review: the REQ-19 week line needs `weightStats` `latestDate >= monday` and `beforeWeek !== null` (`change` alone is not enough).
 
 **Review checkpoint 3d1:** tsc + unit.
 
@@ -362,6 +367,7 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
   - Unit (tests/unit/chat-metrics.test.ts): REQ-21 bare goals, narrowed water goal, no active plan; a plan of 1 L → "Tu meta de agua es **4 vasos** (1 litro) al día."; 4 L → "**12 vasos** (4 litros)". REQ-22: 4 items / 3 without a weight change / no plan. `sweep()` over metric follow-ups ("Fijar mi meta"/"Subir mi plan" are links, excluded). Red first.
   - e2e, written: parity of the goals answer's exercise and water goals and every weekly-progress item with the tiles under the T066 pin (tests/e2e/assistant-parity.spec.ts); one goals answer through `ask()` (tests/e2e/assistant-progress.spec.ts).
 - [ ] T047 [US3] Goals and weekly-progress builders, incl. the no-plan line and "Subir mi plan"; removes "¿Cuál es mi meta?" and "Mi avance de la semana" from the sweep `skip` list (src/lib/domain/chat-metrics.ts)
+  - 3a1 review: the weekly-progress weight item uses the same rule as T045 (`latestDate >= monday` and `beforeWeek !== null`).
 
 **Checkpoint:** US3 code complete (REQ-13 to REQ-22), unit-green; parity (REQ-16) proven in Batch E.
 
@@ -514,7 +520,7 @@ Unit = fail-first proof for logic (run every batch). e2e = written with the task
 | REQ-13 | T005 (guard), T072 (clock), T042 (future-day log) | T039 (pin header), T042 (pin changes "hoy") | T006, T011, T041 |
 | REQ-14 | T039, T067, T042, T044 | T042 | T040, T041, T068 |
 | REQ-15 | T042, T044 | T042 | T043, T045 |
-| REQ-16 | T075 (progress.ts numbers) | T066 (dashboard), T042, T044, T046 (parity; e2e only) | T037, T038, T043, T045, T047 |
+| REQ-16 | T075 (progress.ts numbers; the fixture self-checks `waterGlasses*0.25*7 === weekWaterGoalLiters` and `PARITY_SLOTS.length*7 === weekMealsGoal` are fixture arithmetic, not coverage) | T066 (dashboard), T042, T044, T046 (parity; e2e only) | T037, T038, T043, T045, T047 |
 | REQ-17, REQ-18 | T042 | T042 | T043 |
 | REQ-19, REQ-20 | T044 | T044 | T045 |
 | REQ-21, REQ-22 | T046 | T046 | T047 |
