@@ -3,14 +3,14 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import type { ChatAnswer, Rich, ScopeKey, Section } from "../../src/lib/assistant";
-import { addOnSpecs, DEFAULT_MEALS, PLAN_NAME, planFixture, TIME_WINDOWS, type SeedRecipe } from "../shared/assistant-fixture";
+import { addOnSpecs, DEFAULT_MEALS, PLAN_NAME, planFixture, slug, TIME_WINDOWS, type SeedLog, type SeedRecipe } from "../shared/assistant-fixture";
 import { sql } from "./database";
 import { expect, test as base, watch } from "./fixtures";
 import { installToolkit } from "./theme-audit";
 import { contrast, effectiveBackground, toRgb, type Theme } from "./theme-helpers";
 
 export { expect } from "./fixtures";
-export { PLAN_NAME, type SeedRecipe };
+export { PLAN_NAME, type SeedLog, type SeedRecipe };
 
 // Shared by the assistant specs (assistant-*.spec.ts). Every spec file runs as its own user (plan D2), so a spec can
 // seed recipes, a cart and a plan without touching the main user's data or the other specs.
@@ -23,7 +23,6 @@ let chatUser: ChatUser | null = null;
 
 const lit = (value: string) => `'${value.replace(/'/g, "''")}'`;
 const json = (value: unknown) => `${lit(JSON.stringify(value))}::json`;
-const slug = (value: string) => value.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 
 function currentUser(): ChatUser {
   if (!chatUser) throw new Error("createChatUser() must run in beforeAll before the assistant helpers are used");
@@ -236,8 +235,6 @@ export function seedPlan({ times, meals = DEFAULT_MEALS, supplements = true, obj
 export function clearPlan() {
   sql(planRowDeletes(lit(currentUser().id)).join(";"));
 }
-
-export type SeedLog = { date: string; meals_done?: string[]; water_glasses?: number; weight_kg?: number | null; exercised?: boolean };
 
 /** Replaces all of the user's daily logs. `date` is YYYY-MM-DD; omitted fields default to nothing done (0 glasses, no weight, no exercise). */
 export function seedLogs(rows: SeedLog[]) {

@@ -9,6 +9,10 @@ export type SeedRecipe = {
   ingredients: { name: string; quantity?: number; unit?: string; category?: string }[];
 };
 
+export const slug = (value: string) => value.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+export type SeedLog = { date: string; meals_done?: string[]; water_glasses?: number; weight_kg?: number | null; exercised?: boolean };
+
 export const PLAN_NAME = "Plan e2e del asistente";
 export const DEFAULT_MEALS = ["Desayuno", "Colación", "Comida", "Cena"];
 export const TIME_WINDOWS = ["Entre 7 a 8 am", "Entre 10 a 11 am", "Entre 2 a 3 pm", "Entre 8 a 9 pm"];
@@ -70,3 +74,31 @@ export function addOnSpecs(meals: string[]) {
     { name: "Fruta de temporada", slot: meals.length - 1, quantity: 2, unit: "" }
   ];
 }
+
+/**
+ * The record keys each seeded collection has after `toRecord` (src/lib/storage/store.ts): the model's columns without
+ * `seq`, `extra` replaced by its keys (none are seeded), and `name_snapshot`/`category_snapshot` omitted while null.
+ * Kept here, beside the seed, so tests/unit/memdb.test.ts can check `memDb()` against it without importing Prisma. Update
+ * it with prisma/schema.prisma or a seeded column; the e2e run is what proves the seed really produces these keys.
+ */
+export const RECORD_KEYS = {
+  users: ["id", "email", "name", "weight_goal_kg", "activity_goal_days", "created_at", "updated_at", "deleted_at"],
+  plans: ["id", "user_id", "name", "objective", "status", "processing_status", "created_at", "updated_at", "deleted_at"],
+  planVersions: ["id", "plan_id", "version_number", "structured_data", "change_summary", "is_current", "created_at", "updated_at", "deleted_at"],
+  mealTypes: ["id", "plan_version_id", "name", "display_order", "time_window", "created_at", "deleted_at"],
+  recipes: ["id", "user_id", "name", "description", "canonical_hash", "created_at", "updated_at", "deleted_at"],
+  ingredients: ["id", "user_id", "canonical_name", "category", "primary_unit", "created_at", "updated_at", "deleted_at"],
+  ingredientUsages: [
+    "id", "ingredient_id", "source_type", "source_id", "quantity", "unit", "practical_quantity", "practical_unit", "notes", "is_optional",
+    "alternative_group_id", "confidence_score", "requires_review", "created_at", "deleted_at"
+  ],
+  mealOptions: ["id", "plan_version_id", "meal_type_id", "recipe_id", "option_number", "is_unique_option", "created_at", "deleted_at"],
+  planVersionRecipes: ["id", "plan_version_id", "recipe_id", "meal_type_id", "option_number", "created_at", "deleted_at"],
+  sharedAddOns: ["id", "plan_version_id", "meal_type_id", "name", "applies_to_all_options", "required", "notes", "canonical_hash", "created_at", "deleted_at"],
+  carts: ["id", "user_id", "status", "created_at", "updated_at", "deleted_at"],
+  cartItems: [
+    "id", "cart_id", "source_type", "source_id", "quantity_multiplier", "period_days", "training_days", "selected_alternatives", "include_add_ons",
+    "include_supplements", "manual_name", "manual_quantity", "manual_unit", "manual_ingredient_id", "created_at", "updated_at", "deleted_at"
+  ],
+  dailyLogs: ["id", "user_id", "date", "meals_done", "water_glasses", "weight_kg", "exercised", "created_at", "updated_at"]
+} as const;
