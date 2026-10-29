@@ -1,22 +1,36 @@
-import type { AppDb, Recipe } from "@/lib/types";
-import { type ChatAnswer, type FollowUp, type ReplyKind, type Rich, type ScopeKey, type Section, toScopeKey, words } from "@/lib/assistant";
+import type { AppDb, AppUser } from "@/lib/types";
+import { type Block, type Button, type ChatAnswer, type Intent, type ReplyKind, type Rich, type Section, normalizeText, words } from "@/lib/assistant";
 import { consolidateCart } from "@/lib/domain/cart";
-import { answersIn, followUpsFor, isTopicWord, matchTopic, type TopicId } from "@/lib/domain/chat-topics";
-import { activePlan, recipeDetails } from "@/lib/domain/plans";
+import { greetingOf, isTopicWord, matchTopic, STARTERS, TOPICS, type TopicId } from "@/lib/domain/chat-topics";
+import { activePlan } from "@/lib/domain/plans";
 import { formatQty, normalize } from "@/lib/domain/nutrition";
-
-const UNKNOWN_LEAD = "No encontré eso en tu información.";
-const CAPABILITY_LINE = "Puedo ayudarte con tu plan de comidas y horarios, tus recetas e ingredientes, y tu lista de compras.";
-
-type Reply = { kind: ReplyKind; lead: Rich; body?: string; sections?: Section[]; sources?: string[]; follow_ups?: FollowUp[] };
 
 const plain = (rich: Rich) => rich.map((span) => span.text).join("");
 
-/** The response with its plain-text `answer`: the lead, then the body or each section's title line and one line per item (contract). */
-function reply(scope: string, { kind, lead, body, sections = [], sources = [], follow_ups = [] }: Reply): ChatAnswer {
-  const lines = [plain(lead), ...(body ? [body] : []), ...sections.flatMap((section) => [section.title, ...section.items.map(plain)])];
-  return { answer: lines.join("\n"), context_used: scope === "auto" ? "Todo el sistema" : scope, sources, kind, blocks: [], buttons: [], lead, body: body ?? null, sections, follow_ups };
+/** The plain `answer` of the contract: each block's title, lead, then each section's title line and one line per item. */
+const answerText = (blocks: Block[]) =>
+  blocks.flatMap((block) => [...(block.title ? [block.title] : []), plain(block.lead), ...block.sections.flatMap((section) => [section.title, ...section.items.map(plain)])]).join("\n");
+
+const questionButton = (message: string): Button => ({ type: "question", label: message, message });
+
+/** The response: blocks and buttons, the plain `answer`, and the scope-era fields the old client still reads (removed in T016). */
+function reply(kind: ReplyKind, blocks: Block[], buttons: Button[], sources: string[], resolved: Intent[] | undefined): ChatAnswer {
+  return {
+    answer: answerText(blocks),
+    context_used: "Todo el sistema",
+    sources,
+    kind,
+    blocks,
+    buttons,
+    ...(resolved ? { resolved } : {}),
+    lead: blocks[0].lead,
+    body: null,
+    sections: blocks.flatMap((block) => block.sections),
+    follow_ups: buttons.flatMap((button) => (button.type === "question" ? [{ text: button.message, scope: "auto" as const }] : []))
+  };
 }
+
+const standalone = (lead: string): Block[] => [{ title: null, lead: [{ text: lead }], sections: [], buttons: [] }];
 
 const textLead = (text: string): Rich => [{ text }];
 const NO_PLAN_LEAD = "No tienes un plan activo.";
@@ -87,46 +101,35 @@ function recipeList(db: AppDb, userId: string, question: string): Built {
   };
 }
 
-// Asked from a recipe's page: answer from that recipe, narrowing to the ingredients the question names.
-function thisRecipe(db: AppDb, recipe: Recipe, q: string): Built {
-  const details = recipeDetails(db, recipe);
-  const named = details.ingredients.filter((item) => normalize(item.name).split(/\s+/).some((word) => word.length > 2 && q.includes(word)));
-  const steps = recipe.description && !/^extraido de/.test(normalize(recipe.description)) ? lineItems(recipe.description) : [];
-  const aboutPreparation = /prepar|como|cocin|paso|hace/.test(q);
-  const sections: Section[] = [];
-  if (named.length || !aboutPreparation || !steps.length) {
-    sections.push(...section("Ingredientes", (named.length ? named : details.ingredients).map((item) => withValue(item.name, quantity(item)))));
-  }
-  if (steps.length && (aboutPreparation || !named.length)) sections.push(...section("Preparación", steps));
-  return { lead: textLead(`Sobre ${recipe.name}:`), sections, sources: [`Receta: ${recipe.name}`] };
-}
+const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: string) => Built>> = {
+  mealTimes: (db, userId) => mealTimes(db, userId),
+  cart: (db, userId) => cartSummary(db, userId),
+  recipes: recipeList,
+  plan: (db, userId, question) => planSummary(db, userId, normalize(question))
+};
 
-function build(db: AppDb, userId: string, topic: TopicId, scope: ScopeKey, recipe: Recipe | undefined, question: string): Built {
-  if (topic === "mealTimes") return mealTimes(db, userId);
-  if (topic === "plan") return planSummary(db, userId, normalize(question));
-  if (topic === "cart") return cartSummary(db, userId);
-  return scope === "Receta" && recipe ? thisRecipe(db, recipe, normalize(question)) : recipeList(db, userId, question);
-}
-
-// What a narrowed scope shows when no topic matches (REQ-20).
-const OVERVIEW_TOPIC: Partial<Record<ScopeKey, TopicId>> = { "Plan activo": "plan", Recetario: "recipes", Carrito: "cart", Receta: "recipes" };
+/** The interim answer of a topic whose builder has not landed (plan D3). Never asserted by a test; T063 requires none left. */
+const pending = (topic: TopicId): Built => ({ lead: textLead(`Pronto podré responder sobre ${TOPICS[topic].title}.`) });
 
 /**
- * Routing of the contract: a missing recipe first, then the winning topic, then the scope check, then an overview (narrowed
- * scope) or the unknown reply (Todo). `scopeInput` is the wire value as sent; it is echoed in `context_used`.
+ * The answer to one message: depends only on the message, the user's data and `today` (REQ-5). `trace` adds the
+ * resolved intents for the e2e suite (plan D2). `today` is read once the date-based topics exist (US3).
  */
-export function ragAnswer(db: AppDb, userId: string, question: string, scopeInput = "auto", recipeId?: string): ChatAnswer {
-  const scope = toScopeKey(scopeInput);
-  const fixed = (kind: "unknown" | "out_of_scope" | "missing_recipe") => reply(scopeInput, { kind, lead: textLead(UNKNOWN_LEAD), body: CAPABILITY_LINE });
+export function ragAnswer(db: AppDb, user: AppUser, message: string, _today: string, { trace = false }: { trace?: boolean } = {}): ChatAnswer {
+  const starters = STARTERS.map(questionButton);
+  const greeting = greetingOf(message);
+  if (greeting) {
+    const lead = greeting === "thanks" ? "¡Con gusto!" : "¡Hola! ¿En qué te ayudo?";
+    return reply("greeting", standalone(lead), starters, [], trace ? [{ topic: "greeting" }] : undefined);
+  }
 
-  const recipe = recipeId ? db.recipes.find((item) => item.id === recipeId && item.user_id === userId && !item.deleted_at) : undefined;
-  if (scope === "Receta" && !recipe) return fixed("missing_recipe");
+  const topic = matchTopic(message);
+  if (!topic) return reply("no_match", standalone("No entendí tu pregunta. Puedo ayudarte con:"), starters, [], trace ? [] : undefined);
 
-  const winner = matchTopic(question);
-  const topic = winner ?? OVERVIEW_TOPIC[scope];
-  if (winner && !answersIn(winner, scope)) return fixed("out_of_scope");
-  if (!topic) return fixed("unknown");
-
-  const built = build(db, userId, topic, scope, recipe, question);
-  return reply(scopeInput, { kind: winner ? "answer" : "overview", ...built, follow_ups: followUpsFor(topic, scope) });
+  const built = BUILDERS[topic]?.(db, user.id, message) ?? pending(topic);
+  const asked = normalizeText(message);
+  // Repeat rule (chat-polish REQ-5): a follow-up that repeats the question just asked is not offered. Follow-ups only.
+  const followUps = TOPICS[topic].followUps.filter((text) => normalizeText(text) !== asked).map(questionButton);
+  const block: Block = { title: null, lead: built.lead, sections: built.sections ?? [], buttons: [] };
+  return reply("answer", [block], followUps, built.sources ?? [], trace ? [{ topic }] : undefined);
 }

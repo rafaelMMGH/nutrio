@@ -1,10 +1,10 @@
-import { type FollowUp, type ScopeKey, words } from "@/lib/assistant";
+import { words } from "@/lib/assistant";
 
 // Topic matcher of the assistant (spec assistant-chat-polish, REQ-19). A question has at most one winning topic, found
 // from its words against the vocabulary below only. The vocabulary is exhaustive: do not add words the spec's Topics
-// table does not list.
+// table does not list. It is rewritten for the Topics table in T020; until then only the first four topics can match.
 
-export type TopicId = "mealTimes" | "cart" | "recipes" | "plan";
+export type TopicId = "mealTimes" | "cart" | "recipes" | "plan" | "weight" | "exercise" | "water" | "mealsDone" | "goals" | "weekly";
 type Tier = 1 | 2 | 3;
 
 type Vocabulary = { tier: Tier; topic: TopicId; exact: string[]; stems: string[] };
@@ -26,32 +26,30 @@ const WHEN = "cuando";
 // Ties inside a tier go to the first topic of this list.
 const TIE_ORDER: TopicId[] = ["cart", "recipes", "plan", "mealTimes"];
 
-/** Topics that answer a question in each scope ("Answers in" of the Topics table). */
-const ANSWERED_IN: Record<TopicId, ScopeKey[]> = {
-  mealTimes: ["auto", "Plan activo"],
-  cart: ["auto", "Carrito"],
-  recipes: ["auto", "Recetario", "Receta"],
-  plan: ["auto", "Plan activo"]
+/** Title (block title and placeholder name) and follow-up messages of each topic, from the spec's Topics table. */
+export const TOPICS: Record<TopicId, { title: string; followUps: string[] }> = {
+  mealTimes: { title: "Horarios", followUps: ["Mi cena de hoy", "Mi carrito"] },
+  cart: { title: "Carrito", followUps: ["¿Qué recetas hay en mi plan?", "Mi cena de hoy"] },
+  recipes: { title: "Recetas", followUps: ["Mi carrito", "Mi cena de hoy"] },
+  plan: { title: "Plan", followUps: ["¿Cuál es mi meta?", "¿Qué suplementos tomo?", "¿Qué recetas hay en mi plan?"] },
+  weight: { title: "Peso", followUps: ["¿Cuál es mi meta?", "¿Cuánto ejercicio llevo?"] },
+  exercise: { title: "Ejercicio", followUps: ["¿Cuánta agua llevo?", "Mi peso"] },
+  water: { title: "Agua", followUps: ["¿Cuánto ejercicio llevo?", "¿Cuántas comidas llevo?"] },
+  mealsDone: { title: "Comidas", followUps: ["¿Cuánta agua llevo?", "Mi cena de hoy"] },
+  goals: { title: "Metas", followUps: ["Mi avance de la semana", "Mi peso"] },
+  weekly: { title: "Avance", followUps: ["Mi peso", "¿Cuál es mi meta?"] }
 };
 
-export function answersIn(topic: TopicId, scope: ScopeKey): boolean {
-  return ANSWERED_IN[topic].includes(scope);
-}
+/** Empty state, greeting and no-match buttons. */
+export const STARTERS = ["Mi cena de hoy", "Mi avance de la semana", "Mi peso", "Mi carrito"];
 
-const fu = (text: string, scope: ScopeKey): FollowUp => ({ text, scope });
+const GREETING_WORDS = /(^| )(hola|buenos dias|buenas tardes|buenas noches|que tal|gracias)(?= |$)/g;
 
-const FOLLOW_UPS: Record<"mealTimes" | "cart" | "recipeList" | "thisRecipe" | "plan", FollowUp[]> = {
-  mealTimes: [fu("¿Qué recetas hay en mi plan?", "Recetario"), fu("¿Qué hay en mi carrito?", "Carrito"), fu("¿Cuál es mi objetivo?", "Plan activo")],
-  cart: [fu("¿Qué recetas hay en mi plan?", "Recetario"), fu("¿A qué hora es mi comida?", "Plan activo")],
-  recipeList: [fu("¿Qué hay en mi carrito?", "Carrito"), fu("¿A qué hora es mi comida?", "Plan activo")],
-  thisRecipe: [fu("¿Qué ingredientes lleva?", "Receta"), fu("¿Cómo se prepara?", "Receta"), fu("¿Qué hay en mi carrito?", "Carrito")],
-  plan: [fu("¿A qué hora es mi comida?", "Plan activo"), fu("¿Qué suplementos tomo?", "Plan activo"), fu("¿Qué recetas hay en mi plan?", "Recetario")]
-};
-
-/** The topic's full follow-up list, unfiltered. The recipes topic has two: the recipe list, and "this recipe" in scope Receta. */
-export function followUpsFor(topic: TopicId, scope: ScopeKey): FollowUp[] {
-  if (topic === "recipes") return FOLLOW_UPS[scope === "Receta" ? "thisRecipe" : "recipeList"];
-  return FOLLOW_UPS[topic];
+/** "hello" or "thanks" when the message is made only of greeting or thanks words, else null (a greeting before a question is ignored by the matcher). */
+export function greetingOf(question: string): "hello" | "thanks" | null {
+  const text = words(question).join(" ");
+  if (!text || text.replace(GREETING_WORDS, "").trim()) return null;
+  return text.includes("gracias") ? "thanks" : "hello";
 }
 
 /** Tiers of the topics a (normalized) word belongs to. */

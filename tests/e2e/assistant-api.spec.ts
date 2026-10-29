@@ -258,7 +258,9 @@ test.describe("builders", () => {
     expect(await sourcesOf("¿A qué hora es la cena?")).toEqual([`Plan activo: ${PLAN_NAME}`]);
     expect(await sourcesOf("¿Qué recetas hay en mi plan?")).toEqual(["Recetario"]);
 
-    expect(await sourcesOf("¿Qué hago ahora?")).toEqual([]);
+    const nothing = await ask(chatContext.request, "¿Qué hago ahora?");
+    expect(nothing.body.kind).toBe("no_match");
+    expect(nothing.body.sources).toEqual([]);
 
     seedCart(0);
     clearPlan();

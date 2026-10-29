@@ -1,4 +1,6 @@
+import type { z } from "zod";
 import { ragAnswer } from "@/lib/domain/chat";
+import { serverToday } from "@/lib/domain/chat-dates";
 import { loadFor } from "@/lib/domain/queries";
 import { badRequest, json } from "@/lib/http/respond";
 import { requireSession } from "@/lib/http/auth";
@@ -10,7 +12,7 @@ export async function POST(request: Request) {
   if (auth.response) return auth.response;
 
   // An unparsable body or a failed validation is the client's mistake: 400, nothing logged at error level (chat-polish REQ-23).
-  let body;
+  let body: z.infer<typeof chatSchema>;
   try {
     body = chatSchema.parse(await request.json());
   } catch (error) {
@@ -22,7 +24,7 @@ export async function POST(request: Request) {
     const hooks = testHooks(request.headers, process.env);
     const db = await loadFor(auth.user, "chat");
     if (hooks.fail) throw new Error("Injected chat failure (x-e2e-fail)");
-    return json(ragAnswer(db, auth.user.id, body.message));
+    return json(ragAnswer(db, auth.user, body.message, serverToday(new Date()), { trace: hooks.trace }));
   } catch (error) {
     console.error("[api/rag/chat]", { userId: auth.user.id, messageLength: body.message.length }, error);
     return json({ error: "Internal error" }, 500);

@@ -15,8 +15,9 @@ test("@/ imports resolve, including the chat and plans chains", () => {
 });
 
 test("ragAnswer answers on an empty db", () => {
-  const answer = ragAnswer(emptyDb(), "demo-user", "hola");
+  const db = emptyDb();
+  const answer = ragAnswer(db, db.users[0], "hola", "2026-10-28");
   assert.equal(typeof answer.answer, "string");
   assert.ok(answer.answer.length > 0);
-  assert.equal(answer.kind, "unknown");
+  assert.equal(answer.kind, "greeting");
 });

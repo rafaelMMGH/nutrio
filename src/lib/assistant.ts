@@ -68,7 +68,7 @@ export type Intent = { topic: string; slot?: string; recipeIds?: string[]; optio
 
 export type ChatAnswer = {
   answer: string;
-  context_used: string;
+  context_used: "Todo el sistema";
   sources: string[];
   kind: ReplyKind;
   blocks: Block[];
