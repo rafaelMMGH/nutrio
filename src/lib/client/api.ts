@@ -1,5 +1,13 @@
 // Browser-side helpers for calling the app's API routes (mutations and the legacy views' reads).
 
+/** A non-2xx response. `message` is the body's `error` (unchanged for existing callers); `status` lets a caller tell a 500 from a 400. */
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) {
+    super(message);
+    this.name = "ApiError";
+  }
+}
+
 export async function api(path: string, options: RequestInit = {}) {
   const res = await fetch(path, {
     ...options,
@@ -7,7 +15,7 @@ export async function api(path: string, options: RequestInit = {}) {
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: "Request failed" }));
-    throw new Error(body.error || "Request failed");
+    throw new ApiError(body.error || "Request failed", res.status);
   }
   const type = res.headers.get("content-type") || "";
   return type.includes("application/json") ? res.json() : res.text();

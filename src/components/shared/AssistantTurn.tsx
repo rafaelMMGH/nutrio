@@ -18,6 +18,8 @@ export type Turn =
       role: "assistant";
       request: AssistantRequest;
       status: "pending" | "answer" | "error";
+      /** On an error turn: the server answered HTTP 500, which has its own copy (chat-polish REQ-23). */
+      server?: boolean;
       /** Set while a Reintentar is pending: the chips of the earlier answer stay hidden until it settles (REQ-5). */
       retrying?: boolean;
       /** The page's starter questions as they were when the question was sent; a retry builds its chips from them. */
@@ -36,6 +38,7 @@ export function ChipList({ chips, disabled, onAsk }: { chips: TurnChip[]; disabl
 }
 
 export const ERROR_TEXT = "No pude responder en este momento.";
+export const SERVER_ERROR_TEXT = "Algo salió mal al responder. Intenta de nuevo.";
 
 /** prompt-kit's text loader: the words blink between two theme colors (a static word under reduced motion, in CSS). */
 function Loader({ text }: { text: string }) {
@@ -93,7 +96,7 @@ export function AssistantTurn({
         {turn.status !== "error" && <span className="assistant-turn-label">{SCOPE_LABEL[turn.request.scope]}</span>}
       </div>
       <div className="assistant-turn-live" aria-live="polite">
-        {turn.status === "answer" && turn.answer ? <AnswerContent answer={turn.answer} /> : turn.status === "error" ? <p>{ERROR_TEXT}</p> : null}
+        {turn.status === "answer" && turn.answer ? <AnswerContent answer={turn.answer} /> : turn.status === "error" ? <p>{turn.server ? SERVER_ERROR_TEXT : ERROR_TEXT}</p> : null}
       </div>
       {pending && <div className="assistant-turn-pending"><Loader text="Pensando…" /></div>}
       {turn.status === "error" && onRetry && (

@@ -3,7 +3,7 @@
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useContext, useLayoutEffect, useRef, useState } from "react";
 import type { AssistantRequest, Turn, TurnChip } from "@/components/shared/AssistantTurn";
-import { api } from "@/lib/client/api";
+import { api, ApiError } from "@/lib/client/api";
 import { dashboardSuggestions, normalizeText, type ChatAnswer, type Chip, type ScopeKey } from "@/lib/assistant";
 
 /** What the current page tells the floating assistant: its subtitle, the scope it asks in by default and its starter questions. */
@@ -114,7 +114,7 @@ export function useAssistantState() {
     const settle = (turn: Turn) => setTurns((current) => current.map((entry) => (entry.id === id ? turn : entry)));
     const fail = (reason: string, error?: unknown) => {
       console.warn("Assistant request failed", { reason, scope: sent.scope, recipeId: sent.recipeId, error });
-      settle({ id, role: "assistant", request: sent, status: "error", suggestions });
+      settle({ id, role: "assistant", request: sent, status: "error", server: error instanceof ApiError && error.status === 500, suggestions });
     };
     const timer = setTimeout(() => {
       if (generation.current !== mine) return;
