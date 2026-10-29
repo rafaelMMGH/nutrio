@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { useDismiss } from "@/components/useDismiss";
 import { toast } from "sonner";
-import { ArrowRight, ArrowUpRight, CalendarClock, Check, ChevronLeft, ChevronRight, ClipboardCheck, Dumbbell, FileUp, Filter, Flame, Minus, Pencil, Plus, Search, ShoppingBag, ShoppingCart, Utensils } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CalendarClock, Check, ChevronLeft, ChevronRight, ClipboardCheck, Dumbbell, FileUp, Flame, Minus, Pencil, Plus, Search, ShoppingBag, ShoppingCart, Utensils } from "lucide-react";
 import {
   DayLog,
   Meal,
@@ -25,7 +25,7 @@ import {
   plural,
   qty
 } from "./food";
-import { MAX_MESSAGE, SCOPE_LABEL, messageLength, type ScopeKey } from "@/lib/assistant";
+import { MAX_MESSAGE, messageLength } from "@/lib/assistant";
 import "./home.css";
 
 const WEEKDAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -38,7 +38,7 @@ type Props = {
   setWizard: (wizard: { step: number; data: any } | null) => void;
   user: any;
   goals: { weight_goal_kg: number | null; activity_goal_days: number };
-  askAssistant: (message: string, scope: ScopeKey) => Promise<void>;
+  askAssistant: (message: string) => Promise<void>;
   assistantBusy: boolean;
 };
 
@@ -237,16 +237,9 @@ export function DashboardView({ data, user, goals: serverGoals, setView, setWiza
 
 /* ---------- Greeting search: questions go to the assistant ---------- */
 
-const ASSISTANT_SCOPES = (["auto", "Plan activo", "Recetario", "Carrito"] as const).map((value) => ({ value, label: SCOPE_LABEL[value] }));
-
 // `busy` is the assistant's: a pending question blocks the bar until it settles or Nueva conversación discards it.
-function SearchBar({ onAsk, busy }: { onAsk: (message: string, scope: ScopeKey) => Promise<void>; busy: boolean }) {
+function SearchBar({ onAsk, busy }: { onAsk: (message: string) => Promise<void>; busy: boolean }) {
   const [query, setQuery] = useState("");
-  const [scope, setScope] = useState<ScopeKey>("auto");
-  const [open, setOpen] = useState(false);
-  const menu = useRef<HTMLDivElement>(null);
-  useDismiss(open, () => setOpen(false), menu);
-  const current = ASSISTANT_SCOPES.find((item) => item.value === scope) ?? ASSISTANT_SCOPES[0];
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -255,7 +248,7 @@ function SearchBar({ onAsk, busy }: { onAsk: (message: string, scope: ScopeKey) 
     if (!message || busy || messageLength(query) > MAX_MESSAGE) return;
     // The question moves into the assistant panel right away, so the field clears on send, not when the answer lands.
     setQuery("");
-    await onAsk(message, scope);
+    await onAsk(message);
   }
 
   return (
@@ -264,36 +257,11 @@ function SearchBar({ onAsk, busy }: { onAsk: (message: string, scope: ScopeKey) 
       <input
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        placeholder={scope === "auto" ? "Pregunta por tu plan, recetas o compras" : `Pregunta sobre ${current.label.toLowerCase()}`}
+        placeholder="Pregunta por tu plan, tu avance o tus compras"
         aria-label="Preguntar al asistente"
         enterKeyHint="send"
         disabled={busy}
       />
-      <div className="home-search-scope" ref={menu}>
-        <button type="button" className={`home-search-filter${scope === "auto" ? "" : " is-on"}`} aria-haspopup="menu" aria-expanded={open} aria-label={`Buscar en: ${current.label}`} disabled={busy} onClick={() => setOpen(!open)}>
-          <Filter size={18} />
-        </button>
-        {open && (
-          <div className="popover home-scope-menu" role="menu">
-            <p>Buscar en</p>
-            {ASSISTANT_SCOPES.map((item) => (
-              <button
-                type="button"
-                role="menuitemradio"
-                aria-checked={item.value === scope}
-                key={item.value}
-                onClick={() => {
-                  setScope(item.value);
-                  setOpen(false);
-                }}
-              >
-                {item.label}
-                {item.value === scope && <Check size={16} />}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
     </form>
   );
 }

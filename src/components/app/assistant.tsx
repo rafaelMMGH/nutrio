@@ -3,18 +3,10 @@
 import { createContext, useCallback, useContext, useLayoutEffect, useRef, useState } from "react";
 import type { AssistantRequest, Turn } from "@/components/shared/AssistantTurn";
 import { api, ApiError } from "@/lib/client/api";
-import type { ChatAnswer, Chip, ScopeKey } from "@/lib/assistant";
+import type { ChatAnswer } from "@/lib/assistant";
 
-/**
- * What the current page tells the floating assistant: its subtitle, a label only that never reaches the request (REQ-4).
- * The rest is ignored and optional until T069 stops the pages passing it.
- */
-export type AssistantPageContext = {
-  subtitle: string;
-  defaultScope?: ScopeKey;
-  recipeId?: string;
-  suggestions?: Chip[];
-};
+/** What the current page tells the floating assistant: its subtitle, a label only that never reaches the request (REQ-4). */
+export type AssistantPageContext = { subtitle: string };
 
 /** A request still pending after this long is given up on (REQ-8). */
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -114,8 +106,8 @@ export function useAssistantState() {
     setTurns([]);
   }, []);
 
-  /** Opens the assistant and asks (used by the dashboard search bar). The scope is ignored until T069 drops it. */
-  const askInScope = useCallback(async (message: string, _scope?: ScopeKey) => {
+  /** Opens the assistant and asks (used by the dashboard search bar). */
+  const askInScope = useCallback(async (message: string) => {
     setOpen(true);
     setFocusRequest((count) => count + 1);
     await send(message);

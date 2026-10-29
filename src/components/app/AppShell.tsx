@@ -16,7 +16,6 @@ import { AssistantChat, SHEET_QUERY } from "@/components/shared/AssistantChat";
 import { ThemeToggle } from "@/components/app/ThemeToggle";
 import "./shell.css";
 import { api, getErrorMessage } from "@/lib/client/api";
-import type { ScopeKey } from "@/lib/assistant";
 import { useMediaQuery } from "@/lib/client/useMediaQuery";
 
 export type ShellUser = { name: string; email: string };
@@ -27,7 +26,7 @@ type Shell = {
   openDrawer: () => void;
   openUpload: () => void;
   assistantBusy: boolean;
-  askAssistant: (message: string, scope: ScopeKey) => Promise<void>;
+  askAssistant: (message: string) => Promise<void>;
 };
 
 const ShellContext = createContext<Shell | null>(null);
@@ -66,7 +65,7 @@ export function AppShell({ user, children }: Props) {
 
   const openDrawer = useCallback(() => setAssistantOpen(true), [setAssistantOpen]);
 
-  const askAssistant = useCallback((message: string, scope: ScopeKey) => askInScope(message, scope), [askInScope]);
+  const askAssistant = useCallback((message: string) => askInScope(message), [askInScope]);
 
   const shell = useMemo<Shell>(() => ({ refresh, openDrawer, assistantBusy, askAssistant, openUpload: () => setWizard({ step: 0, data: null }) }), [refresh, openDrawer, assistantBusy, askAssistant]);
 

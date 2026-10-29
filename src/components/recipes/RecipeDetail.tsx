@@ -6,7 +6,6 @@ import { Archive, ArrowLeft, Check, ChefHat, CircleCheck, Pencil, Plus, Shopping
 import { ViewTransition } from "@/components/shared/ViewTransition";
 import { foodGroup, foodIcon, isReadableName, normalize, plural, qty } from "@/components/dashboard/food";
 import { useAssistantContext } from "@/components/app/assistant";
-import { recipeSuggestions } from "@/lib/assistant";
 import { recipeMeta } from "./recipe-meta";
 import { RecipeEditDialog } from "./RecipeEditDialog";
 import { useRecipeActions } from "./useRecipeActions";
@@ -34,14 +33,8 @@ export function RecipeDetail({ recipe }: Props) {
   const preparation = steps(recipe.description);
   const groupCounts = meta.groups.map((group) => ({ ...group, count: ingredients.filter((item) => foodGroup(item.category)?.key === group.key).length }));
   const plans = [...new Set((recipe.appearances ?? []).map((a: any) => a.plan_name).filter(Boolean))] as string[];
-  const protein = ingredients.find((item) => foodGroup(item.category)?.key === "proteinas" && isReadableName(item.name));
 
-  useAssistantContext({
-    subtitle: `Sobre ${recipe.name}`,
-    defaultScope: "Receta",
-    recipeId: recipe.id,
-    suggestions: recipeSuggestions(recipe.id, protein?.name)
-  });
+  useAssistantContext({ subtitle: `Sobre ${recipe.name}` });
 
   async function remove() {
     setBusy(true);
