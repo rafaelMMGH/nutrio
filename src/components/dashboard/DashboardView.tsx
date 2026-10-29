@@ -8,8 +8,6 @@ import { ArrowRight, ArrowUpRight, CalendarClock, Check, ChevronLeft, ChevronRig
 import {
   DayLog,
   Meal,
-  WATER_GLASS_LITERS,
-  WATER_GOAL_LITERS,
   addDays,
   dateKey,
   equivalentGroup,
@@ -26,6 +24,7 @@ import {
   qty
 } from "./food";
 import { MAX_MESSAGE, messageLength } from "@/lib/assistant";
+import * as progress from "@/lib/progress";
 import "./home.css";
 
 const WEEKDAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -128,10 +127,9 @@ export function DashboardView({ data, user, goals: serverGoals, setView, setWiza
   const logs = useDailyLogs(data.dashboard.dailyLogs, refresh);
 
   const schedule = data.dashboard.schedule as { plan_name: string; water_goal_liters: number | null; meals: Meal[] } | null;
-  const waterGlasses = Math.min(12, Math.max(4, Math.round((schedule?.water_goal_liters ?? WATER_GOAL_LITERS) / WATER_GLASS_LITERS)));
+  const waterGlasses = progress.waterGoalGlasses(schedule?.water_goal_liters);
   const meals: Meal[] = (schedule?.meals ?? []).map((meal) => ({ ...meal, time_window: times[meal.id] ?? meal.time_window }));
-  const mealIds = new Set(meals.map((meal) => meal.id));
-  const doneOn = (date: string) => Math.min(meals.length, logs.get(date).meals_done.filter((id) => mealIds.has(id)).length);
+  const doneOn = (date: string) => progress.mealsDoneOn(logs.get(date), meals.map((meal) => meal.id));
   const openWizard = () => setWizard({ step: 0, data: null });
 
   const pendingToday = meals.length - doneOn(today);
@@ -584,7 +582,7 @@ function IntakeCard({ meals, log, label, goalGlasses, isFuture, onWater }: { mea
         <p>
           Agua{" "}
           <b>
-            <Roll value={liters(glasses * WATER_GLASS_LITERS)} />/{liters(goalGlasses * WATER_GLASS_LITERS)} L
+            <Roll value={liters(glasses * progress.WATER_GLASS_LITERS)} />/{liters(goalGlasses * progress.WATER_GLASS_LITERS)} L
           </b>
         </p>
         <div className="home-cups" role="group" aria-label="Vasos de agua de 250 ml">
@@ -642,15 +640,17 @@ function ReportCard(props: {
   onSaveGoals: (patch: Partial<Goals>) => void;
 }) {
   const { meals, logs, today, goals, doneOn } = props;
-  const monday = addDays(today, -((parseKey(today).getDay() + 6) % 7));
-  const week = Array.from({ length: 7 }, (_, index) => addDays(monday, index));
-  const sofar = week.filter((date) => date <= today);
+  const monday = progress.mondayOf(today);
+  // Sunday as the end day: days that have not arrived have no log, so the whole week counts the same as up to today.
+  const week = progress.weekDays(monday, addDays(monday, 6));
+  const sunday = week[6];
   const total = meals.length;
+  const slotIds = meals.map((meal) => meal.id);
 
-  const weekWater = sofar.reduce((sum, date) => sum + Math.min(logs.get(date).water_glasses, props.waterGlasses), 0) * WATER_GLASS_LITERS;
-  const weekWaterGoal = props.waterGlasses * WATER_GLASS_LITERS * 7;
-  const weekMeals = sofar.reduce((sum, date) => sum + doneOn(date), 0);
-  const exercised = week.filter((date) => logs.get(date).exercised);
+  const weekWater = progress.weekWater(logs.get, monday, sunday, props.waterGlasses);
+  const weekWaterGoal = props.waterGlasses * progress.WATER_GLASS_LITERS * 7;
+  const weekMeals = progress.weekMeals(logs.get, slotIds, monday, sunday);
+  const exerciseDays = progress.weekExercise(logs.get, monday, sunday);
 
   let streak = 0;
   let cursor = total && doneOn(today) >= total ? today : addDays(today, -1);
@@ -671,7 +671,7 @@ function ReportCard(props: {
       </header>
       <div className="home-tiles">
         <WeightTile logs={logs} today={today} monday={monday} goal={goals.weight_goal_kg} onSaveDay={props.onSaveDay} onSaveGoals={props.onSaveGoals} />
-        <ActivityTile week={week} today={today} done={exercised.length} goal={goals.activity_goal_days} logs={logs} onSaveDay={props.onSaveDay} onSaveGoals={props.onSaveGoals} />
+        <ActivityTile week={week} today={today} done={exerciseDays} goal={goals.activity_goal_days} logs={logs} onSaveDay={props.onSaveDay} onSaveGoals={props.onSaveGoals} />
         <div className="home-tile tone-water">
           <span className="home-tile-label">Agua de la semana</span>
           <span className="home-wave" style={{ transform: `translateY(${(1 - clamp(weekWater / weekWaterGoal)) * 72}%)` }} aria-hidden>
@@ -736,16 +736,12 @@ const kg = (value: number) => value.toLocaleString("es-MX", { maximumFractionDig
 
 function WeightTile({ logs, today, monday, goal, onSaveDay, onSaveGoals }: { logs: Logs; today: string; monday: string; goal: number | null; onSaveDay: (date: string, patch: Partial<DayLog>) => void; onSaveGoals: (patch: Partial<Goals>) => void }) {
   const [open, setOpen] = useState(false);
-  const weights = logs
-    .all()
-    .filter(([date, log]) => date <= today && typeof log.weight_kg === "number")
-    .sort(([a], [b]) => a.localeCompare(b)) as [string, DayLog & { weight_kg: number }][];
-  const start = weights[0]?.[1].weight_kg ?? null;
-  const latest = weights.at(-1)?.[1].weight_kg ?? null;
-  const beforeWeek = weights.filter(([date]) => date < monday).at(-1)?.[1].weight_kg ?? null;
-  const change = latest !== null && beforeWeek !== null ? latest - beforeWeek : null;
-  // Progress from the first weight logged toward the goal, in whichever direction the goal lies.
-  const ratio = latest !== null && start !== null && goal !== null ? (start === goal ? 1 : (start - latest) / (start - goal)) : 0;
+  const { latest, change, ratio } = progress.weightStats(
+    logs.all().map(([date, log]): [string, number | null | undefined] => [date, log.weight_kg]),
+    today,
+    monday,
+    goal
+  );
 
   return (
     <div className="home-tile tone-weight">

@@ -12,9 +12,6 @@ export type Meal = {
 
 export type DayLog = { meals_done: string[]; water_glasses: number; weight_kg?: number | null; exercised?: boolean };
 
-export const WATER_GOAL_LITERS = 2;
-export const WATER_GLASS_LITERS = 0.25;
-
 export function normalize(value = "") {
   return String(value).normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase().trim();
 }
