@@ -210,20 +210,33 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 
 **Review checkpoint 1c2:** tsc + unit.
 
+**Batch note 1c2 (code done, commits 01c5d3b..0b2ae4c; review round 1: FAIL, tests only):** the code matches the spec; every finding is a missing or weak test. T070 and T020 stay unticked until the re-review passes. Fix round 1 (code-writer; tests/unit plus src/lib/domain/chat.ts) covers: (H1) a data-driven vocabulary table that runs every Topics trigger through `ragAnswer` (exact and one typo where the allowance permits); (H2) a test that freezes the recipe-filter word list (`DROPPED_WORDS`) against spec Terms; (M1) pin the TOPICS table (title, button, follow-ups per topic); (M2) de-dup buttons in `ragAnswer`, so "agua, ejercicio y peso" yields a single "Mi peso"; (M3) tests for the block cap (2) and first-appearance order, plus the overflow buttons; (L3/M7) rows for tie order between equal-length phrases, stem-prefix matching and NEVER_FUZZY isolation (a never-fuzzy word neither fuzzy-matches nor is fuzzy-matched). Findings the fix round does not cover were given owners: M4 → T048/T049, M5 → T021/T022, M6 → T023, T029, T047, T052, T054, T063, T076 (see those tasks). Open questions for the user (LOW spec gaps, not decided here): see "Open questions 1c2" below. Commit-label notes: bd015f8's "REQ-19 rows" means **chat-polish** REQ-19 (the old winners table), not this spec's REQ-19 (Weight); the 1c1 review items (matchPhrases exact-beats-fuzzy, L2/L3 rows) were filed under T070 here but committed under T019/T017 labels. History is not rewritten.
+
+**Open questions 1c2 (for the user; the current behavior stays until answered):**
+1. "receta del pollo" / "ingredientes del pollo": the spec lists only "de" as a dish cue, so "del" is not one. Add "del" (and "de la")?
+2. "nombre del plan" / "¿Cómo se llama el plan?" resolve to Plan, not Identity (REQ-31 plan name). Should they be Identity?
+3. "¿A qué hora ceno?" shows all meal times because "ceno" (4 letters) is exact-only and is not a listed slot word. Add verb forms (ceno, desayuno, como) as slot words?
+4. "recetas de pollo" becomes a dish cue, so after T027 it is a not-found/did-you-mean on "pollo" rather than a recipe-list filter. Is that the intended reading?
+5. The `compr*` stem makes "comprendo" a cart question. Narrow the stem (e.g. compra*, compro, comprar)?
+6. Never-fuzzy words are exact-only only in their listed form: "objetos" (plural of never-fuzzy "objeto") is not on the list, so it fuzzy-matches "objetivo" and returns Goals. Should the never-fuzzy list also cover plurals (objetos, pasos, peros)?
+
 **Batch 1d1: resolver**, about 330 lines with tests (revision 7 split of 1d)
 
 - [ ] T021 [US1] Tests REQ-6
   - Unit (tests/unit/chat-intent.test.ts): the REQ-1 Givens left out of T070; via `resolved` and answer text where a builder exists: ingredientes + desayuno, cuándo/hora + compro, ingredientes + comprar, meta de peso, recetas + plan, the button "¿Qué recetas hay en mi plan?", nombre de mi plan, cuántas comidas llevo, qué lleva la cena, cuánto llevo. Every Topics Button, Follow-up and starter of topics that exist at 1d resolves to exactly its topic; `sweep()` extended to them, each with the T020 expected-topic and text/kind assertion. "Mi cena de hoy" returns to the sweep here (resolves to the cena slot; its options text lands with T032), and the `skip` list (PENDING: "¿Cuál es mi meta?", "Mi peso", "Mi avance de la semana") shrinks as each builder lands (T021, then T045, T047). "<Slot ref>" buttons move to T028, "¿Qué lleva <receta>?" to T026. Red first.
+  - 1c2 review (M5), part 1 rows: meals-done phrases today match adjacent words only, so "¿Cuántas comidas ya llevo?" resolves to slotOptions + ambiguous. Add rows where "comidas … llevo" with words in between ("cuántas comidas ya llevo", "cuántas comidas llevo hoy", "cuántas comidas me llevo") resolve to mealsDone alone, winning over ambiguous and over a slot reading of "comidas"; T022 implements it (meals-done detection over the question's words, not only an adjacent phrase).
   - Split (Global rules "Split test tasks"): part 1, committed just before T022, holds the rows asserted on `resolve()` directly (chat-intent.test.ts); part 2, committed just before T023, holds the `ragAnswer`-level rows, the sweep and the e2e.
   - e2e, written (tests/e2e/assistant-match.spec.ts): two REQ-6 Givens with answer text through `ask()`.
 - [ ] T022 [US1] Resolver (src/lib/domain/chat-intent.ts)
   - REQ-6 steps 1–8, with hooks for step 2 (US2) and step 4 (T027); phrase consumption.
   - Combinations: time + slot, goal + metric, "plan" possessor, Plan only when alone, ingredientes + cart, a time word without a slot ignored. At most 2 topics plus overflow.
+  - 1c2 review (M5): mealsDone when "comidas" and "llevo" both occur, not only adjacent (rows in T021 part 1).
 **Review checkpoint 1d1:** tsc + unit.
 
 **Batch 1d2: resolver wiring**, about 170 lines with tests
 
 - [ ] T023 [US1] Wire the resolver into `ragAnswer`, replacing T020's first-appearance list (src/lib/domain/chat.ts)
+  - 1c2 review (M6), owned here: tests/e2e/assistant-api.spec.ts:262 `sourcesOf("¿Qué recetas hay en mi plan?")` expects `["Recetario"]`; update it to the sources of the Recipes answer under the possessor rule. tests/e2e/assistant-next-step.spec.ts fails until this lands (the "Recetas" heading at ~103 and the chips at ~56, ~94, ~178); update those assertions here and list them in the T063 re-check.
 
 **Review checkpoint 1d2:** tsc + unit.
 
@@ -253,6 +266,7 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
   - Slot list from `activeSchedule`, word-to-slot mapping, almuerzo/merienda/snack rules.
   - Slot refs and ordinals (feminine/masculine, >10), slot buttons (times vs options message); slot times builder and variants.
   - T013 review (M2): the "meal times" real-API test (tests/e2e/assistant-answers.spec.ts:117-125) still expects the heading "Comidas" and the source "Basado en: Plan activo:"; update it to the "Horarios" block when this builder replaces the old meal-times answer.
+  - 1c2 review (M6), owned here: tests/e2e/assistant-api.spec.ts "¿A qué hora es la cena?" (lines 261, 273, 277) and "¿Cuándo desayuno?" (line 298) assert the old meal-times answer and sources; rewrite them to the slot-time builder's text and sources.
 **Review checkpoint 2a1:** tsc + unit.
 
 **Batch 2a2: slot resolution**, about 170 lines with tests
@@ -378,6 +392,7 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
   - e2e, written: parity of the goals answer's exercise and water goals and every weekly-progress item with the tiles under the T066 pin (tests/e2e/assistant-parity.spec.ts); one goals answer through `ask()` (tests/e2e/assistant-progress.spec.ts).
 - [ ] T047 [US3] Goals and weekly-progress builders, incl. the no-plan line and "Subir mi plan"; removes "¿Cuál es mi meta?" and "Mi avance de la semana" from the sweep `skip` list (src/lib/domain/chat-metrics.ts)
   - 3a1 review: the weekly-progress weight item uses the same rule as T045 (`latestDate >= monday` and `beforeWeek !== null`).
+  - 1c2 review (M6), owned here: tests/e2e/assistant-api.spec.ts asserts "¿Cuál es mi objetivo?" → "Tu objetivo: …" (lines 68, 199-200, 237-240, 260, 272; also the joined text at ~215 and the lead at ~230); rewrite them to the Goals answer when this builder lands. The plan-summary lead part of those tests (if it keeps the objective) changes again in T054.
 
 **Checkpoint:** US3 code complete (REQ-13 to REQ-22), unit-green; parity (REQ-16) proven in Batch E.
 
@@ -388,8 +403,10 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 - [ ] T048 [US4] Tests REQ-23, REQ-26, REQ-28, REQ-29, REQ-3 text
   - Unit (tests/unit/chat-edges.test.ts): "hola" → greeting + 4 buttons; thanks; "Hola, ¿cuánto peso?" → weight. Pizza not-found quotes "pizza"; pollo → did-you-mean with 2 buttons (no distractor offered); "la opcion 1" → not found. The same question twice → the same variant; for each answer with variants, questions hitting different variants show identical numbers and units (REQ-28). Capital de Francia → no-match + 4 starters; a near recipe name → did-you-mean. No-match asserts the exact lead (one of the two spec Copy variants), exactly the 4 starter buttons, and no objective or meal name anywhere in the answer. 1a2 review (LOW L6): starters are not filtered by the repeat rule: greeting and no_match list all 4 starters even when the message equals a starter-like text. Negative assertion (tests/unit/chat-answer.test.ts): the old fallback texts "No encontré esa información en tu plan activo." and "No encontré esa información en el sistema." never appear. `sweep()` over greeting, no-match and did-you-mean buttons. Red first.
   - e2e, written (tests/e2e/assistant-edges.spec.ts): through `ask()`, "hola", pollo did-you-mean, pizza not found, the same question twice. Finalize the `sources` test in assistant-api.spec.ts: "¿Qué hago ahora?" → kind `no_match` and `sources` `[]`.
+  - 1c2 review (M4): greetings and thanks are exact-only today (`GREETING_WORDS`), but REQ-2 makes "buenos días" a fuzzy multi-word entry and Greeting is a Topics row like any other. Rows: "grasias" (1 edit, 7 letters), "gracia" (singular of gracias), "buenso dias" (swap), "buenas tarde", "buenos dia" → greeting/thanks; "hoal" stays `no_match` (4 letters, exact only). T049 routes greetings through `matchWord`/`matchPhrases`.
   - T013 review (M1), with T049: the REQ-29 no-match test in tests/e2e/assistant-next-step.spec.ts:113-118 hard-codes the first lead variant and the 4 starters; make it variant-agnostic (either spec Copy variant, since REQ-28 picks one by hashing the question).
 - [ ] T049 [US4] Builders and variant picker; REQ-29 matching on the whole question minus stop words (src/lib/domain/chat.ts, src/lib/domain/chat-dish.ts)
+  - 1c2 review (M4): greeting and thanks words go through the REQ-2 matcher (fuzzy, phrases) instead of the exact `GREETING_WORDS` set; rows in T048.
 
 **Review checkpoint 4a:** tsc + unit.
 
@@ -407,6 +424,7 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 **Batch 4b2: clarifications and missing data**, about 290 lines with tests
 
 - [ ] T052 [US4] Clarify replies and the missing-data replies tested in T050 only (src/lib/domain/chat-meals.ts, src/lib/domain/chat-metrics.ts)
+  - 1c2 review (M6), owned here: tests/e2e/assistant-api.spec.ts:117-118 ("¿Cuál es el objetivo de mi plan?" → "No tienes un plan activo.") and :307 use the old copy; rewrite to the spec Copy no-active-plan reply ("Aún no tienes…") for the topic each question resolves to.
 
 **Checkpoint:** US4 code complete (REQ-23 to REQ-29), unit-green.
 
@@ -418,6 +436,7 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
   - Unit (tests/unit/chat-identity.test.ts): "Te llamas Rafael." highlighted; a blank name; "Plan octubre.PDF" → "Plan octubre"; the plan summary lead has the name; no plan → REQ-27; answer text for the identity Givens of REQ-6. Red first.
   - e2e, written (tests/e2e/assistant-identity.spec.ts): "¿Cómo me llamo?" and the plan name through `ask()`.
 - [ ] T054 [US5] Identity builders and the plan-summary lead (src/lib/domain/chat.ts)
+  - 1c2 review (M6): the plan-summary lead change touches the assistant-api.spec.ts objective/plan tests rewritten in T047 (lines ~199-240); update their lead assertions here.
 
 **Checkpoint:** US5 code complete (REQ-30, REQ-31), unit-green.
 
@@ -481,7 +500,7 @@ UI-only: e2e tests are written here and proven in Batch E (T076 run, T077 breaka
 - [ ] T076 [setup] Full run and fix rounds (tests/e2e/*, plus the src/ files a fix needs)
   - Preconditions: no other Playwright run, `lsof -i :3200` empty, nothing in the background; the user's :3000 is not touched.
   - Run 1: one full `npm run test:e2e`, in the foreground. Then the T003 first-run check: `lsof -i :3200` empty and `psql -l` shows no `<name>-e2e`; if either is left over, stop and report. Look at T066 (dashboard baseline) first.
-  - Triage every failure in the batch note: (a) known failure on main; (b) the test contradicts spec v1.6 → fix the test; (c) code bug → fix it, with a unit test first (red, then green) when the cause is logic, otherwise the failing e2e is the proof; (d) snapshot-only diff → T057. In run 1 the `assistant-look` and `a-theme-visual` snapshots are expected red until T057.
+  - Triage every failure in the batch note: (a) known failure on main; (b) the test contradicts spec v1.6 → fix the test; (c) code bug → fix it, with a unit test first (red, then green) when the cause is logic, otherwise the failing e2e is the proof; (d) snapshot-only diff → T057. In run 1 the `assistant-look` and `a-theme-visual` snapshots are expected red until T057. 1c2 review (M6): an assistant-noscope `MESSAGES` pass is not evidence (vacuous until T063 strengthens it).
   - Fix rounds (up to 3): path-limited commits citing the failing test and REQ; gate = tsc + `npm run test:unit` + a rerun of only the affected spec files, one at a time. Failures left after round 3 go to the user.
   - After T077 and T057: one final full `npm run test:e2e`. If it shows a new snapshot-only diff, the user is asked again for a refresh (same T057 procedure) before the checkpoint.
 - [ ] T077 [setup] Red-by-breaking demo for e2e-only behavior (Constitution 1, spec v1.6). Nothing is committed.
@@ -501,7 +520,8 @@ UI-only: e2e tests are written here and proven in Batch E (T076 run, T077 breaka
   - Final REQ-5 sweep over one answer of every reply kind and every button type: `sweep()` (unit) and `resendSweep` (e2e).
   - Merge precondition 1: `grep -rn "Pronto podré" src` returns nothing (no D3 placeholder).
   - Merge precondition 2: `grep -n "headers" src/app/api/rag/chat/route.ts` shows header access only through `testHooks()`; `resolved` is set only under `trace`.
-  - T013 review (M3): re-check the hard-coded follow-up expectations in tests/e2e/assistant-next-step.spec.ts (:49, :57, :87, :94, :178, and the starters at :116) whenever T021/T028/T031/T034 change the Topics follow-ups; confirm the 1b2a carry-overs L4–L6 were applied or recorded as accepted loss.
+  - T013 review (M3): re-check the hard-coded follow-up expectations in tests/e2e/assistant-next-step.spec.ts (:49, :57, :87, :94, :178, and the starters at :116) whenever T021/T028/T031/T034 change the Topics follow-ups; confirm the 1b2a carry-overs L4–L6 were applied or recorded as accepted loss. 1c2 review (M6): include the next-step "Recetas" heading (~103) and chips (~56, ~94, ~178) updated in T023.
+  - 1c2 review (M6): the assistant-noscope.spec.ts `MESSAGES` test is vacuous (it compares the plain call with the legacy-field call, so any answer passes). Give each message an expected kind or lead text, or record it as a pure "fields ignored" check with that limit stated; check it in T076 run 1 triage too.
   - No `ScopeKey`/`scope` remains in chat code: `grep -rEnw "ScopeKey|SCOPE_LABEL|scope" src/lib/assistant.ts src/lib/domain src/app/api/rag/chat src/components/app src/components/shared` returns nothing (src only; tests excluded, they hold the negative assertions per Global rules).
 - [ ] T064 [setup] Synthetic smoke and NFR (tests/e2e/assistant-helpers.ts, tests/e2e/assistant-api.spec.ts)
   - Harness `seedVolume()`: 32 recipes, 69 meals, 365 daily_logs rows, goals, name, add-ons, on the chat user.
