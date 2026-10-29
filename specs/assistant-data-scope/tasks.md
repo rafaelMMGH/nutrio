@@ -39,18 +39,20 @@ Format: `- [ ] T### [P] [US#] Description (path/to/file)`. `[P]` = parallel with
 
 **Batch U0: unit runner and in-memory fixture**, about 200 lines
 
-- [ ] T073 [setup] Unit runner (package.json `scripts` only, tests/unit/smoke.test.ts), about 50 lines
+- [x] T073 [setup] Unit runner (package.json `scripts` only, tests/unit/smoke.test.ts), about 50 lines
   - Add `"test:unit": "tsx --test tests/unit/*.test.ts"` (plan D10: flat directory; Node 20 `--test` does not expand globs and `sh` treats `**` like `*`). No dependency change: `git diff package-lock.json` is empty.
   - Smoke test with `node:test` and `node:assert/strict` that imports through `@/` with a transitive `@/` value import (e.g. `words` from `@/lib/assistant`, `emptyDb` from `@/lib/storage/db`, which imports `@/lib/domain/nutrition`). It also imports `@/lib/domain/chat` and `@/lib/domain/plans` (plans.ts → storage/db, node:fs, pdf-plan → unpdf; plan D10) and calls the current `ragAnswer` on `emptyDb()`, so that chain is proven in U0. Shown red with a deliberately wrong assertion, then green.
   - If `@/` does not resolve: switch the script to `tsx --tsconfig tsconfig.json --test tests/unit/*.test.ts`. If that fails too, stop and report; relative imports in tests are not a fix (the `src/` modules use `@/` internally) and tsconfig-paths must not be installed.
   - Confirm `npx tsc --noEmit` type-checks `tests/unit` (tsconfig `include`) and Playwright ignores it (`testDir: ./tests/e2e`).
-- [ ] T074 [foundational] Shared fixture and `memDb()` (tests/shared/assistant-fixture.ts, tests/e2e/assistant-helpers.ts, tests/unit/memdb.ts, tests/unit/memdb.test.ts)
+- [x] T074 [foundational] Shared fixture and `memDb()` (tests/shared/assistant-fixture.ts, tests/e2e/assistant-helpers.ts, tests/unit/memdb.ts, tests/unit/memdb.test.ts)
   - Move `planFixture`, its recipe/ingredient/description data, the add-on specs, `DEFAULT_MEALS`, `TIME_WINDOWS` and `PLAN_NAME` into tests/shared/assistant-fixture.ts (no Playwright or SQL import). assistant-helpers.ts imports them; `seedPlan` inserts exactly what it did before (a pure move, reviewed as such).
   - Helper fixes (F1a review), separate commit: `seedRecipes` calls `clearPlan()` first (meal_options/plan_version_recipes FK to recipes; doc comment and the seeders comment at ~line 111 say "reseeding recipes clears the plan"), and its `ingredient_usages` delete is limited to recipe sources (add-on usages stay with their shared_add_ons). `SERVER_LOG` is built from `__dirname`, not cwd.
   - `memDb({ meals?, times?, fixture?, supplements?, objective?, logs?, goals?, name?, cart? })` returns `{ db, user }` built from `emptyDb()`: user, plan, current version with `structured_data`, meal types, recipes with ingredient usages, meal options, plan_version_recipes, shared add-ons with `add_on` usages, daily logs and cart, with the same ids and fields as the SQL seed.
   - memdb.test.ts: fixture counts (19 generic, 3 table recipes, 4 distractors), slot and option numbers, add-ons; each memDb collection's record key set equals the keys the seed's rows produce through `toRecord` (model columns plus `extra` keys), checked against a key list kept beside the seed (no Prisma import). Value formats (e.g. dates) stay e2e-only (plan Risks). Shown red by breaking a count.
 
 **Review checkpoint U0:** `npx tsc --noEmit`; `npm run test:unit` green. Batch note: how `@/` resolved.
+
+**Batch note U0 (done, reviewer PASS in round 2; 4+2 commits 1dbe044..1967ec9):** `@/` resolved directly under `tsx --test` (no `--tsconfig` fallback needed). memDb defaults: `fixture: true`, `times: "all"`, name "Asistente memdb", user id `chat-e2e-memdb` (the e2e `seedPlan` keeps `fixture` off by default). Round 1 caught `__dirname` being undefined under Playwright's ESM loader; `SERVER_LOG` now uses `fileURLToPath(import.meta.url)`, and that load path is first proven in the 3a2 targeted run or Batch E. Carry-over notes: T010 must update `tests/unit/smoke.test.ts` (its `kind === "unknown"` assertion and the `ragAnswer(db, userId, message)` call change with the new `(db, user, message, today)` signature; hola should become `greeting`). T008 must know `seedRecipes` now clears the plan, so `assistant-api.spec.ts` lines ~411, ~424 and ~516 lose the plan after `seedPlan`; by reading chat.ts those answers don't use the plan. Optional (LOW): pin the plan/version/add-on id formats in memdb.test.ts.
 
 **Batch F1b: test hooks, 500 path (chat-polish REQ-23)**, about 250 lines. May run in a worktree beside 1a1 (plan Batches).
 
