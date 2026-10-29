@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
-import type { ChatAnswer, Rich, ScopeKey, Section } from "../../src/lib/assistant";
+import type { ChatAnswer, Rich, Section } from "../../src/lib/assistant";
 import { addOnSpecs, DEFAULT_MEALS, PLAN_NAME, planFixture, slug, TIME_WINDOWS, type SeedLog, type SeedRecipe } from "../shared/assistant-fixture";
 import { sql } from "./database";
 import { expect, test as base, watch } from "./fixtures";
@@ -172,8 +172,8 @@ export type SeedPlan = {
   recommendations?: string;
   /**
    * Seeds the deterministic recipe fixture (see `planFixture`) and wires it into the plan; it REPLACES all of the user's
-   * recipes. Off by default only while the old specs seed their own recipes before the plan (they would lose them);
-   * T008/T013 flip the default.
+   * recipes. Off by default because old specs seed their own recipes before the plan (they would lose them); every new
+   * spec passes `fixture: true`.
    */
   fixture?: boolean;
 };
@@ -278,14 +278,10 @@ export type AskOptions = {
 /**
  * POSTs a question to the chat API as the page's user; `request` is `page.request`. The body is a `ChatAnswer` on 200
  * and the error JSON otherwise. The test hooks are headers, so they work only when the server runs with E2E_HOOKS.
- * Until T008 the third parameter may also be the legacy scope string (then `recipeId` is the fourth argument).
  */
-export async function ask(request: APIRequestContext, message: string, options: AskOptions | ScopeKey | "Carrito actual" = {}, recipeId?: string): Promise<AskResult> {
-  const legacy = typeof options === "string";
-  const { today, fail, trace }: AskOptions = legacy ? {} : options;
+export async function ask(request: APIRequestContext, message: string, { today, fail, trace }: AskOptions = {}): Promise<AskResult> {
   const headers: Record<string, string> = { ...(today ? { "x-e2e-today": today } : {}), ...(fail ? { "x-e2e-fail": "chat" } : {}), ...(trace ? { "x-e2e-trace": "1" } : {}) };
-  const data = { message, ...(legacy ? { scope: options } : {}), ...(recipeId ? { recipe_id: recipeId } : {}) };
-  const response = await request.post("/api/rag/chat", { data, headers });
+  const response = await request.post("/api/rag/chat", { data: { message }, headers });
   return { status: response.status(), body: (await response.json()) as ChatAnswer };
 }
 
