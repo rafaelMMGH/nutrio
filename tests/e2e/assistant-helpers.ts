@@ -321,7 +321,8 @@ const blockText = (blocks: SweepBlock[] = []) =>
  * REQ-5: re-sends the message of every question button in `answers` (top-level and per block) as the first message of a
  * new conversation, twice, and expects status 200 both times, a defined kind that is never clarify, did_you_mean or
  * no_match, a non-empty `blocks` array, the same blocks both times and no D3 placeholder ("Pronto podré responder
- * sobre …") in the answer or the block text, and for each button the topic and lead of the Button column map (tests/shared/assistant-buttons.ts), asserted on `resolved`. Fails when there is nothing to send or an input answer is itself a
+ * sobre …") in the answer or the block text, and for each button the topic and lead of the Button column map
+ * (tests/shared/assistant-buttons.ts), asserted on `resolved`. Fails when there is nothing to send or an input answer is itself a
  * placeholder, so it never passes vacuously. Returns the messages it swept.
  */
 export async function resendSweep(request: APIRequestContext, answers: readonly SweepAnswer[]) {

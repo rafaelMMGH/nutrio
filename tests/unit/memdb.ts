@@ -183,7 +183,8 @@ const PLACEHOLDER = /Pronto podré responder sobre/;
 
 /**
  * REQ-5: re-asks the message of every question button in `answers` (top level and per block) as the first message of a
- * new conversation, twice, through `ragAnswer`, and expects the topic and lead of the Button column map (tests/shared/assistant-buttons.ts), the same blocks both times and a definite kind (never
+ * new conversation, twice, through `ragAnswer`, and expects the topic and lead of the Button column map
+ * (tests/shared/assistant-buttons.ts), the same blocks both times and a definite kind (never
  * clarify, did_you_mean or no_match). Fails on an empty set and on a D3 placeholder, so it never passes vacuously.
  * `skip` lists messages whose builder does not exist yet; each batch that adds one shrinks the list. Returns the swept messages.
  */
