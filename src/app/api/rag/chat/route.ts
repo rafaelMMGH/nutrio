@@ -20,9 +20,9 @@ export async function POST(request: Request) {
   // Anything that fails from here on is ours: log it with context and answer with a generic 500.
   try {
     const hooks = testHooks(request.headers, process.env);
-    const db = await loadFor(auth.user, "cart", "recipes");
+    const db = await loadFor(auth.user, "chat");
     if (hooks.fail) throw new Error("Injected chat failure (x-e2e-fail)");
-    return json(ragAnswer(db, auth.user.id, body.message, body.scope, body.recipe_id));
+    return json(ragAnswer(db, auth.user.id, body.message));
   } catch (error) {
     console.error("[api/rag/chat]", { userId: auth.user.id, messageLength: body.message.length }, error);
     return json({ error: "Internal error" }, 500);

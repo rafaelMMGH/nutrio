@@ -10,6 +10,7 @@ import { cartCollections, loadDb, recipeCollections, union, type Collection } fr
 export const needs = {
   activePlan: ["plans", "planVersions"],
   cart: cartCollections,
+  chat: union(cartCollections, recipeCollections, ["mealTypes", "mealOptions", "dailyLogs"]),
   dashboard: union(cartCollections, recipeCollections, ["mealTypes", "mealOptions", "dailyLogs"]),
   plans: ["plans", "planVersions"],
   recipes: recipeCollections,

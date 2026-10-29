@@ -21,7 +21,10 @@ function isRealDay(value: string) {
  */
 export function testHooks(headers: Headers, env: Record<string, string | undefined>): TestHooks {
   if (env.E2E_HOOKS !== "1" || env.NODE_ENV === "production") return { trace: false };
-  const today = headers.get("x-e2e-today")?.trim();
+  const pin = headers.get("x-e2e-today");
+  const today = pin?.trim();
+  // A pin that is present but not a real day is a bug in the test; say so instead of silently answering with the real date.
+  if (pin !== null && !(today && isRealDay(today))) console.warn(`[test-hooks] ignoring x-e2e-today ${JSON.stringify(pin)}: expected a real YYYY-MM-DD day`);
   return {
     ...(today && isRealDay(today) ? { today } : {}),
     ...(headers.get("x-e2e-fail") === "chat" ? { fail: true as const } : {}),
