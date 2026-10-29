@@ -194,3 +194,18 @@ test("REQ-24 a topic button already among the second block's follow-ups is offer
   const reply = ragAnswer(db, user, "agua, ejercicio y peso", TODAY);
   assert.deepEqual(messagesOf(reply.buttons), ["¿Cuánta agua llevo?", "Mi peso"]);
 });
+
+test("REQ-24 a question with three topics gets two titled blocks; the third becomes its button", () => {
+  const { db, user } = memDb();
+  const reply = ragAnswer(db, user, "agua, ejercicio y peso", TODAY, { trace: true });
+  assert.equal(reply.blocks.length, 2);
+  assert.deepEqual(reply.blocks.map((block) => block.title), ["Agua", "Ejercicio"]);
+  assert.deepEqual(reply.resolved?.map((intent) => intent.topic), ["water", "exercise"]);
+});
+
+test("REQ-24 topics are answered in question order, also when a phrase comes after a word", () => {
+  const { db, user } = memDb();
+  const reply = ragAnswer(db, user, "agua y cómo me llamo", TODAY, { trace: true });
+  assert.deepEqual(reply.resolved?.map((intent) => intent.topic), ["water", "identity"]);
+  assert.equal(reply.blocks[0].title, "Agua");
+});
