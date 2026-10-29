@@ -90,3 +90,36 @@ describe("progress.ts weight", () => {
     assert.equal(weightStats([["2026-10-20", 63]], PARITY_TODAY, PARITY_MONDAY, 63).ratio, 1);
   });
 });
+
+describe("progress.ts edges", () => {
+  const log = (meals_done: string[]): ProgressLog => ({ meals_done, water_glasses: 0 });
+  const near = (actual: number, want: number) => assert.ok(Math.abs(actual - want) < 1e-9, `${actual} is not ${want}`);
+
+  it("mealsDoneOn ignores ids that are not slots and never exceeds the slots", () => {
+    assert.equal(mealsDoneOn(log(["m1", "gone"]), PARITY_SLOTS), 1);
+    assert.equal(mealsDoneOn(log(["m1", "m1", "m1", "m1", "m1"]), PARITY_SLOTS), 4);
+  });
+
+  it("weekDays is empty when endDay is before Monday", () => {
+    assert.deepEqual(weekDays(PARITY_MONDAY, "2026-10-25"), []);
+  });
+
+  it("weightStats treats a weight on Monday as part of the week, not the one before it", () => {
+    const stats = weightStats([["2026-10-20", 67], ["2026-10-26", 66]], PARITY_TODAY, PARITY_MONDAY, null);
+    assert.equal(stats.beforeWeek, 67);
+    assert.equal(stats.change, -1);
+  });
+
+  it("weightStats gives change 0 when the latest weight is the one before Monday", () => {
+    const stats = weightStats([["2026-10-20", 67], ["2026-10-25", 66.6]], PARITY_TODAY, PARITY_MONDAY, null);
+    assert.equal(stats.latestDate, "2026-10-25");
+    assert.equal(stats.beforeWeek, 66.6);
+    assert.equal(stats.change, 0);
+  });
+
+  it("weightStats ratio follows a gaining goal and is not clamped", () => {
+    near(weightStats([["2026-10-20", 60], ["2026-10-27", 62]], PARITY_TODAY, PARITY_MONDAY, 66).ratio, 1 / 3);
+    near(weightStats([["2026-10-20", 67], ["2026-10-27", 68]], PARITY_TODAY, PARITY_MONDAY, 63).ratio, -0.25);
+    near(weightStats([["2026-10-20", 67], ["2026-10-27", 62]], PARITY_TODAY, PARITY_MONDAY, 63).ratio, 1.25);
+  });
+});
