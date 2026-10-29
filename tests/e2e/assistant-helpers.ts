@@ -357,10 +357,10 @@ export async function resendSweep(request: APIRequestContext, answers: readonly 
 // Fixture: a page signed in as the chat user
 
 export const test = base.extend<{ chat: Page; chatContext: BrowserContext }>({
-  // Same options as the project's pages (viewport, color scheme, reduced motion) so `test.use` applies unchanged.
-  chatContext: async ({ browser, baseURL, viewport, colorScheme, reducedMotion, hasTouch, isMobile, forcedColors, issues }, use) => {
+  // Same options as the project's pages (viewport, color scheme, reduced motion, time zone) so `test.use` applies unchanged.
+  chatContext: async ({ browser, baseURL, viewport, colorScheme, reducedMotion, hasTouch, isMobile, forcedColors, timezoneId, issues }, use) => {
     const user = currentUser();
-    const context = await browser.newContext({ baseURL, viewport, colorScheme, reducedMotion, hasTouch, isMobile, forcedColors, locale: "es-MX" });
+    const context = await browser.newContext({ baseURL, viewport, colorScheme, reducedMotion, hasTouch, isMobile, forcedColors, timezoneId, locale: "es-MX" });
     // Registered before the first page exists, so every page of the context reports into `issues`.
     context.on("page", (page) => watch(page, issues));
     await context.addCookies([{ name: "nm_session", value: user.token, url: baseURL ?? "http://localhost:3200", httpOnly: true, sameSite: "Lax" }]);
