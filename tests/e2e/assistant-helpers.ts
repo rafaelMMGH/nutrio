@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { readFileSync } from "node:fs";
 import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import type { ChatAnswer, Rich, ScopeKey, Section } from "../../src/lib/assistant";
 import { sql } from "./database";
@@ -66,6 +67,7 @@ function planRowDeletes(u: string) {
   return [
     `delete from shopping_list_items where shopping_list_id in ${lists}`,
     `delete from shopping_lists where user_id = ${u}`,
+    `delete from ingredient_usages where source_type = 'add_on' and source_id in (select id from shared_add_ons where plan_version_id in ${versions})`,
     `delete from shared_add_ons where plan_version_id in ${versions}`,
     `delete from plan_version_recipes where plan_version_id in ${versions}`,
     `delete from meal_options where plan_version_id in ${versions}`,
@@ -171,16 +173,93 @@ export type SeedPlan = {
   supplements?: boolean;
   objective?: string;
   recommendations?: string;
+  /**
+   * Seeds the deterministic recipe fixture (see `planFixture`) and wires it into the plan; it REPLACES all of the user's
+   * recipes. Off by default only while the old specs seed their own recipes before the plan (they would lose them);
+   * T008/T013 flip the default.
+   */
+  fixture?: boolean;
 };
 
 export const PLAN_NAME = "Plan e2e del asistente";
 const DEFAULT_MEALS = ["Desayuno", "Colación", "Comida", "Cena"];
 const TIME_WINDOWS = ["Entre 7 a 8 am", "Entre 10 a 11 am", "Entre 2 a 3 pm", "Entre 8 a 9 pm"];
 
+const unaccent = (value: string) => value.normalize("NFD").replace(/\p{Diacritic}/gu, "");
+
+type Placed = { recipe: SeedRecipe; /** Index into `meals`, or null for a recipe outside the plan. */ slot: number | null; option: number };
+
+/**
+ * The deterministic recipe fixture of the REQ-3 table: 19 generic names ("Desayuno opcion 1", round-robin over the
+ * slots, numbered per name so duplicate slots never collide), "Pollo asado", "Ensalada de pollo" and "Sándwich de atún",
+ * and distractors that must never be a candidate for any REQ-3 phrase: "Sopa de lima", "Atole de avena", "Chilaquiles
+ * verdes" and "Tacos de frijol". They share no word and no near spelling with "pollo asado", "sandwich de atun" or
+ * "pizza"; the first two are planned, the last two only in the recipe book. Ingredients cover quantity + unit, quantity
+ * only (unit "") and neither (0, ""); descriptions are filled, empty or an "Extraído de" import note.
+ */
+function planFixture(meals: string[]): Placed[] {
+  const placed: Placed[] = [];
+  const perSlot = meals.map(() => 0);
+  const perName = new Map<string, number>();
+  const variants: SeedRecipe["ingredients"][] = [
+    [{ name: "Huevo", quantity: 2, unit: "pieza", category: "Proteínas" }, { name: "Aguacate", quantity: 1, unit: "" }],
+    [{ name: "Avena", quantity: 40, unit: "g" }, { name: "Canela", quantity: 0, unit: "" }],
+    [{ name: "Frijoles", quantity: 1, unit: "taza" }, { name: "Sal", quantity: 0, unit: "" }]
+  ];
+  const descriptions = ["", "Mezcla todo. Sirve caliente.", "Extraído de plan.pdf"];
+  const add = (name: string, slot: number | null, index: number, description = descriptions[index % 3]) => {
+    const option = slot === null ? 0 : ++perSlot[slot];
+    placed.push({ recipe: { name, description, ingredients: variants[index % 3] }, slot, option });
+  };
+  const slotOf = (word: string) => {
+    const found = meals.findIndex((meal) => unaccent(meal).toLowerCase() === word);
+    return found === -1 ? meals.length - 1 : found;
+  };
+  // With no meals at all (meals: []) every recipe stays outside the plan.
+  const planned = (word: string) => (meals.length ? slotOf(word) : null);
+  for (let index = 0; meals.length && index < 19; index++) {
+    const base = `${unaccent(meals[index % meals.length])} opcion`;
+    const number = (perName.get(base) ?? 0) + 1;
+    perName.set(base, number);
+    add(`${base} ${number}`, index % meals.length, index);
+  }
+  const steps = "Sazona el pollo. Hornea 30 minutos. Sirve con limón.";
+  add("Pollo asado", planned("comida"), 0, steps);
+  add("Ensalada de pollo", planned("comida"), 1, steps);
+  add("Sándwich de atún", planned("cena"), 2, steps);
+  add("Sopa de lima", planned("comida"), 0);
+  add("Atole de avena", planned("desayuno"), 1);
+  add("Chilaquiles verdes", null, 2);
+  add("Tacos de frijol", null, 0);
+  return placed;
+}
+
+/** A complement on the first slot ("Agua natural · 1 vaso") and a quantity-only one on the last, each with an `add_on` usage. */
+function addOnStatements(versionId: string, meals: string[]): string[] {
+  const userId = currentUser().id;
+  const specs = [
+    { name: "Agua natural", slot: 0, quantity: 1, unit: "vaso" },
+    { name: "Fruta de temporada", slot: meals.length - 1, quantity: 2, unit: "" }
+  ];
+  if (!meals.length) return [];
+  return specs.flatMap(({ name, slot, quantity, unit }) => {
+    const addOnId = `${versionId}-addon-${slug(name)}`;
+    const ingredientId = `${userId}-ing-${slug(name)}`;
+    return [
+      `insert into shared_add_ons (id, plan_version_id, meal_type_id, name, applies_to_all_options, required, notes, canonical_hash, created_at) values (${lit(addOnId)}, ${lit(versionId)}, ${lit(`${versionId}-meal-${slot}`)}, ${lit(name)}, true, false, '', ${lit(slug(name))}, now())`,
+      `insert into ingredients (id, user_id, canonical_name, category, primary_unit, created_at, updated_at) values (${lit(ingredientId)}, ${lit(userId)}, ${lit(name)}, 'Otros', ${lit(unit)}, now(), now()) on conflict (id) do nothing`,
+      `insert into ingredient_usages (id, ingredient_id, source_type, source_id, quantity, unit, notes, is_optional, confidence_score, requires_review, created_at) values (${lit(`${addOnId}-use`)}, ${lit(ingredientId)}, 'add_on', ${lit(addOnId)}, ${quantity}, ${lit(unit)}, '', false, 1, false, now())`
+    ];
+  });
+}
+
 /** Replaces the active plan: plan, current version (`structured_data`) and one meal type per meal. */
-export function seedPlan({ times, meals = DEFAULT_MEALS, supplements = true, objective = "Mejorar mi energía", recommendations = "Tomar agua durante el día" }: SeedPlan) {
+export function seedPlan({ times, meals = DEFAULT_MEALS, supplements = true, objective = "Mejorar mi energía", recommendations = "Tomar agua durante el día", fixture = false }: SeedPlan) {
   clearPlan();
   const userId = currentUser().id;
+  const placed = fixture ? planFixture(meals) : [];
+  // Recipes after clearPlan: reseeding wipes the old ones, which is only possible once the plan rows pointing at them are gone.
+  const recipeIds = fixture ? seedRecipes(placed.map((entry) => entry.recipe)) : {};
   const planId = `${userId}-plan`;
   const versionId = `${planId}-v1`;
   const windows = meals.map((_, index) => (times === "all" || (times === "some" && index % 2 === 0) ? TIME_WINDOWS[index % TIME_WINDOWS.length] : ""));
@@ -201,6 +280,16 @@ export function seedPlan({ times, meals = DEFAULT_MEALS, supplements = true, obj
         `insert into meal_types (id, plan_version_id, name, display_order, time_window, created_at) values (${lit(`${versionId}-meal-${index}`)}, ${lit(versionId)}, ${lit(name)}, ${index}, ${lit(windows[index])}, now())`
     )
   ];
+  for (const { recipe, slot, option } of placed) {
+    if (slot === null) continue;
+    const mealId = `${versionId}-meal-${slot}`;
+    const recipeId = recipeIds[recipe.name];
+    statements.push(
+      `insert into meal_options (id, plan_version_id, meal_type_id, recipe_id, option_number, is_unique_option, created_at) values (${lit(`${recipeId}-opt`)}, ${lit(versionId)}, ${lit(mealId)}, ${lit(recipeId)}, ${option}, false, now())`,
+      `insert into plan_version_recipes (id, plan_version_id, recipe_id, meal_type_id, option_number, created_at) values (${lit(`${recipeId}-pvr`)}, ${lit(versionId)}, ${lit(recipeId)}, ${lit(mealId)}, ${option}, now())`
+    );
+  }
+  if (fixture) statements.push(...addOnStatements(versionId, meals));
   sql(statements.join(";"));
 }
 
@@ -209,15 +298,105 @@ export function clearPlan() {
   sql(planRowDeletes(lit(currentUser().id)).join(";"));
 }
 
+export type SeedLog = { date: string; meals_done?: string[]; water_glasses?: number; weight_kg?: number | null; exercised?: boolean };
+
+/** Replaces all of the user's daily logs. `date` is YYYY-MM-DD; omitted fields default to nothing done (0 glasses, no weight, no exercise). */
+export function seedLogs(rows: SeedLog[]) {
+  const userId = currentUser().id;
+  const statements = [`delete from daily_logs where user_id = ${lit(userId)}`];
+  for (const { date, meals_done = [], water_glasses = 0, weight_kg = null, exercised = false } of rows) {
+    const mealsDone = meals_done.length ? `array[${meals_done.map(lit).join(",")}]::text[]` : "'{}'::text[]";
+    statements.push(
+      `insert into daily_logs (id, user_id, date, meals_done, water_glasses, weight_kg, exercised, created_at, updated_at) values (${lit(`${userId}-log-${date}`)}, ${lit(userId)}, ${lit(date)}::date, ${mealsDone}, ${water_glasses}, ${weight_kg ?? "null"}, ${exercised}, now(), now())`
+    );
+  }
+  sql(statements.join(";"));
+}
+
+/** Sets the user's weekly goals; a key left out is untouched, `weight: null` clears the target weight. */
+export function setGoals({ weight, days }: { weight?: number | null; days?: number }) {
+  const sets = [...(weight !== undefined ? [`weight_goal_kg = ${weight ?? "null"}`] : []), ...(days !== undefined ? [`activity_goal_days = ${days}`] : [])];
+  if (sets.length) sql(`update users set ${sets.join(", ")} where id = ${lit(currentUser().id)}`);
+}
+
+/** Sets the user's name (blank allowed, for "Aún no tengo tu nombre registrado."). */
+export function setName(name: string) {
+  sql(`update users set name = ${lit(name)} where id = ${lit(currentUser().id)}`);
+}
+
 // ---------------------------------------------------------------------------------------------------------------------
 // API
 
 export type AskResult = { status: number; body: ChatAnswer };
 
-/** POSTs a question to the chat API as the page's user. `request` is `page.request`. The body is a `ChatAnswer` on 200 and the error JSON otherwise. */
-export async function ask(request: APIRequestContext, message: string, scope?: ScopeKey | "Carrito actual", recipeId?: string): Promise<AskResult> {
-  const response = await request.post("/api/rag/chat", { data: { message, ...(scope ? { scope } : {}), ...(recipeId ? { recipe_id: recipeId } : {}) } });
+export type AskOptions = {
+  /** YYYY-MM-DD: the server's "today" (header x-e2e-today). */
+  today?: string;
+  /** Makes the route throw inside the builder call (header x-e2e-fail: chat), for the 500 path. */
+  fail?: boolean;
+  /** Asks for `resolved` in the body (header x-e2e-trace: 1). */
+  trace?: boolean;
+};
+
+/**
+ * POSTs a question to the chat API as the page's user; `request` is `page.request`. The body is a `ChatAnswer` on 200
+ * and the error JSON otherwise. The test hooks are headers, so they work only when the server runs with E2E_HOOKS.
+ * Until T008 the third parameter may also be the legacy scope string (then `recipeId` is the fourth argument).
+ */
+export async function ask(request: APIRequestContext, message: string, options: AskOptions | ScopeKey | "Carrito actual" = {}, recipeId?: string): Promise<AskResult> {
+  const legacy = typeof options === "string";
+  const { today, fail, trace }: AskOptions = legacy ? {} : options;
+  const headers: Record<string, string> = { ...(today ? { "x-e2e-today": today } : {}), ...(fail ? { "x-e2e-fail": "chat" } : {}), ...(trace ? { "x-e2e-trace": "1" } : {}) };
+  const data = { message, ...(legacy ? { scope: options } : {}), ...(recipeId ? { recipe_id: recipeId } : {}) };
+  const response = await request.post("/api/rag/chat", { data, headers });
   return { status: response.status(), body: (await response.json()) as ChatAnswer };
+}
+
+/** Sends x-e2e-today on every chat request the context's pages make, so UI-driven asks see `date` (YYYY-MM-DD) as today. */
+export async function pinToday(context: BrowserContext, date: string) {
+  await context.route(/\/api\/rag\/chat$/, (route) => route.continue({ headers: { ...route.request().headers(), "x-e2e-today": date } }));
+}
+
+const SERVER_LOG = "tests/e2e/.server.log";
+
+/** Marks the end of the e2e server's log now: `since()` returns the text appended after that point (a missing file counts as empty). */
+export function serverLog() {
+  const read = () => {
+    try {
+      return readFileSync(SERVER_LOG);
+    } catch {
+      return Buffer.alloc(0);
+    }
+  };
+  const offset = read().length;
+  return { offset, since: () => read().subarray(offset).toString("utf8") };
+}
+
+type SweepButton = { type: string; message?: string };
+type SweepAnswer = { answer: string; kind: string; blocks?: { buttons?: SweepButton[] }[]; buttons?: SweepButton[] };
+
+/**
+ * REQ-5: re-sends the message of every question button in `answers` (top-level and per block) as the first message of a
+ * new conversation, twice, and expects status 200, the same blocks both times, a definite kind (never clarify,
+ * did_you_mean or no_match) and no D3 placeholder ("Pronto podré responder sobre …"). Fails when there is nothing to
+ * send or an input answer is itself a placeholder, so it never passes vacuously. Returns the messages it swept.
+ */
+export async function resendSweep(request: APIRequestContext, answers: readonly SweepAnswer[]) {
+  const placeholder = /Pronto podré responder sobre/;
+  for (const answer of answers) expect(answer.answer, "placeholder answer in the sweep input").not.toMatch(placeholder);
+  const buttons = answers.flatMap((answer) => [...(answer.buttons ?? []), ...(answer.blocks ?? []).flatMap((block) => block.buttons ?? [])]);
+  const messages = [...new Set(buttons.flatMap((button) => (button.type === "question" && button.message ? [button.message] : [])))];
+  expect(messages.length, "resendSweep found no question buttons to check").toBeGreaterThan(0);
+  for (const message of messages) {
+    const first = await ask(request, message);
+    const again = await ask(request, message);
+    const body = first.body as unknown as SweepAnswer;
+    expect(first.status, message).toBe(200);
+    expect(body.answer, message).not.toMatch(placeholder);
+    expect(["clarify", "did_you_mean", "no_match"], message).not.toContain(body.kind);
+    expect((again.body as unknown as SweepAnswer).blocks, message).toEqual(body.blocks);
+  }
+  return messages;
 }
 
 // ---------------------------------------------------------------------------------------------------------------------
