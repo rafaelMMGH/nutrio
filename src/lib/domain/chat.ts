@@ -136,6 +136,7 @@ export function ragAnswer(db: AppDb, user: AppUser, message: string, _today: str
   const builts = answered.map((topic) => BUILDERS[topic]?.(db, user.id, message) ?? pending(topic));
   const blocks = builts.map((built, index): Block => ({ title: answered.length > 1 ? TOPICS[answered[index]].title : null, lead: built.lead, sections: built.sections ?? [], buttons: [] }));
   // Repeat rule (chat-polish REQ-5): a follow-up that repeats the question just asked is not offered. Follow-ups only.
-  const followUps = [...TOPICS[answered[answered.length - 1]].followUps.filter((text) => normalizeText(text) !== asked), ...overflow];
+  // A button is offered once: an overflow topic can also be one of the follow-ups (REQ-24).
+  const followUps = [...new Set([...TOPICS[answered[answered.length - 1]].followUps.filter((text) => normalizeText(text) !== asked), ...overflow])];
   return reply("answer", blocks, followUps.map(questionButton), builts.flatMap((built) => built.sources ?? []), trace ? answered.map((topic) => ({ topic })) : undefined);
 }
