@@ -13,7 +13,7 @@ const answerText = (blocks: Block[]) =>
 
 const questionButton = (message: string): Button => ({ type: "question", label: message, message });
 
-/** The response: blocks and buttons, the plain `answer`, and the scope-era fields the old client still reads (removed in T016). */
+/** The response: blocks and buttons, and the plain `answer`. */
 function reply(kind: ReplyKind, blocks: Block[], buttons: Button[], sources: string[], resolved: Intent[] | undefined): ChatAnswer {
   return {
     answer: answerText(blocks),
@@ -22,11 +22,7 @@ function reply(kind: ReplyKind, blocks: Block[], buttons: Button[], sources: str
     kind,
     blocks,
     buttons,
-    ...(resolved ? { resolved } : {}),
-    lead: blocks[0].lead,
-    body: null,
-    sections: blocks.flatMap((block) => block.sections),
-    follow_ups: buttons.flatMap((button) => (button.type === "question" ? [{ text: button.message, scope: "auto" as const }] : []))
+    ...(resolved ? { resolved } : {})
   };
 }
 
