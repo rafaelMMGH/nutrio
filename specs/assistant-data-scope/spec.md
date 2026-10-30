@@ -1,6 +1,6 @@
 # Spec: Assistant data scope
 
-**Status:** approved (spec-change v1.7, Gate 1 approved by the user 2026-10-29; returns to `planned` after the plan/tasks differences are re-analyzed and Gate 2 is approved)
+**Status:** planned (spec-change v1.7: Gate 1 approved by the user 2026-10-29; plan revision 9 analyzed (PASS) and Gate 2 approved by the user 2026-10-29)
 **Version:** 1.7 · **Branch:** feature/assistant-data-scope · **Owner:** Rafael Martinez · **Date:** 2026-10-29
 **Related:** [assistant-chat-polish](../assistant-chat-polish/spec.md) v1.9 (parts superseded by this spec) · **Contract:** [contracts/chat-api.md](contracts/chat-api.md)
 
