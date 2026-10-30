@@ -74,7 +74,22 @@ const ROWS: [string, string[]][] = [
   ["agua y carrito", ["water", "cart"]],
   // typos (REQ-2)
   ["¿Qué hay en mi carito?", ["cart"]],
-  ["ejersisio", ["exercise"]]
+  ["ejersisio", ["exercise"]],
+  // weak readings, pinned as CURRENT behavior (pending spec decision, 1d1 Open question Q-c): all meal times, then
+  // the ambiguous "llevo", then Plan
+  ["cuándo voy", ["mealTimes"]],
+  ["horario y plan", ["mealTimes"]],
+  ["cómo voy con mi plan", ["ambiguous"]],
+  // meals done: the pair of words in either order, with a slot or a topic around it
+  ["llevo la comida", ["mealsDone"]],
+  ["qué comida llevo", ["mealsDone"]],
+  ["agua y cuántas comidas llevo", ["water", "mealsDone"]],
+  ["cuántas comidas llevo y agua", ["mealsDone", "water"]],
+  ["resumen de comidas llevo", ["mealsDone"]],
+  // identity phrases are positioned intents; the same intent twice is one
+  ["cómo se llama mi plan y mi nombre", ["identity:plan", "identity:name"]],
+  ["mi nombre y cómo se llama mi plan", ["identity:name", "identity:plan"]],
+  ["cena y mi cena", ["slotOptions:cena"]]
 ];
 
 for (const [message, expected] of ROWS) {

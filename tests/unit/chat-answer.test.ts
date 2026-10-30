@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Block, ChatAnswer } from "@/lib/assistant";
-import { ragAnswer } from "@/lib/domain/chat";
+import { ragAnswer, recipeList } from "@/lib/domain/chat";
 import { memDb, sweep } from "./memdb";
 
 // The answer path of the chat over in-memory data (plan D10): the same ragAnswer the route calls, with today passed in.
@@ -90,21 +90,22 @@ test("resolved appears only with the trace option, and the visible answer is the
 
 test("REQ-5 the repeat rule drops a follow-up that repeats the message, however it is typed", () => {
   const { db, user } = memDb();
-  // Two topics (until the resolver): the second block's follow-ups, here Plan's, without the question just asked.
-  const wanted = ["¿Cuál es mi meta?", "¿Qué suplementos tomo?"];
+  // Recipes are one topic here ("plan" is the possessor), so its follow-ups are the ones offered, without the question just asked.
+  const wanted = ["Mi carrito", "Mi cena de hoy"];
   assert.deepEqual(messagesOf(ragAnswer(db, user, "¿Qué recetas hay en mi plan?", TODAY).buttons), wanted);
   assert.deepEqual(messagesOf(ragAnswer(db, user, "¡¿QUÉ recetas hay en MI plan?!", TODAY).buttons), wanted);
+  assert.deepEqual(messagesOf(ragAnswer(db, user, "Mi carrito", TODAY).buttons), ["¿Qué recetas hay en mi plan?", "Mi cena de hoy"]);
   assert.deepEqual(messagesOf(ragAnswer(db, user, "¿Qué suplementos tomo?", TODAY).buttons), ["¿Cuál es mi meta?", "¿Qué recetas hay en mi plan?"]);
 });
 
 // Buttons that cannot be swept yet: no builder (goals, weight, weekly, metrics, slot options: "Mi cena de hoy" returns
-// with T021 and T032) or more than one matched topic until the resolver (T022/T023: possessor "plan", "llevo").
-const PENDING = ["¿Cuál es mi meta?", "Mi peso", "Mi avance de la semana", "Mi cena de hoy", "¿Qué recetas hay en mi plan?", "¿Cuánto ejercicio llevo?", "¿Cuánta agua llevo?", "¿Cuántas comidas llevo?"];
+// with T032).
+const PENDING = ["¿Cuál es mi meta?", "Mi peso", "Mi avance de la semana", "Mi cena de hoy", "¿Cuánto ejercicio llevo?", "¿Cuánta agua llevo?", "¿Cuántas comidas llevo?"];
 
 test("REQ-5 every starter and follow-up with a builder resolves to its Button-column topic and gives the same answer", () => {
   const { db, user } = memDb({ cart: 3 });
   const answers = ["hola", "Mi carrito", "¿Cuál es mi horario?", "¿Cuál es mi plan?"].map((message) => ragAnswer(db, user, message, TODAY));
-  assert.deepEqual(sweep(db, user, answers, TODAY, { skip: PENDING }).sort(), ["Mi carrito", "¿Qué suplementos tomo?"].sort());
+  assert.deepEqual(sweep(db, user, answers, TODAY, { skip: PENDING }).sort(), ["Mi carrito", "¿Qué suplementos tomo?", "¿Qué recetas hay en mi plan?"].sort());
 });
 
 test("the sweep fails on an empty set and on a placeholder", () => {
@@ -118,8 +119,7 @@ test("the sweep fails on an empty set and on a placeholder", () => {
 const topicsOf = (db: ReturnType<typeof memDb>["db"], user: ReturnType<typeof memDb>["user"], message: string) =>
   ragAnswer(db, user, message, TODAY, { trace: true }).resolved?.map((intent) => intent.topic);
 
-// REQ-1 Givens and the synonym groups of the Topics table. Until the resolver (T023) the topic list is the matched
-// topics in order of first appearance, so only questions with one topic are listed; combinations belong to T021.
+// REQ-1 Givens and the synonym groups of the Topics table, one topic each; the combinations are in chat-intent.test.ts.
 const GIVENS: [string, string, RegExp?][] = [
   ["¿CUÁNTO PESÉ?", "weight"],
   ["báscula", "weight"],
@@ -217,12 +217,14 @@ const ALSO_DROPPED = ["hora", "horas", "horario", "horarios", "cuando", "desayun
 // One real word per prefix (compr, receta, ingrediente, prepar, suplement, recomend), and two forms of the first.
 const PREFIXED = ["comprar", "compras", "recetario", "ingredientes", "preparado", "suplementos", "recomendado"];
 
+// The filter is the recipe list's own: the resolver lets some of these words (slots, cart, goals) take the question
+// away from Recipes, so the rows call the Recipes builder directly. Its wiring is the "descomprar" row below.
 function recipeBlock(word: string, question: string) {
   const { db, user } = memDb({ fixture: false });
   const template = { user_id: user.id, description: "", created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z", deleted_at: null };
   db.recipes = ["Pollo asado", `Sopa ${word}`].map((name, index) => ({ ...template, id: `r${index}`, name, canonical_hash: `r${index}` }));
-  const block = ragAnswer(db, user, question, TODAY).blocks[0];
-  return { lead: plain(block.lead), items: block.sections.flatMap((section) => section.items.map(plain)) };
+  const built = recipeList(db, user.id, question);
+  return { lead: plain(built.lead), items: (built.sections ?? []).flatMap((section) => section.items.map(plain)) };
 }
 
 for (const word of [...STOP_WORDS, ...ALSO_DROPPED, ...PREFIXED, "ya"]) {
@@ -231,8 +233,40 @@ for (const word of [...STOP_WORDS, ...ALSO_DROPPED, ...PREFIXED, "ya"]) {
   });
 }
 
-for (const word of ["peso", "sal"]) {
+// "descomprar" only contains "compr": a dropped prefix is a prefix (startsWith), so it narrows.
+for (const word of ["peso", "sal", "descomprar"]) {
   test(`REQ-1 the recipe list still narrows by the word "${word}"`, () => {
     assert.deepEqual(recipeBlock(word, `recetas ${word}`), { lead: "Estas recetas coinciden con tu pregunta.", items: [`Sopa ${word}`] });
   });
 }
+
+test("REQ-1 the answer to a recipes question is the Recipes block alone, narrowed by a word with a dropped prefix inside it", () => {
+  const { db, user } = memDb({ fixture: false });
+  const template = { user_id: user.id, description: "", created_at: "2026-01-01T00:00:00.000Z", updated_at: "2026-01-01T00:00:00.000Z", deleted_at: null };
+  db.recipes = ["Pollo asado", "Sopa descomprar"].map((name, index) => ({ ...template, id: `r${index}`, name, canonical_hash: `r${index}` }));
+  const reply = ragAnswer(db, user, "recetas descomprar", TODAY, { trace: true });
+  assert.deepEqual(reply.resolved?.map((intent) => intent.topic), ["recipes"]);
+  assert.equal(reply.blocks.length, 1);
+  assert.deepEqual(reply.blocks[0].sections.flatMap((section) => section.items.map(plain)), ["Sopa descomprar"]);
+});
+
+test("REQ-6 the resolver picks the topics: the possessor plan, ingredients with a cart cue, a time word beside a cart cue", () => {
+  const { db, user } = memDb({ cart: 2 });
+  const recipes = ragAnswer(db, user, "¿Qué recetas hay en mi plan?", TODAY, { trace: true });
+  assert.deepEqual(recipes.resolved?.map((intent) => intent.topic), ["recipes"]);
+  assert.deepEqual(recipes.blocks.map((block) => block.title), [null]);
+  assert.deepEqual(recipes.sources, ["Recetario"]);
+  for (const message of ["¿Qué ingredientes necesito comprar?", "¿Cuándo compro?"]) {
+    const cart = ragAnswer(db, user, message, TODAY, { trace: true });
+    assert.deepEqual(cart.resolved?.map((intent) => intent.topic), ["cart"], message);
+    assert.match(cart.answer, /carrito/, message);
+  }
+});
+
+test("REQ-24 the answered topics come from the resolver: a third topic with no button leaves no stray button", () => {
+  const { db, user } = memDb();
+  const reply = ragAnswer(db, user, "agua, ejercicio y cómo me llamo", TODAY, { trace: true });
+  assert.deepEqual(reply.resolved?.map((intent) => intent.topic), ["water", "exercise"]);
+  // Only the second block's follow-ups: the identity topic has no button to offer.
+  assert.deepEqual(messagesOf(reply.buttons), ["¿Cuánta agua llevo?", "Mi peso"]);
+});

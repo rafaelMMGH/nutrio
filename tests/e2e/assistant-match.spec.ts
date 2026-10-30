@@ -30,3 +30,16 @@ test("REQ-2 'una planta' is not 'plan': the no-match reply with the four starter
   expect(body.resolved).toEqual([]);
   expect(body.buttons.map((button) => button.label)).toEqual(["Mi cena de hoy", "Mi avance de la semana", "Mi peso", "Mi carrito"]);
 });
+
+test("REQ-6 'plan' beside 'recetas' is the possessor: only the Recipes answer, from the recipe book", async ({ chatContext }) => {
+  const { body } = await ask(chatContext.request, "¿Qué recetas hay en mi plan?", { trace: true });
+  expect(body.resolved?.map((intent) => intent.topic)).toEqual(["recipes"]);
+  expect(body.sources).toEqual(["Recetario"]);
+  expect(body.answer).toContain("Quesadillas");
+});
+
+test("REQ-6 'ingredientes' with a cart cue is the cart alone", async ({ chatContext }) => {
+  const { body } = await ask(chatContext.request, "¿Qué ingredientes necesito comprar?", { trace: true });
+  expect(body.resolved?.map((intent) => intent.topic)).toEqual(["cart"]);
+  expect(body.answer).toContain("Esto es lo que tienes en tu carrito.");
+});
