@@ -27,7 +27,7 @@ const TABLE: { word: string; entries: string[]; matches: boolean; why: string }[
   { word: "cuántas", entries: ["cuantos"], matches: false, why: "never-fuzzy" },
   { word: "cuántos", entries: ["cuando"], matches: false, why: "never-fuzzy word: one edit from the plural cuandos, still not a time word; the only row where NEVER_FUZZY is what blocks the match" },
   { word: "cuánta", entries: ["cuando"], matches: false, why: "never-fuzzy word: two edits from cuando, out of the allowance of 1 anyway" },
-  { word: "cuántas", entries: ["cuando"], matches: false, why: "never-fuzzy word: three edits from cuando, out of the allowance of 1 anyway" },
+  { word: "cuántas", entries: ["cuando"], matches: false, why: "never-fuzzy word: two edits from the plural cuandos, out of the allowance of 1 anyway" },
   { word: "objeta", entries: ["objeto"], matches: false, why: "an entry that is never-fuzzy is exact only (6 letters would allow 1 edit)" },
   { word: "pasor", entries: ["pasar"], matches: false, why: "an entry that is never-fuzzy is exact only (5 letters would allow 1 edit)" },
   { word: "peso", entries: ["pero"], matches: false, why: "never-fuzzy entry" },
