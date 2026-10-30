@@ -99,5 +99,5 @@ export function topicHits(tokens: readonly string[]): TopicHit[] {
   return hits.sort((a, b) => a.at - b.at);
 }
 
-/** The topics a question matches, in order of first appearance, without the REQ-6 rules (T023 replaces its use with `resolve`). */
+/** The topics a question matches, in order of first appearance, without the REQ-6 rules (the answer uses `resolve`; this is the vocabulary tests' view). */
 export const matchTopics = (question: string): TopicId[] => [...new Set(topicHits(words(question)).map((hit) => hit.topic))];

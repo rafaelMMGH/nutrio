@@ -1,7 +1,8 @@
 import type { AppDb, AppUser } from "@/lib/types";
 import { type Block, type Button, type ChatAnswer, type Intent, type ReplyKind, type Rich, type Section, normalizeText, STARTERS, words } from "@/lib/assistant";
 import { consolidateCart } from "@/lib/domain/cart";
-import { greetingOf, matchTopics, TOPICS, type TopicId } from "@/lib/domain/chat-topics";
+import { resolve } from "@/lib/domain/chat-intent";
+import { greetingOf, TOPICS, type TopicId } from "@/lib/domain/chat-topics";
 import { activePlan } from "@/lib/domain/plans";
 import { formatQty } from "@/lib/domain/nutrition";
 
@@ -88,7 +89,7 @@ const DROPPED_WORDS = new Set([
 ]);
 const DROPPED_PREFIXES = ["compr", "receta", "ingrediente", "prepar", "suplement", "recomend"];
 
-function recipeList(db: AppDb, userId: string, question: string): Built {
+export function recipeList(db: AppDb, userId: string, question: string): Built {
   const recipes = db.recipes.filter((item) => item.user_id === userId && !item.deleted_at);
   if (!recipes.length) return { lead: textLead("Aún no tienes recetas.") };
   const filter = words(question).filter((word) => word.length >= 3 && !DROPPED_WORDS.has(word) && !DROPPED_PREFIXES.some((prefix) => word.startsWith(prefix)));
@@ -111,13 +112,10 @@ const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: st
 /** The interim answer of a topic whose builder has not landed (plan D3). Never asserted by a test; T063 requires none left. */
 const pending = (topic: TopicId): Built => ({ lead: textLead(`Pronto podré responder sobre ${TOPICS[topic].title ?? "esta pregunta"}.`) });
 
-/** At most this many topics are answered; the rest become their topic buttons (REQ-24). */
-const MAX_TOPICS = 2;
-
 /**
  * The answer to one message: depends only on the message, the user's data and `today` (REQ-5). `trace` adds the
- * resolved intents for the e2e suite (plan D2). `today` is read once the date-based topics exist (US3). Until the
- * resolver (T023) the topics are the matched ones in order of first appearance.
+ * resolved intents for the e2e suite (plan D2). `today` is read once the date-based topics exist (US3). The topics
+ * are the resolver's (REQ-6): at most two are answered, the rest are offered as buttons.
  */
 export function ragAnswer(db: AppDb, user: AppUser, message: string, _today: string, { trace = false }: { trace?: boolean } = {}): ChatAnswer {
   const starters = STARTERS.map(questionButton);
@@ -127,16 +125,18 @@ export function ragAnswer(db: AppDb, user: AppUser, message: string, _today: str
     return reply("greeting", standalone(lead), starters, [], trace ? [{ topic: "greeting" }] : undefined);
   }
 
-  const matched = matchTopics(message);
-  if (!matched.length) return reply("no_match", standalone("No entendí tu pregunta. Puedo ayudarte con:"), starters, [], trace ? [] : undefined);
+  const { intents, overflow: further } = resolve(message);
+  if (!intents.length) return reply("no_match", standalone("No entendí tu pregunta. Puedo ayudarte con:"), starters, [], trace ? [] : undefined);
 
-  const answered = matched.slice(0, MAX_TOPICS);
-  const overflow = matched.slice(MAX_TOPICS).flatMap((topic) => TOPICS[topic].button ?? []);
+  // The resolver only returns topics of the table.
+  const answered = intents.map((intent) => intent.topic as TopicId);
+  // A topic without a button (identity, slots, ...) is left out silently.
+  const overflow = further.flatMap((intent) => TOPICS[intent.topic as TopicId].button ?? []);
   const asked = normalizeText(message);
   const builts = answered.map((topic) => BUILDERS[topic]?.(db, user.id, message) ?? pending(topic));
   const blocks = builts.map((built, index): Block => ({ title: answered.length > 1 ? TOPICS[answered[index]].title : null, lead: built.lead, sections: built.sections ?? [], buttons: [] }));
   // Repeat rule (chat-polish REQ-5): a follow-up that repeats the question just asked is not offered. Follow-ups only.
   // A button is offered once: an overflow topic can also be one of the follow-ups (REQ-24).
   const followUps = [...new Set([...TOPICS[answered[answered.length - 1]].followUps.filter((text) => normalizeText(text) !== asked), ...overflow])];
-  return reply("answer", blocks, followUps.map(questionButton), builts.flatMap((built) => built.sources ?? []), trace ? answered.map((topic) => ({ topic })) : undefined);
+  return reply("answer", blocks, followUps.map(questionButton), builts.flatMap((built) => built.sources ?? []), trace ? intents : undefined);
 }

@@ -162,10 +162,12 @@ for (const [message, topic, lead] of GIVENS) {
 
 test("REQ-1 two topics are answered in order of first appearance, titled", () => {
   const { db, user } = memDb({ cart: 2 });
-  const reply = ragAnswer(db, user, "carrito y horario", TODAY, { trace: true });
-  assert.deepEqual(reply.resolved?.map((intent) => intent.topic), ["cart", "mealTimes"]);
-  assert.deepEqual(reply.blocks.map((block) => block.title), ["Carrito", "Horarios"]);
-  assert.deepEqual(messagesOf(ragAnswer(db, user, "carrito, horario y plan", TODAY).buttons).slice(-1), ["¿Cuál es mi plan?"]);
+  const reply = ragAnswer(db, user, "peso y carrito", TODAY, { trace: true });
+  assert.deepEqual(reply.resolved?.map((intent) => intent.topic), ["weight", "cart"]);
+  assert.deepEqual(reply.blocks.map((block) => block.title), ["Peso", "Carrito"]);
+  assert.deepEqual(messagesOf(ragAnswer(db, user, "carrito, peso y agua", TODAY).buttons).slice(-1), ["¿Cuánta agua llevo?"]);
+  // A time word beside another topic is ignored (REQ-6): the cart alone.
+  assert.deepEqual(topicsOf(db, user, "carrito y horario"), ["cart"]);
 });
 
 // REQ-2 table through the answer path: a typo resolves to its topic, a ✗ row to nothing.
