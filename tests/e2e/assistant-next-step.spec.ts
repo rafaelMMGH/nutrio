@@ -102,7 +102,7 @@ test.describe("REQ-5: chips under the latest answer", () => {
     await ui.chips.first().click();
     expect((await request).postDataJSON()).toEqual({ message: RECIPES_CHIP });
     await expect(ui.assistantTurns).toHaveCount(2);
-    await expect(ui.assistantTurns.nth(1).getByRole("heading", { level: 3 })).toHaveText(["Recetas"]);
+    await expect(ui.assistantTurns.nth(1).getByRole("heading", { level: 4 })).toHaveText(["Recetas"]);
   });
 });
 
@@ -174,7 +174,7 @@ test.describe("REQ-8: error, Reintentar and the 15 s timeout", () => {
 
       healthy.release();
       await expect(ui.assistantTurns).toHaveCount(1);
-      await expect(ui.assistantTurns.getByRole("heading", { level: 3 })).toHaveText(["Ingredientes"]);
+      await expect(ui.assistantTurns.getByRole("heading", { level: 4 })).toHaveText(["Ingredientes"]);
       await expect(ui.chips).toHaveText([RECIPES_CHIP, "Mi cena de hoy"]);
       await expect(ui.panel).not.toContainText(SERVER_ERROR_COPY);
       await expect(retryButton(chat)).toHaveCount(0);

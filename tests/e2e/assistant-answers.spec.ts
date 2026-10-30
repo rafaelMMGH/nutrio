@@ -66,7 +66,7 @@ test.describe("REQ-2, REQ-3, REQ-18: an answer shows exactly its structure", () 
   test("a cart answer has one h3 below the panel h2, one li per item and highlighted quantities", async ({ chat }) => {
     const turn = await answerTurn(chat, cartAnswer(3));
     await expect(assistantUi(chat).panel.getByRole("heading", { level: 2 })).toHaveCount(1);
-    await expect(turn.getByRole("heading", { level: 3 })).toHaveText(["Ingredientes"]);
+    await expect(turn.getByRole("heading", { level: 4 })).toHaveText(["Ingredientes"]);
     await expect(turn.getByRole("paragraph").first()).toHaveText("Esto es lo que tienes en tu carrito.");
     await expect(turn.getByRole("listitem")).toHaveText(["Ingrediente 01 · 1 g", "Ingrediente 02 · 2 g", "Ingrediente 03 · 3 g"]);
     const strong = turn.locator("strong");
@@ -85,7 +85,7 @@ test.describe("REQ-2, REQ-3, REQ-18: an answer shows exactly its structure", () 
   test("text only in `answer` is not shown as a heading, item or highlight", async ({ chat }) => {
     const answer = { ...cartAnswer(2), answer: "SOLO EN ANSWER" };
     const turn = await answerTurn(chat, answer);
-    await expect(turn.getByRole("heading", { level: 3 })).toHaveText(["Ingredientes"]);
+    await expect(turn.getByRole("heading", { level: 4 })).toHaveText(["Ingredientes"]);
     await expect(turn.getByRole("listitem")).toHaveCount(2);
     await expect(turn).not.toContainText("SOLO EN ANSWER");
   });
@@ -118,7 +118,7 @@ test.describe("REQ-2, REQ-3, REQ-18: an answer shows exactly its structure", () 
     const ui = await openAssistant(chat);
     await typeQuestion(chat, "¿A qué hora es mi comida?");
     const turn = ui.assistantTurns.first();
-    await expect(turn.getByRole("heading", { level: 3 })).toHaveText(["Comidas"]);
+    await expect(turn.getByRole("heading", { level: 4 })).toHaveText(["Comidas"]);
     await expect(turn.getByRole("listitem")).toHaveText(["Desayuno · Entre 7 a 8 am", "Colación · Entre 10 a 11 am", "Comida · Entre 2 a 3 pm", "Cena · Entre 8 a 9 pm"]);
     await expect(turn.locator("strong")).toHaveText(["Entre 7 a 8 am", "Entre 10 a 11 am", "Entre 2 a 3 pm", "Entre 8 a 9 pm"]);
     await expect(turn).toContainText("Basado en: Plan activo:");
