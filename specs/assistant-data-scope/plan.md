@@ -1,8 +1,8 @@
 # Plan: Assistant data scope
 
-**Spec:** [spec.md](spec.md) (v1.6) · **Contract:** [contracts/chat-api.md](contracts/chat-api.md) · **Checklist:** [checklists/ux.md](checklists/ux.md) · **Also:** chat-polish REQ-23 ([assistant-chat-polish/spec.md](../assistant-chat-polish/spec.md) v1.9) · **Revision 7** (2026-10-29): batches re-estimated with tests after 1a2 and split at ~450 (revision 6: unit-first cadence, spec v1.6).
+**Spec:** [spec.md](spec.md) (v1.7) · **Contract:** [contracts/chat-api.md](contracts/chat-api.md) · **Checklist:** [checklists/ux.md](checklists/ux.md) · **Also:** chat-polish REQ-23 ([assistant-chat-polish/spec.md](../assistant-chat-polish/spec.md) v1.9) · **Revision 9** (2026-10-29): verifier-spec analyze round 1 folded (PASS, no HIGH): rule 1 beats not-a-dish-name (D11), more REQ-26/29 answer rows, optional T080 split out of T079. Revision 8: spec v1.7, no fuse.js, in-house dish matcher; batch 1e split into 1e1/1e2 (revision 7: batches re-estimated with tests after 1a2 and split at ~450; revision 6: unit-first cadence, spec v1.6).
 
-**User asks (nothing else needs a yes):** (1) `npm install fuse.js@7.5.0 --save-exact` (T025; yes already given in the spec); (2) the one snapshot refresh at the end of Batch E (T057); (3) the manual ≤1 s check on real data before merge (T065); (4) push and PR.
+**User asks (nothing else needs a yes):** (1) the one snapshot refresh at the end of Batch E (T057); (2) the manual ≤1 s check on real data before merge (T065); (3) push and PR. No dependency is added (spec v1.7; T025 dropped).
 
 ## Decisions
 
@@ -16,6 +16,7 @@
 - **D8 Invalid or unparsable body** (malformed JSON, zod failure) returns 400 with no error-level log (since v1.4). Anything that throws after a successful parse returns 500.
 - **D9 Shared weekly math takes an end day.** `progress.ts` week functions take `endDay`: the dashboard passes Sunday, the chat passes today. No future day can be logged from the dashboard and no test seeds one, so results are identical (since v1.4 Assumptions).
 - **D10 Unit tests (since revision 6, spec v1.6).** `npm run test:unit` = `tsx --test tests/unit/*.test.ts`: Node 20 `node:test` + `node:assert/strict` through the installed tsx, no new dependency. The directory stays flat because Node 20 `--test` does not expand globs and npm's `sh` treats `**` like `*`. `@/` resolves through tsx's own tsconfig `paths` support (the `src/` modules use it internally, so relative imports in tests alone would not be enough); T073 proves it, fallback `tsx --tsconfig tsconfig.json --test …`, otherwise stop and report (tsconfig-paths is not allowed). Unit tests import only modules that do not transitively import `queries.ts`, `storage/store.ts`, `storage/pg.ts`, Prisma or `next/*` (e.g. `assistant.ts`, `chat*.ts`, `progress.ts`, `recipe-steps.ts`, `test-hooks.ts`, `validation/schemas.ts`, and through `chat.ts` also `plans.ts` (→ `storage/db`, `node:fs`, `pdf-plan` → unpdf), `cart.ts`, `nutrition.ts`), never a route; T073's smoke test exercises the `chat.ts` chain in U0. `memDb()` (tests/unit/memdb.ts) builds an in-memory `AppDb` from `emptyDb()` plus the same deterministic fixture the e2e `seedPlan` uses: `planFixture` moves to tests/shared/assistant-fixture.ts (no Playwright import) and both sides import it, so the fixtures cannot drift. Logic tests call `ragAnswer(db, user, message, today)`, the same path as `ask()`, with today passed directly (spec NFR Testability).
+- **D11 Dish matcher (spec v1.7 REQ-3, REQ-26, REQ-29), in-house, no dependency.** New module src/lib/domain/chat-dish.ts over `matchWord` (chat-match.ts). Phrase and name words are normalized and lose the REQ-3 stop words (Terms; a separate list from the frozen filter list, adds al, y, a). A phrase word matches a name word when `matchWord` accepts it in either direction (first letter must match); exact-wins is per name. Recall = matched phrase words / phrase words; precision = matched name words / name words; candidates (recall > 0) sorted by recall, precision, insertion order. `matchDish(phrase, recipes)` → `{ kind: "found", recipe } | { kind: "didYouMean", candidates /* ≤3, best first */ } | { kind: "none", dishName: boolean }`: rule 1 exact (normalized, stop words removed both sides), rule 2 recall = 1 and no second candidate or the second strictly worse on (recall, precision), rule 3 did-you-mean, rule 4 none. `dishName: false` (empty, under 3 chars, only topic trigger, slot, ordinal, date-cue or day-part words, or slot word + number) means REQ-6 step 4 falls through to steps 5–6; step 7 gives "¿De qué platillo?" (empty phrase, REQ-25) or not-found. `rankDish(phrase, recipes)` (candidates only, never found) serves REQ-29 step 8 over the whole question (T049). Candidates come from the caller: `resolve(question, recipes?: readonly Recipe[])` (optional, so existing tests keep working); `ragAnswer` passes `db.recipes` owned by the user, not deleted, non-generic (`isGeneric`: normalized name = slot word + " opcion " + digits), in seq order. An exact normalized match runs before the "dish cue + slot → slot wins" rule. An exact name (rule 1) also beats the not-a-dish-name rule: a recipe named only with trigger, slot or date-cue words (e.g. "Desayuno de hoy") is still found. Date-cue words come from one exported list in chat-dates.ts that the US3 parser reuses. Spike (T024, outside the repo): spec rows 0 failures; mismatches 5 (fuse.js 10); wrong opens 0 (fuse 1); about 22 ms at 5,000 names.
 
 ## Approach
 
@@ -33,7 +34,7 @@
 | Word/phrase matcher | edit distance, allowance, plural forms, phrase consumption | src/lib/domain/chat-match.ts |
 | Vocabulary and topic table | rewritten: Topics table, starters | src/lib/domain/chat-topics.ts |
 | Intent resolution | REQ-6 order, possessor, combinations | src/lib/domain/chat-intent.ts |
-| Dish matcher | fuse.js over non-generic names, threshold from spike | src/lib/domain/chat-dish.ts |
+| Dish matcher | in-house over `matchWord` (D11): `matchDish`, `rankDish`, not-a-dish-name rule; REQ-3, REQ-26, REQ-29 | src/lib/domain/chat-dish.ts |
 | Slots, options, detail | slot refs and ordinals, almuerzo/merienda/snack, paging, labels, detail, complements | src/lib/domain/chat-meals.ts |
 | Date phrases, today | `serverToday(now)` (America/Mexico_City via `Intl`, T011); phrase table, labels, clamp, fallback (US3) | src/lib/domain/chat-dates.ts |
 | Shared progress math | pure, client-safe: Monday, week days, water goal (clamp 4–12), capped water, meals done, exercise days, weight stats; `endDay` param (D9) | src/lib/progress.ts |
@@ -73,7 +74,6 @@ type ChatAnswer = { answer: string; context_used: "Todo el sistema"; sources: st
 
 | Dependency | Reason | Needs approval |
 |---|---|---|
-| fuse.js, exactly 7.5.0 | Fuzzy dish-name and did-you-mean ranking over multi-word phrases (REQ-3, REQ-26, REQ-29). Word-level typos stay in-house. Zero runtime deps, typed, Node ≥10. The spike (T024) fixes the threshold before it enters the repo. | **Given** by the user (spec Decisions, 2026-10-28). The orchestrator runs `npm install fuse.js@7.5.0 --save-exact` (T025). |
 | prompt-kit `response-stream` | Copied source (zero deps) with MIT attribution, not a package. | no |
 
 ## Testing strategy
@@ -83,7 +83,7 @@ Unit tests first (spec v1.6 NFR Testability, D10); e2e tests are still written w
 - **Unit (logic, fail-first proof):** every check that needs no browser, DB or server: `normalizeText`/`matchWord` and the REQ-2 table, `testHooks`, `serverToday`, `chatSchema` stripping, the date parser and labels (REQ-14 table with today passed in), `progress.ts` metrics, the resolver (REQ-6), the dish matcher (REQ-3 table on `memDb()`), slots, ordinals, option paging and labels, detail, `recipeSteps`, metric builders and copy (pluralization, units, empty ranges), variants (REQ-28), greeting/no-match/did-you-mean, multi-topic and clarify, identity, missing data. Each is shown red (unit run) before its code. The REQ-2/3/14 tables live only in unit tests.
 - **e2e (written per task, run in Batch E):** UI (rendering, buttons, bubbles, avatar, typing, live region, focus, keyboard, nav closing, 360 px layout, snapshots), API contract over HTTP (400/500/log, `{ message }` only, `resolved` absent without the header, the pin header), REQ-16 chat-vs-dashboard parity (needs the dashboard), and per logic REQ one or two representative rows through `ask()`, so every REQ keeps an e2e test (spec v1.6).
 - **tsc rule:** `npx tsc --noEmit` covers `tests/`, so it must pass at each task's final commit and at every batch checkpoint. A red tests-only commit (tests importing a module or signature not yet written) is exempt, but is never left as the batch tip or a worktree's merge tip. Since 1a2, each code task's red tests are committed immediately before that task's code (one-commit red window), never all up front.
-- **Harness (T004) and fixture (T074):** the deterministic fixture (19 generic names, "Pollo asado", "Ensalada de pollo", "Sándwich de atún"; distractors "Sopa de lima", "Atole de avena", "Chilaquiles verdes", "Tacos de frijol") lives in tests/shared/assistant-fixture.ts; `seedPlan` inserts it over SQL, `memDb()` builds it in memory. Real recipe names are used only in the T024 spike, in a scratch copy outside the repo.
+- **Harness (T004) and fixture (T074, T078):** the deterministic fixture lives in tests/shared/assistant-fixture.ts; `seedPlan` inserts it over SQL, `memDb()` builds it in memory. Base, in insertion order (spec REQ-3): 19 generic names, "Pollo asado", "Ensalada de pollo", "Sándwich de atún", distractors "Atole de avena", "Chilaquiles verdes", "Tacos de frijol". `extras: true` appends "Pollo asado con verduras", "Sopa de lima", "Pan de horno" (outside the plan, so base slots and option numbers are the same in both). T078 moves "Sopa de lima" out of the base: 25 base recipes, Comida has 7 options (was 8), 23 meal options. Real recipe names were used only in the T024 spike, outside the repo.
 - **Button sweeps (REQ-5):** unit `sweep(db, answers, today)` re-asks every question button through `ragAnswer` and compares blocks; it fails on an empty set or a D3 placeholder. Since T020 (1a2 review M2) it also checks each button against an expected-topic map from the Topics "Button" column: exactly one `resolved` intent with that topic plus a text or `kind` assertion, since comparing two calls of a stateless function alone always passes; its `skip` list of pending builders shrinks as they land. Each story extends it (T072, T021, T026, T028, T031, T034, T046, T048, T050). The e2e `resendSweep` runs in T072 (partial) and T063 (final, every reply kind).
 - **Parity (REQ-16), e2e only:** T066 records the dashboard tiles for seeded logs (`timezoneId: "America/Mexico_City"`, logs relative to the real current Monday; no clock pin, which would break hydration); T042, T044 and T046 extend it to the chat. Run once, targeted, at the 3a2 merge (Batch gate exception), then first in Batch E. Before that, T075 pins `progress.ts` to the same hand-computed numbers in unit tests; logs and expected numbers live once in tests/shared/progress-fixture.ts, used by T066 and T075.
 - **NFR (T064):** synthetic dataset (32 recipes, 69 meals, 365 daily_logs, goals, name, add-ons) over HTTP, one question per topic after a warm-up; no 500, ≤5 s, timings logged. Manual ≤1 s check on real data by the user (T065).
@@ -103,7 +103,7 @@ Sizes are changed lines including tests (revision 7: the earlier estimates left 
 | 1b2 test churn, leftovers | T013, T016 | ~360 | — |
 | 1c1 / 1c2 | T017–T019 / T070, T020 | ~380 / ~380 | 3a1–3a2 may run beside 1c1–3b2 |
 | 1d1 / 1d2 | T021 pt 1, T022 / T021 pt 2, T023 | ~330 / ~170 | idem |
-| 1e | T024–T027 | ~300 | idem |
+| 1e1 fixture, matcher / 1e2 step 4 wiring | T078, T026 pt 1, T027 / T026 pt 2, T079, T080 (optional; else with T029 in 2a1) (T024 done, T025 dropped) | ~350 / ~200 (~230 with T080) | idem |
 | 2a1 / 2a2 | T028 pt 1, T029 / T028 pt 2, T030 | ~330 / ~170 | idem |
 | 2b1 / 2b2 | T031 pt 1, T032 / T031 pt 2, T033 | ~300 / ~180 | idem |
 | 2c1 / 2c2 | T034 pt 1, T035 / T034 pt 2, T036 | ~170 / ~340 | idem |
@@ -112,16 +112,16 @@ Sizes are changed lines including tests (revision 7: the earlier estimates left 
 | 3c1 water / 3c2 exercise | T042, T043 pt 1 / pt 2 | ~260 / ~250 | — |
 | 3d1 weight / 3d2 meals done | T044, T045 pt 1 / pt 2 | ~310 / ~200 | — |
 | 3e | T046, T047 | ~430 | — |
-| 4a / 4b1 / 4b2 | T048, T049 / T050 pt 1, T051 / T050 pt 2, T052 | ~460 / ~250 / ~290 | — |
+| 4a / 4b1 / 4b2 | T048, T049 / T050 pt 1, T051 / T050 pt 2, T052 | ~490 / ~250 / ~290 | — |
 | 5 identity | T053, T054 | ~240 | — |
 | 6a1 / 6a2 | T055 (e2e, not run) / T056 | ~250 / ~260 | — |
 | 6b1 / 6b2 / 6c | T058 / T059, T060 / T061, T062 | ~110 / ~370 / ~350 | — |
 | E stabilization | T076, T077, T057 | ≤ ~450 per fix round incl. tests; T077 commits nothing | — |
 | Final | T063–T065 | ~200 | — |
 
-39 batches (5 done, 34 to go). The user accepted 1a1, 1a2, 1b1, 4b, 2c, 3c, 3d, 6a over the old ~300 target (2026-10-29); 1b1, 1d, 2a, 2b, 2c, 3c, 3d, 4b, 6a, 6b are now split (conservative). 4a (~460) has no clean split and sits at the cap.
+41 batches (15 done, counting 1b2a/1b2b, 3a1 and 3a2; 26 to go). Revision 8 splits 1e (no install; ~530 added lines in one batch would pass the cap). The user accepted 1a1, 1a2, 1b1, 4b, 2c, 3c, 3d, 6a over the old ~300 target (2026-10-29); 1b1, 1d, 2a, 2b, 2c, 3c, 3d, 4b, 6a, 6b are now split (conservative). 4a (~490 after the revision 9 REQ-26/REQ-29 answer rows) has no clean split and passes the cap; the running-estimate stop applies (decision for the user: accept, or split T048 by builder before 4a starts).
 
-**Worktree rules:** created from the current feature-branch tip; only write code and run tsc and unit tests (never e2e); path-limited per-task commits; each worktree needs `node_modules` (a symlink to the main checkout's is fine) for tsc and unit tests. Merged back by the orchestrator by cherry-pick or `git merge --no-ff` (a fast-forward is impossible once the main line has advanced), which then reruns tsc and `npm run test:unit` on the merged tip. T025 changes package.json after the 3a worktree is created, so the merged tip runs `npm ci` (or at least tsc) before the unit run. If a parallel batch finds it must edit a file the other batch owns, it stops and the two run sequentially.
+**Worktree rules:** created from the current feature-branch tip; only write code and run tsc and unit tests (never e2e); path-limited per-task commits; each worktree needs `node_modules` (a symlink to the main checkout's is fine) for tsc and unit tests. Merged back by the orchestrator by cherry-pick or `git merge --no-ff` (a fast-forward is impossible once the main line has advanced), which then reruns tsc and `npm run test:unit` on the merged tip. If a parallel batch finds it must edit a file the other batch owns, it stops and the two run sequentially.
 
 ## Risks
 
@@ -136,7 +136,7 @@ Sizes are changed lines including tests (revision 7: the earlier estimates left 
 | Test-only `resolved` masks missing copy | REQ "green" with no visible answer | D2; Coverage table lists a text-asserting test per REQ; T063 audit. |
 | Hooks leak to production | Pinned date or forced 500 in prod | Guard on `NODE_ENV` + `E2E_HOOKS`; unit test with a non-test env; route reads headers only via `testHooks()` (reviewer item, T063 grep). |
 | Snapshot diffs (`assistant-look`, `a-theme-visual`) | Blocked gate | One refresh (T057) at the end of Batch E after the user's yes; reviewer judges confinement per test from the diff image. |
-| fuse threshold too loose or tight | Wrong dish opened | Spike first (T024); unit REQ-3 table plus distractors. |
+| In-house dish matcher opens the wrong dish or offers noise | Wrong detail, or did-you-mean on non-recipe words | Spike done (T024: 0 wrong opens, 17 of 57 non-recipe words with a result); open only at recall = 1 and clearly ahead (D11); unit REQ-3 and REQ-29 tables plus distractors and the not-a-dish-name rows (T026). |
 | `next dev` dies mid-run behind `\| tee` (D5, no `pipefail`) | Exit status is tee's; the run fails with a less clear message | Accepted; read tests/e2e/.server.log first. |
 | Typing changes height after scroll decisions | Jumpy scroll (chat-polish REQ-11) | Lay out the full lead invisibly and type into an overlay. |
 | tee log flaky, or orphan `next`/clone after teardown | REQ-23 log assertion fails; :3200 busy | Poll up to 2 s with the D5 fallback; T076 first-run orphan check. |
@@ -146,9 +146,9 @@ Sizes are changed lines including tests (revision 7: the earlier estimates left 
 ## Constitution check
 
 - [x] 1 Tests prove behavior: every logic REQ has a unit test shown red before its code; UI- and HTTP-only behavior has an e2e test proven red by breakage in Batch E (T077); every REQ keeps an e2e test (Coverage table; `resolved` never suffices). **Tension:** the principle's parenthetical says "today that means a Playwright e2e test"; spec v1.6 (user decision) adds unit tests. This is an explicit user waiver (2026-10-29): the Constitution is not amended; the fail-first proof is a unit test for logic and the T077 demo for UI-only/HTTP-only behavior.
-- [x] 2 The spec is the source of truth: plan follows spec v1.6; no spec edits here.
+- [x] 2 The spec is the source of truth: plan follows spec v1.7; no spec edits here.
 - [x] 3 No speculative abstraction: `progress.ts` (dashboard, chat), `recipe-steps.ts` (recipe page, chat), `normalizeText` replaces a second normalizer, `testHooks` (route, unit test), the shared fixture (e2e seed, `memDb`). The 500 handler is inlined (one route returns 500).
-- [x] 4 Dependencies: only fuse.js 7.5.0 (user's yes on record). The unit runner adds a script, not a package.
+- [x] 4 Dependencies: none added (spec v1.7: fuse.js dropped, T025 dropped). The unit runner adds a script, not a package.
 - [x] 5 No secrets: hooks use a non-secret env flag; `.env.local` untouched.
 - [x] 6 Errors: the 500 path logs route, user id, message length and stack; invalid input is 400 without an error log.
-- [x] 7 Small changes: per-task path-limited commits; batch sizes (tests included) in the Batches table, cap ~450 after the revision 7 re-estimate; done overs 1a1 (~436) and 1a2 (~557) accepted by the user 2026-10-29; the other accepted overs (1b1, 2c, 3c, 3d, 4b, 6a) are now split; 4a sits at ~460.
+- [x] 7 Small changes: per-task path-limited commits; batch sizes (tests included) in the Batches table, cap ~450 after the revision 7 re-estimate; done overs 1a1 (~436) and 1a2 (~557) accepted by the user 2026-10-29; the other accepted overs (1b1, 2c, 3c, 3d, 4b, 6a) are now split; 4a sits at ~490 (revision 9; user decision pending, Batches).
