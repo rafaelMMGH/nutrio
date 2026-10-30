@@ -27,7 +27,7 @@ function distance(a: string, b: string): number {
   return rows[a.length][b.length];
 }
 
-const isExact = (word: string, entry: string) => (entry.endsWith("*") ? word.startsWith(entry.slice(0, -1)) : forms(entry).includes(word));
+export const isExact = (word: string, entry: string) => (entry.endsWith("*") ? word.startsWith(entry.slice(0, -1)) : forms(entry).includes(word));
 
 /**
  * The entries a word matches. A "stem*" entry matches an exact prefix; any other entry matches its singular or plural
