@@ -25,6 +25,9 @@ const TABLE: { word: string; entries: string[]; matches: boolean; why: string }[
   { word: "objeto", entries: ["objetivo"], matches: false, why: "never-fuzzy" },
   { word: "cuanto", entries: ["cuando"], matches: false, why: "never-fuzzy" },
   { word: "cuántas", entries: ["cuantos"], matches: false, why: "never-fuzzy" },
+  { word: "cuántos", entries: ["cuando"], matches: false, why: "never-fuzzy word: one edit from cuando, still not a time word" },
+  { word: "cuánta", entries: ["cuando"], matches: false, why: "never-fuzzy word: one edit from cuando" },
+  { word: "cuántas", entries: ["cuando"], matches: false, why: "never-fuzzy word: two edits from cuando" },
   { word: "objeta", entries: ["objeto"], matches: false, why: "an entry that is never-fuzzy is exact only (6 letters would allow 1 edit)" },
   { word: "pasor", entries: ["pasar"], matches: false, why: "an entry that is never-fuzzy is exact only (5 letters would allow 1 edit)" },
   { word: "peso", entries: ["pero"], matches: false, why: "never-fuzzy entry" },
@@ -65,6 +68,10 @@ test("a multi-word entry compares each word with its own allowance and consumes 
   assert.deepEqual(matchPhrases(words("bunos días"), ["buenos dias"]), [{ phrase: "buenos dias", from: 0, to: 2 }]);
   assert.deepEqual(matchPhrases(words("buenas tardes"), ["buenos dias"]), []);
   assert.deepEqual(matchPhrases(words("buenos"), ["buenos dias"]), []);
+});
+
+test("the longest phrase wins whichever order the phrases are listed in", () => {
+  assert.deepEqual(matchPhrases(words("Hola, buenos dias"), ["dias", "buenos dias"]), [{ phrase: "buenos dias", from: 1, to: 3 }]);
 });
 
 test("an exact word never fuzzy-matches another phrase's word at the same position, whichever order they are listed", () => {
