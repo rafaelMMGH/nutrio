@@ -177,6 +177,8 @@ export type SeedPlan = {
    * spec passes `fixture: true`.
    */
   fixture?: boolean;
+  /** With `fixture`, appends the "With the extra recipes" of the REQ-3 table outside the plan. */
+  extras?: boolean;
 };
 
 /** A complement on the first slot and a quantity-only one on the last (`addOnSpecs`), each with an `add_on` usage. */
@@ -194,10 +196,10 @@ function addOnStatements(versionId: string, meals: string[]): string[] {
 }
 
 /** Replaces the active plan: plan, current version (`structured_data`) and one meal type per meal. */
-export function seedPlan({ times, meals = DEFAULT_MEALS, supplements = true, objective = "Mejorar mi energía", recommendations = "Tomar agua durante el día", fixture = false }: SeedPlan) {
+export function seedPlan({ times, meals = DEFAULT_MEALS, supplements = true, objective = "Mejorar mi energía", recommendations = "Tomar agua durante el día", fixture = false, extras = false }: SeedPlan) {
   clearPlan();
   const userId = currentUser().id;
-  const placed = fixture ? planFixture(meals) : [];
+  const placed = fixture ? planFixture(meals, { extras }) : [];
   // seedRecipes clears the plan again (harmless); the plan row itself is inserted below.
   const recipeIds = fixture ? seedRecipes(placed.map((entry) => entry.recipe)) : {};
   const planId = `${userId}-plan`;

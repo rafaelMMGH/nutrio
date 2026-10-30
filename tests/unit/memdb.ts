@@ -16,6 +16,8 @@ export type MemDbOptions = {
   times?: "all" | "some" | "none";
   /** The recipe fixture of `planFixture`, wired into the plan. Default true (the e2e `seedPlan` defaults to false). */
   fixture?: boolean;
+  /** Appends the "With the extra recipes" of the REQ-3 table to the fixture, outside the plan. Default false. */
+  extras?: boolean;
   supplements?: boolean;
   objective?: string;
   recommendations?: string;
@@ -33,6 +35,7 @@ export function memDb({
   meals = DEFAULT_MEALS,
   times = "all",
   fixture = true,
+  extras = false,
   supplements = true,
   objective = "Mejorar mi energía",
   recommendations = "Tomar agua durante el día",
@@ -96,7 +99,7 @@ export function memDb({
     deleted_at: null
   });
 
-  const placed = fixture ? planFixture(meals) : [];
+  const placed = fixture ? planFixture(meals, { extras }) : [];
   const recipeIds: Record<string, string> = {};
   for (const { recipe } of placed) {
     const recipeId = `${USER_ID}-rec-${slug(recipe.name)}`;

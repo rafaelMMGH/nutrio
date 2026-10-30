@@ -22,14 +22,15 @@ const unaccent = (value: string) => value.normalize("NFD").replace(/\p{Diacritic
 export type Placed = { recipe: SeedRecipe; /** Index into `meals`, or null for a recipe outside the plan. */ slot: number | null; option: number };
 
 /**
- * The deterministic recipe fixture of the REQ-3 table: 19 generic names ("Desayuno opcion 1", round-robin over the
- * slots, numbered per name so duplicate slots never collide), "Pollo asado", "Ensalada de pollo" and "Sándwich de atún",
- * and distractors that must never be a candidate for any REQ-3 phrase: "Sopa de lima", "Atole de avena", "Chilaquiles
- * verdes" and "Tacos de frijol". They share no word and no near spelling with "pollo asado", "sandwich de atun" or
- * "pizza"; the first two are planned, the last two only in the recipe book. Ingredients cover quantity + unit, quantity
- * only (unit "") and neither (0, ""); descriptions are filled, empty or an "Extraído de" import note.
+ * The deterministic recipe fixture of the REQ-3 table, in insertion order: 19 generic names ("Desayuno opcion 1",
+ * round-robin over the slots, numbered per name so duplicate slots never collide), "Pollo asado", "Ensalada de pollo"
+ * and "Sándwich de atún", then the distractors "Atole de avena" (planned), "Chilaquiles verdes" and "Tacos de frijol"
+ * (recipe book only). The distractors share no word and no near spelling with any phrase of the REQ-3 or REQ-29 tables.
+ * `extras: true` appends "Pollo asado con verduras", "Sopa de lima" and "Pan de horno" outside the plan (the "With the
+ * extra recipes" rows), so slots and option numbers are identical in both fixtures. Ingredients cover quantity + unit,
+ * quantity only (unit "") and neither (0, ""); descriptions are filled, empty or an "Extraído de" import note.
  */
-export function planFixture(meals: string[]): Placed[] {
+export function planFixture(meals: string[], { extras = false }: { extras?: boolean } = {}): Placed[] {
   const placed: Placed[] = [];
   const perSlot = meals.map(() => 0);
   const perName = new Map<string, number>();
@@ -59,10 +60,14 @@ export function planFixture(meals: string[]): Placed[] {
   add("Pollo asado", planned("comida"), 0, steps);
   add("Ensalada de pollo", planned("comida"), 1, steps);
   add("Sándwich de atún", planned("cena"), 2, steps);
-  add("Sopa de lima", planned("comida"), 0);
   add("Atole de avena", planned("desayuno"), 1);
   add("Chilaquiles verdes", null, 2);
   add("Tacos de frijol", null, 0);
+  if (extras) {
+    add("Pollo asado con verduras", null, 0, steps);
+    add("Sopa de lima", null, 1);
+    add("Pan de horno", null, 2);
+  }
   return placed;
 }
 
