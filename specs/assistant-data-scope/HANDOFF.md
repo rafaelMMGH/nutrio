@@ -4,18 +4,19 @@ A new orchestrator session can continue from here without the earlier conversati
 
 ## 1. State in one paragraph
 
-Feature branch `feature/assistant-data-scope` (local, never pushed), tip `0ff4ea2` (updated 2026-10-29 after batches 1c2 and 3a2). Spec `spec.md` v1.6, status `planned`; `assistant-chat-polish` is `partial` (its REQ-23, HTTP 500, is delivered by this feature and is already implemented in F1b). 29 of 76 tasks are ticked. **Done and reviewed (PASS):** F1a, U0, F1b, 1a1, 1a2, 1b1a, 1b1b, 1b2a, 1b2b, 1c1, 3a1, 1c2 (T070, T020; review round 2 PASS, fix commits 8102f7d..ecb2925), 3a2 (T066, T038; cherry-picked as 33aab9f..0ff4ea2). The only e2e run since F1a is the targeted 3a2 run `npx playwright test assistant-parity.spec.ts -g "dashboard"`: PASSED (by design, see section 4). Unit suite: 360 tests green at the tip; `npx tsc --noEmit` clean.
+Feature branch `feature/assistant-data-scope` (local, never pushed), tip `3ba4332` (updated 2026-10-29 after batch 1d1). Spec `spec.md` v1.6, status `planned`; `assistant-chat-polish` is `partial` (its REQ-23, HTTP 500, is delivered by this feature and is already implemented in F1b). 30 of 76 tasks are ticked (T021 part 1 is done but T021 stays open for part 2). **Done and reviewed (PASS):** F1a, U0, F1b, 1a1, 1a2, 1b1a, 1b1b, 1b2a, 1b2b, 1c1, 3a1, 1c2 (T070, T020; review round 2 PASS, fix commits 8102f7d..ecb2925), 3a2 (T066, T038; cherry-picked as 33aab9f..0ff4ea2), 1d1 (T021 part 1, T022; commits 4e6e12a, 3ba4332). The only e2e run since F1a is the targeted 3a2 run `npx playwright test assistant-parity.spec.ts -g "dashboard"`: PASSED (by design, see section 4). Unit suite: 421 tests green at the tip; `npx tsc --noEmit` clean.
 
 ## 2. Immediate next steps, in this order
 
-1. **Batch 1d1** (T021 part 1, T022): resolver tests on `resolve()` then `src/lib/domain/chat-intent.ts`. T021 now also carries the 1c2 round-2 follow-ups (chat-match rows, third topic with no button, filter prefix mid-word); see the 1c2 batch note and T021/T023/T027/T029 in `tasks.md`.
+1. **Batch 1d2** (T021 part 2, T023), in progress (code-writer): `ragAnswer`-level rows, sweep and e2e, then wiring the resolver into `ragAnswer`; also the 1d1 follow-ups (dead `TIME_WORDS`/`goalAt` branch, kill-mutant rows, cuánta/cuántas comment fix). See Batch note 1d1 and T021/T022/T023/T027 in `tasks.md`.
+   **New user questions:** "Open questions 1d1" (Q-a..Q-d) in `tasks.md`, next to "Open questions 1c2"; current behavior stays until answered, changes only through a spec-change.
 2. Commit the docs (planner edits to `tasks.md`/`plan.md`/`HANDOFF.md` are committed path-limited by the orchestrator, never by agents).
 3. Continue with the remaining batches (section 3).
 4. The 3a2 worktree branch `worktree-agent-a4fb1720775853511` is merged; deleting it (with the other agent worktrees, section 6) still awaits the user's yes.
 
 ## 3. Remaining batches (from plan.md "Batches", sizes are ADDED lines, tests included)
 
-**next:** 1d1 (T021 pt1, T022) ~330 · 1d2 (T021 pt2, T023) ~170 · 1e (T024 fuse.js spike in a scratch copy, **T025 install needs the user's yes**, T026–T027) ~300 · 2a1/2a2 (T028–T030) · 2b1/2b2 (T031–T033) · 2c1/2c2 (T034–T036) · 3b1/3b2 (T039–T041, T067–T068) · 3c1/3c2 (T042–T043) · 3d1/3d2 (T044–T045) · 3e (T046–T047) · 4a (T048–T049) · 4b1/4b2 (T050–T052) · 5 (T053–T054) · 6a1/6a2 (T055–T056) · 6b1/6b2 (T058–T060) · 6c (T061–T062) · **E** (T076 first full e2e + fix rounds, T077 red-by-breaking demo for UI-only behavior, **T057 the ONE snapshot refresh needs the user's yes**) · Final (T063–T065: coverage audit, synthetic-volume check, **the user's manual ≤1 s check on real data before merge**). Open items per batch live in the batch notes in `tasks.md`.
+**next:** 1d2 (T021 pt2, T023) ~170, in progress · 1e (T024 fuse.js spike in a scratch copy, **T025 install needs the user's yes**, T026–T027) ~300 · 2a1/2a2 (T028–T030) · 2b1/2b2 (T031–T033) · 2c1/2c2 (T034–T036) · 3b1/3b2 (T039–T041, T067–T068) · 3c1/3c2 (T042–T043) · 3d1/3d2 (T044–T045) · 3e (T046–T047) · 4a (T048–T049) · 4b1/4b2 (T050–T052) · 5 (T053–T054) · 6a1/6a2 (T055–T056) · 6b1/6b2 (T058–T060) · 6c (T061–T062) · **E** (T076 first full e2e + fix rounds, T077 red-by-breaking demo for UI-only behavior, **T057 the ONE snapshot refresh needs the user's yes**) · Final (T063–T065: coverage audit, synthetic-volume check, **the user's manual ≤1 s check on real data before merge**). Open items per batch live in the batch notes in `tasks.md`.
 
 ## 4. Rules the user set (all recorded in tasks.md/plan.md Global rules)
 
@@ -35,6 +36,8 @@ Feature branch `feature/assistant-data-scope` (local, never pushed), tip `0ff4ea
 - Do not resume finished agents; start fresh ones.
 
 ## 6. Open items that need the user
+
+- **Resolver questions** (tasks.md "Open questions 1c2" items 1-6 and "Open questions 1d1" Q-a..Q-d): ask the user; answers feed one spec-change, which also records the 1d1 reviewer-accepted decisions (Batch note 1d1).
 
 - **Constitution reminder (explicit request):** when the feature finishes, remind the user that CONSTITUTION principle 1 says tests are "today ... a Playwright e2e test" while this feature treats unit tests as the fail-first proof for logic (spec v1.6). The user decided NOT to amend it; ask once whether to leave it or propose a one-line amendment (needs a team PR).
 - **Wrong T ids in three commit messages** of batch 1c1: `07b3cab` says T018 (is T019, matcher), `3e441c1` and `488d61f` say T019 (are T018, normalizer). History not rewritten; ask whether to rewrite or leave (recorded in the Batch note 1c1).
