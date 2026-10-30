@@ -8,7 +8,6 @@ import { greetingOf, topicHits, type TopicHit, type TopicId } from "@/lib/domain
 export type Resolution = { intents: Intent[]; overflow: Intent[] };
 
 const MAX_INTENTS = 2;
-const TIME_WORDS = ["hora", "horario", "cuando"];
 /** A verb form of a slot word is that slot. */
 const SLOT_OF_VERB: Record<string, string> = { desayunar: "desayuno", comer: "comida", cenar: "cena" };
 const METRICS = ["weight", "exercise", "water"] as const;
@@ -59,7 +58,7 @@ export function resolve(question: string): Resolution {
     // counts only here), the ambiguous "llevo" (REQ-25, step 6), then the Plan topic, which applies only when alone.
     if (timeAt !== undefined) return only({ topic: "mealTimes" });
     if (topicAt("ambiguous") !== undefined) return only({ topic: "ambiguous" });
-    if (topicAt("plan") !== undefined || goalAt !== undefined) return only({ topic: "plan" });
+    if (topicAt("plan") !== undefined) return only({ topic: "plan" });
     return only();
   }
 
