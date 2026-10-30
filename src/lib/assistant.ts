@@ -48,7 +48,18 @@ export type Button =
 export type Block = { title: string | null; lead: Rich; sections: Section[]; buttons: Button[] };
 
 /** What the resolver found in a question; only the test trace (`resolved`) exposes it. Fields are filled as the resolver learns them. */
-export type Intent = { topic: string; slot?: string; recipeIds?: string[]; option?: number; page?: number; period?: string };
+export type Intent = {
+  topic: string;
+  slot?: string;
+  /** Goals narrowed to one metric ("meta de peso"). */
+  metric?: "weight" | "exercise" | "water";
+  /** What an identity question asks for. */
+  of?: "name" | "plan";
+  recipeIds?: string[];
+  option?: number;
+  page?: number;
+  period?: string;
+};
 
 export type ChatAnswer = {
   answer: string;

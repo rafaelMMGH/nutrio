@@ -66,21 +66,38 @@ export function greetingOf(question: string): "hello" | "thanks" | null {
   return text.includes("gracias") ? "thanks" : "hello";
 }
 
+/** A vocabulary entry found in a question: the topic, the entry (a phrase or a word) and the index of its first word. */
+export type TopicHit = { topic: TopicId; entry: string; at: number };
+
+// "comidas … llevo": the noun and the verbs of the meals-done phrases, which may be apart in a question (1c2 review M5).
+const MEALS_DONE_PHRASES = VOCABULARY.filter(({ topic }) => topic === "mealsDone").flatMap(({ phrases }) => phrases.map((phrase) => phrase.split(" ")));
+const MEALS_DONE_NOUNS = [...new Set(MEALS_DONE_PHRASES.map(([noun]) => noun))];
+const MEALS_DONE_VERBS = [...new Set(MEALS_DONE_PHRASES.map(([, verb]) => verb))];
+
 /**
- * The topics a question matches, in order of first appearance: phrases first (they consume their words), then each
- * remaining word against the vocabulary. No REQ-6 rules yet (T022).
+ * Every vocabulary entry a question's words match. Phrases come first and consume their words; then meals done is
+ * looked for over the words left, apart or not; then each remaining word against the word entries. No REQ-6 rules.
  */
-export function matchTopics(question: string): TopicId[] {
-  const tokens = words(question);
-  const hits: { topic: TopicId; at: number }[] = [];
+export function topicHits(tokens: readonly string[]): TopicHit[] {
+  const hits: TopicHit[] = [];
   const consumed = new Set<number>();
   for (const { phrase, from, to } of matchPhrases(tokens, [...PHRASES.keys()])) {
-    hits.push({ topic: PHRASES.get(phrase)!, at: from });
+    hits.push({ topic: PHRASES.get(phrase)!, entry: phrase, at: from });
     for (let index = from; index < to; index++) consumed.add(index);
+  }
+  // A word that exactly equals an entry of another phrase ("lleva") never reaches "llevo" (matchWord), so "qué lleva la comida" is not meals done.
+  const unconsumed = (entries: string[]) => tokens.flatMap((token, at) => (!consumed.has(at) && matchWord(token, WORD_ENTRIES).some((entry) => entries.includes(entry)) ? [at] : []));
+  const [noun, verb] = [unconsumed(MEALS_DONE_NOUNS)[0], unconsumed(MEALS_DONE_VERBS)[0]];
+  if (noun !== undefined && verb !== undefined) {
+    hits.push({ topic: "mealsDone", entry: MEALS_DONE_PHRASES[0].join(" "), at: Math.min(noun, verb) });
+    consumed.add(noun).add(verb);
   }
   tokens.forEach((token, at) => {
     if (consumed.has(at)) return;
-    for (const entry of matchWord(token, WORD_ENTRIES)) for (const topic of ENTRY_TOPICS.get(entry) ?? []) hits.push({ topic, at });
+    for (const entry of matchWord(token, WORD_ENTRIES)) for (const topic of ENTRY_TOPICS.get(entry) ?? []) hits.push({ topic, entry, at });
   });
-  return [...new Set(hits.sort((a, b) => a.at - b.at).map((hit) => hit.topic))];
+  return hits.sort((a, b) => a.at - b.at);
 }
+
+/** The topics a question matches, in order of first appearance, without the REQ-6 rules (T023 replaces its use with `resolve`). */
+export const matchTopics = (question: string): TopicId[] => [...new Set(topicHits(words(question)).map((hit) => hit.topic))];
