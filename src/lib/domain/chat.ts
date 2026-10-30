@@ -138,5 +138,5 @@ export function ragAnswer(db: AppDb, user: AppUser, message: string, _today: str
   // Repeat rule (chat-polish REQ-5): a follow-up that repeats the question just asked is not offered. Follow-ups only.
   // A button is offered once: an overflow topic can also be one of the follow-ups (REQ-24).
   const followUps = [...new Set([...TOPICS[answered[answered.length - 1]].followUps.filter((text) => normalizeText(text) !== asked), ...overflow])];
-  return reply("answer", blocks, followUps.map(questionButton), builts.flatMap((built) => built.sources ?? []), trace ? intents : undefined);
+  return reply("answer", blocks, followUps.map(questionButton), [...new Set(builts.flatMap((built) => built.sources ?? []))], trace ? intents : undefined);
 }
