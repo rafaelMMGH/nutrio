@@ -170,6 +170,20 @@ test("REQ-1 two topics are answered in order of first appearance, titled", () =>
   assert.deepEqual(topicsOf(db, user, "carrito y horario"), ["cart"]);
 });
 
+test("REQ-3 the sources of the second answered block are listed too", () => {
+  const { db, user } = memDb({ cart: 2 });
+  const reply = ragAnswer(db, user, "mi objetivo y carrito", TODAY, { trace: true });
+  assert.deepEqual(reply.resolved?.map((intent) => intent.topic), ["goals", "cart"]);
+  // Includes, not equals: the goals block may bring its own sources once its builder lands.
+  assert.ok(reply.sources.includes("Carrito actual"), reply.sources.join());
+});
+
+test("REQ-3 a source shared by two blocks is listed once", () => {
+  const { db, user } = memDb();
+  const reply = ragAnswer(db, user, "¿A qué hora es el desayuno y la cena?", TODAY);
+  assert.equal(reply.sources.length, new Set(reply.sources).size, reply.sources.join());
+});
+
 // REQ-2 table through the answer path: a typo resolves to its topic, a ✗ row to nothing.
 const TYPOS: [string, string][] = [["carito", "cart"], ["carrtio", "cart"], ["recta", "recipes"], ["desayno", "slotOptions"], ["ejersisio", "exercise"], ["horarios", "mealTimes"]];
 const NOT_TOPICS = ["ahora", "ahorita", "pero", "carritito", "garrito", "vasto", "pasar", "lleva", "objeto", "cuanto", "una planta", "¿Qué cosas tengo?", "¿Qué hago ahora?"];
