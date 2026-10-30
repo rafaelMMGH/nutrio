@@ -86,6 +86,7 @@ const ROWS: [string, string[]][] = [
   ["agua y cuántas comidas llevo", ["water", "mealsDone"]],
   ["cuántas comidas llevo y agua", ["mealsDone", "water"]],
   ["resumen de comidas llevo", ["mealsDone"]],
+  ["comidas, agua y llevo", ["mealsDone", "water"]],
   // identity phrases are positioned intents; the same intent twice is one
   ["cómo se llama mi plan y mi nombre", ["identity:plan", "identity:name"]],
   ["mi nombre y cómo se llama mi plan", ["identity:name", "identity:plan"]],
