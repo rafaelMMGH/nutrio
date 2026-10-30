@@ -5,14 +5,25 @@ import { memDb } from "./memdb";
 
 const names = (rows: { name: string }[]) => rows.map((row) => row.name);
 
-test("default fixture: 19 generic recipes, 3 table recipes and 4 distractors", () => {
+test("default fixture: 19 generic recipes, 3 table recipes and 3 distractors, in this order", () => {
   const { db } = memDb();
   const recipes = names(db.recipes);
-  assert.equal(recipes.length, 26);
-  assert.equal(recipes.filter((name) => /^(Desayuno|Colacion|Comida|Cena) opcion \d+$/.test(name)).length, 19);
-  for (const name of ["Pollo asado", "Ensalada de pollo", "Sándwich de atún"]) assert.ok(recipes.includes(name), name);
-  for (const name of ["Sopa de lima", "Atole de avena", "Chilaquiles verdes", "Tacos de frijol"]) assert.ok(recipes.includes(name), name);
-  assert.equal(db.ingredientUsages.filter((usage) => usage.source_type === "recipe").length, 52);
+  assert.equal(recipes.length, 25);
+  assert.equal(recipes.slice(0, 19).filter((name) => /^(Desayuno|Colacion|Comida|Cena) opcion \d+$/.test(name)).length, 19);
+  assert.deepEqual(recipes.slice(19), ["Pollo asado", "Ensalada de pollo", "Sándwich de atún", "Atole de avena", "Chilaquiles verdes", "Tacos de frijol"]);
+  assert.ok(!recipes.includes("Sopa de lima"));
+  assert.equal(db.ingredientUsages.filter((usage) => usage.source_type === "recipe").length, 50);
+});
+
+test("extras: three more recipes appended in order, outside the plan, and the base slots and option numbers do not move", () => {
+  const base = memDb().db;
+  const { db } = memDb({ extras: true });
+  assert.equal(db.recipes.length, 28);
+  assert.deepEqual(names(db.recipes).slice(0, 25), names(base.recipes));
+  assert.deepEqual(names(db.recipes).slice(25), ["Pollo asado con verduras", "Sopa de lima", "Pan de horno"]);
+  assert.deepEqual(db.mealOptions.map((option) => [option.recipe_id, option.meal_type_id, option.option_number]), base.mealOptions.map((option) => [option.recipe_id, option.meal_type_id, option.option_number]));
+  for (const extra of db.recipes.slice(25)) assert.ok(!db.mealOptions.some((option) => option.recipe_id === extra.id), extra.name);
+  assert.equal(db.ingredientUsages.filter((usage) => usage.source_type === "recipe").length, 56);
 });
 
 test("slots, option numbers and the recipes outside the plan", () => {
@@ -28,8 +39,9 @@ test("slots, option numbers and the recipes outside the plan", () => {
   ]);
   const idOf = (name: string) => db.recipes.find((recipe) => recipe.name === name)!.id;
   const optionOf = (name: string) => db.mealOptions.find((option) => option.recipe_id === idOf(name));
-  assert.equal(db.mealOptions.length, 24);
-  assert.equal(db.planVersionRecipes.length, 24);
+  assert.equal(db.mealOptions.length, 23);
+  assert.equal(db.planVersionRecipes.length, 23);
+  assert.equal(db.mealOptions.filter((option) => option.meal_type_id === db.mealTypes[2].id).length, 7);
   assert.deepEqual([optionOf("Pollo asado")!.meal_type_id, optionOf("Pollo asado")!.option_number], [db.mealTypes[2].id, 6]);
   assert.equal(optionOf("Ensalada de pollo")!.option_number, 7);
   assert.deepEqual([optionOf("Sándwich de atún")!.meal_type_id, optionOf("Sándwich de atún")!.option_number], [db.mealTypes[3].id, 5]);
