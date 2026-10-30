@@ -112,6 +112,11 @@ test("word match is symmetric: the typo allowance may come from the phrase word 
   assert.deepEqual(shape("ensalada", adHoc("Ensald")), ["found", "Ensald"]);
 });
 
+test("a phrase word counts once in recall, however many name words it matches", () => {
+  // "pollo" fuzzy-matches both "polla" and "polle": recall 1, precision 2/4, behind "Asado pollo" (recall 1, precision 1).
+  assert.deepEqual(shape("pollo asado", adHoc("Polla polle asada asado", "Asado pollo")), ["found", "Asado pollo"]);
+});
+
 test("the first letter must match, in either direction", () => {
   assert.deepEqual(shape("esado", adHoc("Pollo asado")), ["none", true]);
   assert.deepEqual(shape("hornillo", adHoc("Pan de ornillo")), ["none", true]);
@@ -179,6 +184,7 @@ test("REQ-29: rankDish over the whole question, candidates only, never a found",
 
 test("rankDish keeps the not-a-dish-name rule and ranks an exact name like any other candidate", () => {
   assert.deepEqual(rankDish("agua", BASE), []);
+  assert.deepEqual(rankDish("agua", adHoc("Agua fresca")), []);
   assert.deepEqual(rankDish("", BASE), []);
   assert.deepEqual(rankDish("sandwich de atun", BASE).map((recipe) => recipe.name), ["Sándwich de atún"]);
   assert.equal(rankDish("taco", adHoc("Taco uno", "Taco dos", "Taco tres", "Taco cuatro")).length, 3);
