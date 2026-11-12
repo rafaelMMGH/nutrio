@@ -51,6 +51,8 @@ export type Block = { title: string | null; lead: Rich; sections: Section[]; but
 export type Intent = {
   topic: string;
   slot?: string;
+  /** Which of several same-named slots a typed ordinal or "<slot> <n>" names (1-based, REQ-11); the plan decides if it applies. */
+  ordinal?: number;
   /** Goals narrowed to one metric ("meta de peso"). */
   metric?: "weight" | "exercise" | "water";
   /** What an identity question asks for. */

@@ -55,7 +55,7 @@ function mealTimes(db: AppDb, userId: string, intent: Intent): Built {
   if (!plan) return { lead: textLead(NO_PLAN_LEAD) };
   const sources = [`Plan activo: ${plan.planName}`];
   if (intent.slot) {
-    const chosen = chooseSlot(plan, intent.slot, "times");
+    const chosen = chooseSlot(plan, intent.slot, "times", intent.ordinal);
     return "built" in chosen ? chosen.built : { lead: slotTimeLead(chosen.slot), sources };
   }
   const lead = plan.slots.some((slot) => slot.time) ? "Estos son los horarios de tus comidas." : "Tu plan no tiene horarios para tus comidas.";

@@ -17,6 +17,18 @@ const METRICS = ["weight", "exercise", "water"] as const;
 /** Topics that answer a question about a number: weekly progress and the ambiguous "llevo" give way to them. */
 const METRIC_TOPICS: TopicId[] = [...METRICS, "mealsDone"];
 
+/** Ordinal words of a slot ref (Terms), normalized: both genders, "primero" and "tercero" included. */
+const ORDINAL_WORDS: Record<string, number> = Object.fromEntries(
+  [["primera", "primer", "primero"], ["segunda", "segundo"], ["tercera", "tercer", "tercero"], ["cuarta", "cuarto"], ["quinta", "quinto"], ["sexta", "sexto"], ["septima", "septimo"], ["octava", "octavo"], ["novena", "noveno"], ["decima", "decimo"]]
+    .flatMap((forms, index) => forms.map((form) => [form, index + 1]))
+);
+
+/** The position a slot word carries: an ordinal word before or after it ("segunda colación"), or a number after it ("colación 2"). */
+function ordinalAt(tokens: string[], at: number): { ordinal?: number } {
+  const ordinal = ORDINAL_WORDS[tokens[at - 1]] ?? ORDINAL_WORDS[tokens[at + 1]] ?? (/^\d{1,3}$/.test(tokens[at + 1] ?? "") ? Number(tokens[at + 1]) : undefined);
+  return ordinal ? { ordinal } : {};
+}
+
 const ARTICLES = ["el", "la", "los", "las", "un", "una"];
 
 const only = (...intents: Intent[]): Resolution => ({ intents, overflow: [] });
@@ -67,7 +79,7 @@ export function resolve(question: string, recipes?: readonly Recipe[]): Resoluti
 
   for (const hit of hits.filter(({ topic }) => topic === "identity")) add(hit.at, { topic: "identity", of: hit.entry.includes("plan") ? "plan" : "name" });
   // Time word + slot = slot times; a slot alone (or with a dish cue, which the slot reading wins) = its options.
-  for (const hit of slotHits) add(hit.at, { topic: timed ? "mealTimes" : "slotOptions", slot: SLOT_OF_VERB[hit.entry] ?? hit.entry });
+  for (const hit of slotHits) add(hit.at, { topic: timed ? "mealTimes" : "slotOptions", slot: SLOT_OF_VERB[hit.entry] ?? hit.entry, ...ordinalAt(tokens, hit.at) });
   if (!slotHits.length && !recipes) add(topicAt("dish"), { topic: "dish" });
 
   // Goal word + metric = that goal only; a goal word beside "plan" and no metric is the Plan topic (below).

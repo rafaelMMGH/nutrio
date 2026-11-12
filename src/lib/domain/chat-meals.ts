@@ -61,11 +61,13 @@ const withAccent = (word: string) => (word === "colacion" ? "colación" : word);
 /**
  * The slot a slot word names, or the reply that asks for it: several slots with that name (REQ-11), "almuerzo" with
  * no such slot (REQ-7), or a slot the plan lacks (REQ-27). `ask` says which question the choice buttons send.
+ * `ordinal` (REQ-11) picks one of the same-named slots; out of range it asks again.
  */
-export function chooseSlot(plan: SlotPlan, word: string, ask: SlotAsk): { slot: Slot } | { built: Built } {
+export function chooseSlot(plan: SlotPlan, word: string, ask: SlotAsk, ordinal?: number): { slot: Slot } | { built: Built } {
   const sources = [`Plan activo: ${plan.planName}`];
   const found = slotsNamed(plan.slots, word);
   if (found.length === 1) return { slot: found[0] };
+  if (ordinal && ordinal <= found.length) return { slot: found[ordinal - 1] };
   if (found.length > 1) {
     const buttons = found.map((slot) => slotButton(slot, ask, slot.time ? `${slot.ref} (${slot.time})` : slot.ref));
     return { built: { lead: [{ text: `Tienes ${found.length} ${plural(found[0].name)}. ¿Cuál?` }], buttons, kind: "clarify", sources } };
