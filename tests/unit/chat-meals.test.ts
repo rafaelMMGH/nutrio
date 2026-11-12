@@ -4,10 +4,10 @@ import type { ChatAnswer } from "@/lib/assistant";
 import { ragAnswer } from "@/lib/domain/chat";
 import { chooseSlot, planSlots } from "@/lib/domain/chat-meals";
 import { PLAN_NAME } from "../shared/assistant-fixture";
-import { memDb, type MemDbOptions } from "./memdb";
+import { memDb, sweep, type MemDbOptions } from "./memdb";
 
 // Spec assistant-data-scope REQ-7 (slot words), REQ-8 (slot times) and the REQ-11 labels, over the in-memory plan.
-// Typed ordinals and "<slot> <n>" belong to the resolver (T030); the options builder to T032.
+// The resolver picks the slot a typed ordinal or "<slot> <n>" names (T030); the options builder is T032.
 
 const TODAY = "2026-10-28";
 const DUPLICATED = ["Desayuno", "Colación", "Comida", "Colación", "Cena"];
@@ -125,4 +125,49 @@ test("REQ-11 eleven colaciones: the tenth and eleventh buttons read 'Décima col
 
 test("REQ-11 two snacks read '2 snacks' (the loanword takes only an s)", () => {
   assert.equal(ask("¿A qué hora es mi snack?", { meals: ["Desayuno", "Snack", "Snack"] }).answer, "Tienes 2 snacks. ¿Cuál?");
+});
+
+// T028 part 2: typed ordinals and "<slot> <n>" (REQ-11), the duplicate buttons no longer loop, the sweep.
+const SECOND_COLACION = "Tu horario de segunda colación: Entre 8 a 9 pm.";
+const trace = (message: string, options?: MemDbOptions) => ask(message, options).resolved;
+
+test("REQ-11 the duplicate-colación buttons answer their slot's time instead of asking again", () => {
+  const first = ask("¿A qué hora es mi primera colación?", { meals: DUPLICATED });
+  assert.equal(first.kind, "answer");
+  assert.equal(first.answer, "Tu horario de primera colación: Entre 10 a 11 am.");
+  assert.equal(ask("¿A qué hora es mi segunda colación?", { meals: DUPLICATED }).answer, SECOND_COLACION);
+});
+
+test("REQ-11 typed ordinals pick the slot, with or without accents and in either gender", () => {
+  for (const typed of ["segunda colación", "segunda colacion", "SEGUNDA COLACIÓN", "colación 2", "colacion 2"]) {
+    assert.equal(ask(`¿A qué hora es mi ${typed}?`, { meals: DUPLICATED }).answer, SECOND_COLACION, typed);
+  }
+  const meals = ["Desayuno", "Desayuno", "Cena"];
+  assert.equal(ask("¿A qué hora es mi segundo desayuno?", { meals }).answer, "Tu horario de segundo desayuno: Entre 10 a 11 am.");
+  assert.match(ask("¿A qué hora es mi colación 11?", { meals: Array(11).fill("Colación") }).answer, /^Tu horario de colación 11: /);
+});
+
+test("REQ-11 an ordinal the plan lacks asks which one; on a single slot it is that slot", () => {
+  assert.equal(ask("¿A qué hora es mi tercera colación?", { meals: DUPLICATED }).answer, "Tienes 2 colaciones. ¿Cuál?");
+  assert.equal(ask("¿A qué hora es mi primera cena?").answer, "Tu horario de cena: Entre 8 a 9 pm.");
+});
+
+test("REQ-11 a typed ordinal reaches the options reading with the slot's position", () => {
+  assert.deepEqual(trace("segunda colacion", { meals: DUPLICATED }), [{ topic: "slotOptions", slot: "colacion", ordinal: 2 }]);
+});
+
+test("REQ-11 with REQ-6 step 4: '¿Qué lleva la segunda colación?' is the second colación's options, not a not-found reply", () => {
+  const reply = ask("¿Qué lleva la segunda colación?", { meals: DUPLICATED });
+  assert.deepEqual(reply.resolved, [{ topic: "slotOptions", slot: "colacion", ordinal: 2 }]);
+  assert.ok(!["did_you_mean", "no_match"].includes(reply.kind), reply.kind);
+});
+
+test("REQ-5 every slot button of the duplicate, almuerzo and not-in-plan replies resolves to its slot's time", () => {
+  const swept = (message: string, options: MemDbOptions) => {
+    const { db, user } = memDb(options);
+    return sweep(db, user, [ragAnswer(db, user, message, TODAY)], TODAY);
+  };
+  assert.deepEqual(swept("¿A qué hora es mi colación?", { meals: DUPLICATED }), ["¿A qué hora es mi primera colación?", "¿A qué hora es mi segunda colación?"]);
+  assert.deepEqual(swept("¿A qué hora es mi almuerzo?", {}), ["¿A qué hora es mi desayuno?", "¿A qué hora es mi comida?"]);
+  assert.deepEqual(swept("¿A qué hora es mi almuerzo?", { meals: ["Colación", "Cena"] }), ["¿A qué hora es mi colación?", "¿A qué hora es mi cena?"]);
 });

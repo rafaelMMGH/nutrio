@@ -150,8 +150,8 @@ test("REQ-6 step 4: several candidates are a did-you-mean in matcher order; no c
 test("REQ-6 step 4: a phrase that is not a dish name falls through to the slot or topic reading", () => {
   assert.deepEqual(withRecipes("¿Qué lleva la cena?").map(label), ["slotOptions:cena"]);
   assert.deepEqual(withRecipes("¿Qué lleva el agua?").map(label), ["water"]);
-  // A slot ref: slot rows complete in T028/T030, here it only must not be a dish.
-  assert.deepEqual(withRecipes("¿Qué lleva la segunda colación?").map(label), ["slotOptions:colacion"]);
+  // A slot ref is not a dish name (REQ-11); its ordinal is the T030 rows below.
+  assert.deepEqual(withRecipes("¿Qué lleva la segunda colación?"), [{ topic: "slotOptions", slot: "colacion", ordinal: 2 }]);
 });
 
 test("REQ-6 step 7: a dish cue with an empty phrase and nothing else resolved is the clarify intent", () => {
@@ -171,4 +171,33 @@ test("resolve(question) without recipes keeps the plain dish intent", () => {
 // Open question 1c2 item 4, pinned as CURRENT behavior until the user answers: "receta de" is a dish cue, so "pollo" is a dish phrase.
 test("CURRENT: 'recetas de pollo' is a dish phrase with candidates, not a recipe-list filter", () => {
   assert.deepEqual(withRecipes("recetas de pollo"), [{ topic: "dish", outcome: "didYouMean", recipeIds: [idOf("Pollo asado"), idOf("Ensalada de pollo")], phrase: "pollo" }]);
+});
+
+// REQ-11 (T030): a typed ordinal or "<slot> <n>" names which of the duplicated slots; the resolver cannot see the plan,
+// so it reports the position and the answer builders decide (a non-duplicated "<slot> <n>" is option n, T033).
+const ORDINALS: [string, string, number][] = [
+  ["¿A qué hora es mi segunda colación?", "mealTimes", 2],
+  ["segunda colacion", "slotOptions", 2],
+  ["Primera colación", "slotOptions", 1],
+  ["la colación tercera", "slotOptions", 3],
+  ["mi primer desayuno", "slotOptions", 1],
+  ["Segundo snack", "slotOptions", 2],
+  ["décimo desayuno", "slotOptions", 10],
+  ["Séptima colación", "slotOptions", 7],
+  ["colación 2", "slotOptions", 2],
+  ["Colación 11", "slotOptions", 11],
+  ["¿Cuándo es mi colación 3?", "mealTimes", 3]
+];
+for (const [message, topic, ordinal] of ORDINALS) {
+  test(`REQ-11 resolve "${message}" -> ${topic} with ordinal ${ordinal}`, () => {
+    const [intent, ...rest] = resolve(message).intents;
+    assert.equal(intent.topic, topic);
+    assert.equal(intent.ordinal, ordinal);
+    assert.equal(rest.length, 0);
+  });
+}
+
+test("REQ-11 a slot word without an ordinal carries none, and each slot word takes its own", () => {
+  assert.deepEqual(resolve("mi colación").intents, [{ topic: "slotOptions", slot: "colacion" }]);
+  assert.deepEqual(resolve("primera colación y cena").intents, [{ topic: "slotOptions", slot: "colacion", ordinal: 1 }, { topic: "slotOptions", slot: "cena" }]);
 });
