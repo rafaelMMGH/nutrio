@@ -1,5 +1,5 @@
 import type { Button, ChatAnswer } from "../../src/lib/assistant";
-import { ask, createChatUser, deleteChatUser, expect, resendSweep, seedPlan, test } from "./assistant-helpers";
+import { ask, createChatUser, deleteChatUser, expect, openAssistant, resendSweep, seedPlan, test } from "./assistant-helpers";
 
 // REQ-7 (almuerzo), REQ-8 (slot times) and REQ-11 (duplicate slots) through POST /api/rag/chat as a seeded user.
 // Written, not run, until Batch E.
@@ -61,9 +61,40 @@ test("REQ-11 duplicate colaciones: the buttons answer their own slot, and typed 
 });
 
 test("REQ-11 with REQ-6 step 4: '¿Qué lleva la segunda colación?' is the second colación's options, not a not-found reply", async ({ chatContext }) => {
-  seedPlan({ times: "all", meals: DUPLICATED });
+  seedPlan({ times: "all", meals: DUPLICATED, fixture: true });
   const { status, body } = await ask(chatContext.request, "¿Qué lleva la segunda colación?", { trace: true });
   expect(status).toBe(200);
   expect(body.resolved).toEqual([{ topic: "slotOptions", slot: "colacion", ordinal: 2 }]);
   expect(["did_you_mean", "no_match"]).not.toContain(body.kind);
+  expect(body.answer).toContain("segunda colación");
+  expect(questions(body).slice(0, 3).map((button) => button.message)).toEqual([1, 2, 3].map((n) => `Segunda colación, opción ${n}`));
+});
+
+test("REQ-9 and REQ-10 typed selection and paging: 'cena opción 2', paging buttons, and an option past the last", async ({ chatContext }) => {
+  seedPlan({ times: "all", fixture: true });
+  const first = await ask(chatContext.request, "¿Cuál es mi cena?");
+  expect(questions(first.body).map((button) => button.message).slice(-1)).toEqual(["Cena, más opciones (página 2)"]);
+  const second = await ask(chatContext.request, "Cena, más opciones (página 2)");
+  expect(questions(second.body).map((button) => button.label).slice(-1)).toEqual(["Opciones anteriores"]);
+  await resendSweep(chatContext.request, [first.body, second.body]);
+
+  const typed = await ask(chatContext.request, "cena opción 2", { trace: true });
+  expect(typed.body.resolved).toEqual([{ topic: "slotOptions", slot: "cena", option: 2 }]);
+  expect((await ask(chatContext.request, "la 2 de la cena")).body.blocks).toEqual(typed.body.blocks);
+  const past = await ask(chatContext.request, "cena opción 7");
+  expect(past.body.answer).toContain("Tu cena tiene 5 opciones.");
+});
+
+test("REQ-9 UI flow: tapping 'Ver más opciones' sends the paging message and shows 'Opciones anteriores'", async ({ chat }) => {
+  seedPlan({ times: "all", fixture: true });
+  await chat.goto("/");
+  const ui = await openAssistant(chat);
+  await ui.input.fill("¿Cuál es mi cena?");
+  await ui.send.click();
+  await ui.panel.getByRole("button", { name: "Ver más opciones" }).click();
+  await expect(ui.userTurns.last()).toHaveText("Cena, más opciones (página 2)");
+  await expect(ui.panel.getByRole("button", { name: "Opciones anteriores" })).toBeVisible();
+  await ui.panel.getByRole("button", { name: "Opciones anteriores" }).click();
+  await expect(ui.userTurns.last()).toHaveText("Cena, más opciones (página 1)");
+  await expect(ui.panel.getByRole("button", { name: "Ver más opciones" })).toBeVisible();
 });

@@ -161,6 +161,10 @@ test("REQ-11 with REQ-6 step 4: '¿Qué lleva la segunda colación?' is the seco
   const reply = ask("¿Qué lleva la segunda colación?", { meals: DUPLICATED });
   assert.deepEqual(reply.resolved, [{ topic: "slotOptions", slot: "colacion", ordinal: 2 }]);
   assert.ok(!["did_you_mean", "no_match"].includes(reply.kind), reply.kind);
+  // T031 part 2: the slot's lead and its own options, in plan order.
+  assert.match(reply.answer, /segunda colación/);
+  assert.deepEqual(questions(reply).map((button) => button.label), ["Opción 1: Huevo, Aguacate", "Opción 2: Frijoles, Sal", "Opción 3: Avena, Canela", "Ver más opciones"]);
+  assert.deepEqual(questions(reply).slice(0, 3).map((button) => button.message), [1, 2, 3].map((n) => `Segunda colación, opción ${n}`));
 });
 
 test("REQ-5 every slot button of the duplicate, almuerzo and not-in-plan replies resolves to its slot's time", () => {
@@ -318,4 +322,57 @@ test("REQ-9 through ragAnswer: '¿Qué puedo cenar?' answers with the first page
   const reply = ask("¿Qué puedo cenar?");
   assert.equal(reply.kind, "answer");
   assert.deepEqual(builtQuestions(reply).map((button) => button.label), ["Opción 1: Huevo, Aguacate", "Opción 2: Avena, Canela", "Opción 3: Frijoles, Sal", "Ver más opciones"]);
+});
+
+test("REQ-5 every options, option and paging button resolves to slotOptions and answers (T031 part 2)", () => {
+  const swept = (message: string, options: MemDbOptions, more: string[] = []) => {
+    const { db, user } = memDb(options);
+    return sweep(db, user, [message, ...more].map((text) => ragAnswer(db, user, text, TODAY)), TODAY);
+  };
+  assert.equal(swept("¿Cuál es mi cena?", {}, ["Cena, más opciones (página 2)"]).length, 7);
+  assert.equal(swept("¿Cuál es mi comida?", {}, ["Comida, más opciones (página 2)", "Comida, más opciones (página 3)"]).length, 9);
+  assert.equal(swept("¿Cuál es mi colación?", { meals: DUPLICATED }).length, 2);
+  assert.equal(swept("¿Cuál es mi colación?", { meals: Array(11).fill("Colación") }).length, 11);
+  assert.equal(swept("¿Cuál es mi desayuno?", { meals: ["Desayuno", "Desayuno"] }).length, 2);
+});
+
+// REQ-9, REQ-10, REQ-11 (T033 / T031 part 2): typed selection and paging through ragAnswer.
+const buttonLabels = (reply: ChatAnswer) => questions(reply).map((button) => button.label);
+
+test("REQ-10 'cena opción 2', 'cena opcion 2', 'la 2 de la cena' and the option button give the same answer", () => {
+  const button = ask("Cena, opción 2");
+  assert.deepEqual(button.resolved, [{ topic: "slotOptions", slot: "cena", option: 2 }]);
+  for (const typed of ["cena opción 2", "cena opcion 2", "la 2 de la cena"]) assert.deepEqual(ask(typed).blocks, button.blocks, typed);
+});
+
+test("REQ-10 an option number beyond the slot's options says how many there are, then the first page", () => {
+  for (const typed of ["cena opción 7", "Cena, opción 7", "cena 7"]) {
+    const reply = ask(typed);
+    assert.equal(reply.blocks[0].lead[0].text, "Tu cena tiene 5 opciones.", typed);
+    assert.deepEqual(buttonLabels(reply), buttonLabels(ask("¿Cuál es mi cena?")), typed);
+  }
+});
+
+test("REQ-11 '<slot> <n>': option n on a single slot, the slot's ordinal when it is duplicated", () => {
+  assert.equal(ask("cena 9").blocks[0].lead[0].text, "Tu cena tiene 5 opciones.");
+  const second = ask("colación 2", { meals: DUPLICATED });
+  assert.match(second.answer, /segunda colación/);
+  assert.notEqual(second.kind, "clarify");
+  assert.doesNotMatch(second.answer, /tiene \d+ opciones/);
+});
+
+test("REQ-9 typed paging: a page, no number = page 2, page 1 = the plain answer, a page past the last = the last", () => {
+  const plain = ask("¿Cuál es mi cena?");
+  assert.deepEqual(buttonLabels(ask("Cena, más opciones (página 2)")), ["Opción 4: Huevo, Aguacate", "Sándwich de atún", "Opciones anteriores"]);
+  assert.deepEqual(buttonLabels(ask("cena más opciones")), buttonLabels(ask("Cena, más opciones (página 2)")));
+  assert.deepEqual(buttonLabels(ask("Cena, más opciones (página 1)")), buttonLabels(plain));
+  assert.deepEqual(buttonLabels(ask("Cena, más opciones (página 9)")), buttonLabels(ask("Cena, más opciones (página 2)")));
+  assert.deepEqual(buttonLabels(ask("Cena, más opciones (página 3.5)")), buttonLabels(ask("Cena, más opciones (página 2)")));
+  assert.deepEqual(buttonLabels(ask("Segunda colación, más opciones (página 2)", { meals: DUPLICATED })).slice(-1), ["Opciones anteriores"]);
+});
+
+test("REQ-3 'la comida opcion 1' is option selection on comida, not a dish and not a not-found reply", () => {
+  const reply = ask("la comida opcion 1");
+  assert.deepEqual(reply.resolved, [{ topic: "slotOptions", slot: "comida", option: 1 }]);
+  assert.ok(!["did_you_mean", "no_match"].includes(reply.kind), reply.kind);
 });

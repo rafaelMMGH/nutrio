@@ -308,7 +308,7 @@ test("REQ-6 step 4: a soft-deleted recipe and another user's recipe are never fo
   assert.deepEqual(dishIntent(db, user, "¿Qué lleva tacos de frijol?"), { topic: "dish", outcome: "notFound", phrase: "tacos de frijol" });
 });
 
-test("REQ-6 step 4: a generic option name is never a dish", () => {
+test("REQ-6 steps 2 and 4: a generic option name is never a dish; '<slot> opcion <n>' is option selection (REQ-10)", () => {
   const { db, user } = memDb();
-  assert.equal(dishIntent(db, user, "¿Qué lleva desayuno opcion 1?")?.outcome, "notFound");
+  assert.deepEqual(dishIntent(db, user, "¿Qué lleva desayuno opcion 1?"), { topic: "slotOptions", slot: "desayuno", option: 1 });
 });

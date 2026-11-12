@@ -207,3 +207,42 @@ test("REQ-11 a word that names an Object property beside a slot word is no ordin
     assert.deepEqual(resolve(`mi ${word} colación`).intents, [{ topic: "slotOptions", slot: "colacion" }], word);
   }
 });
+
+// REQ-10, REQ-9, REQ-11 (T033): resolver step 2, option selection and paging, ahead of the dish cue and the slot reading.
+const OPTION_ROWS: [string, object][] = [
+  ["cena opción 2", { slot: "cena", option: 2 }],
+  ["cena opcion 2", { slot: "cena", option: 2 }],
+  ["Cena, opción 2", { slot: "cena", option: 2 }],
+  ["la 2 de la cena", { slot: "cena", option: 2 }],
+  ["opción 2 de la cena", { slot: "cena", option: 2 }],
+  ["la comida opcion 1", { slot: "comida", option: 1 }],
+  ["¿Qué lleva desayuno opcion 1?", { slot: "desayuno", option: 1 }],
+  ["Segunda colación, opción 2", { slot: "colacion", ordinal: 2, option: 2 }],
+  ["Colación 11, opción 3", { slot: "colacion", ordinal: 11, numbered: true, option: 3 }]
+];
+for (const [message, expected] of OPTION_ROWS) {
+  test(`REQ-10 resolve "${message}" -> option selection`, () => {
+    assert.deepEqual(resolve(message).intents, [{ topic: "slotOptions", ...expected }]);
+    assert.deepEqual(resolve(message, memDb().db.recipes.filter((recipe) => !isGeneric(recipe.name))).intents, [{ topic: "slotOptions", ...expected }]);
+  });
+}
+
+const PAGE_ROWS: [string, object][] = [
+  ["Cena, más opciones (página 2)", { slot: "cena", page: 2 }],
+  ["cena más opciones", { slot: "cena", page: 2 }],
+  ["cena mas opciones pagina 1", { slot: "cena", page: 1 }],
+  ["Cena, más opciones (página 3.5)", { slot: "cena", page: 2 }],
+  ["Cena, más opciones (página 2x)", { slot: "cena", page: 2 }],
+  ["Segunda colación, más opciones (página 1)", { slot: "colacion", ordinal: 2, page: 1 }]
+];
+for (const [message, expected] of PAGE_ROWS) {
+  test(`REQ-9 resolve "${message}" -> paging`, () => {
+    assert.deepEqual(resolve(message).intents, [{ topic: "slotOptions", ...expected }]);
+  });
+}
+
+test("REQ-11 '<slot> <n>' is flagged as a bare number, for the plan to read as option n on a single slot; 'colación 2 am' is no ordinal", () => {
+  assert.deepEqual(resolve("cena 2").intents, [{ topic: "slotOptions", slot: "cena", ordinal: 2, numbered: true }]);
+  assert.deepEqual(resolve("colación 2 am").intents, [{ topic: "slotOptions", slot: "colacion" }]);
+  assert.deepEqual(resolve("segunda colación").intents, [{ topic: "slotOptions", slot: "colacion", ordinal: 2 }]);
+});
