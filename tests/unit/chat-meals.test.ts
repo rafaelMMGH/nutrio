@@ -254,6 +254,39 @@ test("REQ-9 the lead is one of the three variants, the same for the same questio
   assert.equal(leadText(options("cena")), lead);
 });
 
+/** The cena slot's options, in the fixture's insertion order. */
+const cenaOptions = (db: AppDb) => {
+  const cena = db.mealTypes.find((meal) => meal.name === "Cena")!;
+  return db.mealOptions.filter((option) => option.meal_type_id === cena.id);
+};
+
+test("REQ-9 plan order comes from option_number, not from the order the rows are stored in", () => {
+  const plain = labels(options("cena"));
+  assert.deepEqual(labels(options("cena", {}, undefined, (db) => db.mealOptions.reverse())), plain);
+});
+
+test("REQ-9 a soft-deleted option or recipe is skipped, and the labels count the options that are listed", () => {
+  const second = cenaOptions(memDb().db)[1];
+  const skipped = (tweak: (db: AppDb) => void) => labels(options("cena", {}, undefined, tweak));
+  const withoutSecond = ["Opción 1: Huevo, Aguacate", "Opción 2: Frijoles, Sal", "Opción 3: Huevo, Aguacate", "Ver más opciones"];
+  assert.deepEqual(skipped((db) => { cenaOptions(db)[1].deleted_at = "2026-02-01T00:00:00.000Z"; }), withoutSecond);
+  assert.deepEqual(skipped((db) => { db.recipes.find((recipe) => recipe.id === second.recipe_id)!.deleted_at = "2026-02-01T00:00:00.000Z"; }), withoutSecond);
+});
+
+test("REQ-9 exactly one page: 3 options have no paging buttons, and 1 option is listed alone (the detail is T034)", () => {
+  const keep = (count: number) => (db: AppDb) => { const own = cenaOptions(db); db.mealOptions = db.mealOptions.filter((option) => !own.includes(option) || own.indexOf(option) < count); };
+  assert.deepEqual(labels(options("cena", {}, undefined, keep(3))), ["Opción 1: Huevo, Aguacate", "Opción 2: Avena, Canela", "Opción 3: Frijoles, Sal"]);
+  assert.deepEqual(labels(options("cena", {}, undefined, keep(1))), ["Opción 1: Huevo, Aguacate"]);
+});
+
+test("REQ-28 the lead variants are all in use: different questions reach each of the three", () => {
+  const seen = new Set(["¿Cuál es mi cena?", "¿Qué hay de cena?", "¿Qué puedo cenar?", "cena", "¿Qué lleva la cena?", "mi cena", "ingredientes de la cena", "¿Qué cenaré hoy?"].map((question) => {
+    const { db, user } = memDb();
+    return leadText(slotOptions(db, user.id, { topic: "slotOptions", slot: "cena" }, question));
+  }));
+  assert.equal(seen.size, 3, [...seen].join(" | "));
+});
+
 test("REQ-10 a number beyond the slot's options says how many it has, then the first page", () => {
   const built = options("cena", { asked: 7 });
   assert.equal(leadText(built), "Tu cena tiene 5 opciones.");
