@@ -417,8 +417,8 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
 
 **Batch 2c1: shared step splitter**, about 170 lines with tests (revision 7 split of 2c)
 
-- [ ] T034 [US2] Tests REQ-12, REQ-11 (single option), REQ-3 text
-  - **Part 1 done: a87a443; part 2 in batch 2c2.**
+- [x] T034 [US2] Tests REQ-12, REQ-11 (single option), REQ-3 text
+  - **Part 1 done: a87a443; part 2 done: 73e8cfd (red: tsc clean, 556 pass / 15 fail); see Batch note 2c2.**
   - Unit (tests/unit/recipe-steps.test.ts): `recipeSteps` returns no steps for "Extraído de plan.pdf", "EXTRAÍDO DE plan.pdf" and "Extraido de plan.pdf"; "¿Listo? Ásalo. Él sirve." keeps its split. Red first.
   - Unit (tests/unit/chat-meals.test.ts): 12 ingredients all shown; steps 1–2 equal `recipeSteps(description)` 1–2, plus the "Ver receta completa" link to `/recipes/<id>`; "Extraído de plan.pdf" → the no-preparation item; complement "Agua natural · 1 vaso", none → no heading; by dish name, complements only if the recipe is in exactly one slot; ingredient formats with no unit and with neither; a generic-name lead; a single-option slot goes straight to the detail; a recipe with zero ingredients and zero steps still gets a detail answer (lead, no empty headings); every detail answer's `sources` equals `["Receta: <name>"]` (contract keeps `sources`); REQ-3 text: each found row shows the detail lead and "la comida opcion 1" shows comida option 1's detail; end-of-US2 `sweep()` over every existing Topics, slot, option, paging and "¿Qué lleva <receta>?" button.
   - Split: part 1 (just before T035) = the recipe-steps.test.ts rows and the recipe-page e2e; part 2 (just before T036, Batch 2c2) = the chat-meals.test.ts rows and the remaining e2e.
@@ -445,12 +445,35 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
 
 **Batch 2c2: dish detail**, about 340 lines with tests
 
-- [ ] T036 [US2] Detail builder: lead, uncapped "Ingredientes", "Preparación" (2 steps + link), "Acompaña con" from the slot's add-ons and `add_on` usages (src/lib/domain/chat-meals.ts)
+- [x] T036 [US2] Detail builder: lead, uncapped "Ingredientes", "Preparación" (2 steps + link), "Acompaña con" from the slot's add-ons and `add_on` usages (src/lib/domain/chat-meals.ts)
+  - **Done: 9a3585e; see Batch note 2c2.**
   - Carry-forward from 1e2 (a), with T048 (whichever lands the dish builder first adds them): `sweep()` in tests/unit/chat-answer.test.ts gains "¿Qué lleva <receta>?" for each non-generic fixture recipe, each resolving to that recipe (red row before the builder).
   - Carry-forwards from 2b2: open the detail for an in-range option selection (MEDIUM-4), indexing the same filtered option list the labels use (2b1 (d)); reject option 0 and non-integer options as out of range (LOW-1); either make the detail lead independent of the typed text or let T034 part 2 compare buttons plus content, so the REQ-10 rows can assert full-answer equality (MEDIUM-1). Optional LOW-4 cleanup in chat-intent.ts (long doc comment ~76, double blank line ~41) if the file is touched.
   - Carry-forward from 2c1 (LOW-1): the detail builder imports `recipeSteps` from src/lib/recipe-steps.ts, which makes its comment (lines 3-4, "the assistant shares it") true; if T036 does not use it, reword the comment.
 
+**Review checkpoint 2c2:** tsc + unit.
+
+**Batch note 2c2 (done; T034 part 2, T036; commits 73e8cfd (T034 part 2 tests, red: tsc clean, 556 pass / 15 fail) and 9a3585e (T036 code); docs commit 9e26b91 sits before them; tip 9a3585e; reviewer PASS, no HIGH, nothing blocking; tsc clean, unit 571/571; no dependency change; src+tests +273/-18 (+291/-23 with docs) vs ~340 est):**
+
+- Landed: `recipeDetail(db, userId, recipe, spot?)` in src/lib/domain/chat-meals.ts. Two lead variants, "**<receta>** lleva:" and "Esto lleva **<receta>**:"; a generic option name leads with "<Slot ref>, opción <n>". Sections: "Ingredientes" (uncapped; omitted when empty), "Preparación" (`recipeSteps` steps 1-2, or the no-preparation item), "Acompaña con" (one item per `add_on` usage; for a dish asked by name, only when the recipe is an option in exactly one slot). `sources` = `["Receta: <name>"]`; kind `detail`. `Built` gained `blockButtons` and the kind "detail". The "Ver receta completa" link is added only when there are more than 2 steps, as a block button.
+- Wiring: `slotOptions` opens the detail for an in-range option and for a single-option slot, indexing the same filtered, `option_number`-sorted list as the labels (closes 2b1 (d), 2b2 MEDIUM-4). Option 0, decimals ("2.5", "2,5") and past-count give "Tu <slot> tiene <n> opciones." plus page 1 (closes 2b2 LOW-1 guard); `selectionAt` reads a typed decimal as option 2.5 so the guard sees it. A found dish opens the detail; did-you-mean and not-found stay placeholders until T048/T049.
+- MEDIUM-1 (2b2) resolved: the detail lead variant is picked from the dish name, not the typed text, so the REQ-10 "same answer" rows assert full-answer equality in unit and e2e. See M2 below for the spec wording.
+- Tests: `sweep()` rows for the 6 non-generic fixture recipes (closes 1e2 (a)); `BUTTON_TOPICS` gained 6 dish entries; `OPTIONS_LEAD` accepts "lleva". Pinned current behavior: "cena 2 veces" opens option 2's detail; "cena 12 veces" gives the out-of-range message; "cena hora opción 2" answers the time (2b2 LOW-3); "colación opción 2" on a duplicated slot asks which colación (2b2 MEDIUM-3, still a spec item). e2e rows written, unrun until Batch E.
+- Carry-forwards (owners recorded on the tasks named):
+  - **M1 (MEDIUM, test gap) → cleanup rows, Batch 3b1 note:** add a row asserting both detail lead variants occur across fixture names ("Pollo asado" gives "Esto lleva…", "Ensalada de pollo" gives "…lleva:"; the always-variant-0 mutation survives today), and a 3-step recipe row expecting the link (the threshold mutation `> 3` survives today).
+  - **M2 (MEDIUM, spec wording) → next spec-change (HANDOFF section 6):** REQ-28 says variants are picked "from the normalized question" (spec.md:246), but the detail lead is picked from the dish name. Record "the detail's lead is picked from the dish" so code and spec agree.
+  - **M3 (MEDIUM, test gap) → cleanup rows, Batch 3b1 note:** three surviving mutants need rows: a soft-deleted add_on, a soft-deleted add_on usage, and a soft-deleted mealOption in another slot when a dish is asked by name (the "exactly one slot" rule). Also the fixture add-on name equals its ingredient name, so no test can tell which name the item uses (the code uses the ingredient name): give the fixture add-on a distinct name and assert the ingredient name.
+  - **L1 (LOW) → T041 (touches chat-intent.ts), red row in the cleanup rows:** the decimal regex at src/lib/domain/chat-intent.ts:57 scans the whole message, so "a las 2.30 cena opción 2" reads option 2.3; anchor it to the option token.
+  - **L2 (LOW, accepted-current readings, not pinned) → HANDOFF section 6 for the user:** "comí 2 de la cena" and "cena es la mejor opción 2 veces" open option 2's detail; "cena más opciones 3" and "(página -1)" give page 2; "cena 2.5" opens option 2; "cena opción -1" opens option 1; "cena opción 2 y 3" opens option 2. Pin the ones the user accepts, tighten the rest at the spec-change.
+  - **L3 (LOW, cosmetic) → cleanup rows:** stale doc comment on `SlotOptionsView.asked` (src/lib/domain/chat-meals.ts ~171).
+  - **L4 (LOW) → cleanup rows:** the "Mi cena de hoy" PENDING skip in tests/unit/chat-answer.test.ts:102-104 is stale (builder exists since T032; the reviewer showed un-skipping passes 122/122). Un-skip it; optionally give `BUTTON_TOPICS["Mi cena de hoy"]` `OPTIONS_LEAD`.
+  - **L5 (LOW) → T051 (with a T050 row), see also T047:** option-detail answers have no follow-ups (`slotOptions` topic `followUps: []` in src/lib/domain/chat-topics.ts:39) while the spec lists "¿A qué hora es mi <slot>?".
+  - **L6 (LOW) → T060 (already owns it), check in T062 and T076:** block-level buttons (now incl. the detail's "Ver receta completa" link) render inside `.assistant-turn-live` (src/components/shared/AssistantTurn.tsx ~62-80); REQ-33 keeps buttons outside the live region.
+  - **L7 (note only):** `formatQty` allows 2 decimals (the recipe page uses it too); left as is.
+  - **L8 (LOW, optional) → cleanup rows:** the `user_id` filter in `BUILDERS.dish` is untested (defense in depth); optionally add a row with another user's recipe of the same name.
+
 **Checkpoint:** US2 code complete (REQ-7 to REQ-12), unit-green; e2e in Batch E.
+**Status (after 2c2, tip 9a3585e):** reached. Every Phase 4 task (T028–T036) is ticked; unit 571/571. Excluded as planned: the US2 e2e rows (assistant-meals.spec.ts and the detail/option rows), written but unrun until Batch E; the did-you-mean/not-found answers for dishes (T048/T049); the REQ-24 2-block button merge (T051). Open spec decisions for the user (next spec-change; none blocks US3): MEDIUM-3 "colación opción 2" on a duplicated slot (Batch note 2b2); M2 detail lead picked from the dish, not the question (REQ-28 wording); L2 accepted-current `selectionAt` readings; plus the US1 items (`isNotDishName` fuzzy, `isPlural` tie rule) and L5 "Comidas" title (Batch note 2a1).
 
 ## Phase 5: US3 (P2) Weekly goals and date-based data
 
@@ -481,6 +504,8 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
 
 **Batch 3b1: date parser**, about 420 lines with tests (3a may run beside it)
 
+- **US2 cleanup rows (from Batch note 2c2; fold in at the start of 3b1, or run as a small cleanup batch of about 60-80 lines if 3b1 would pass the cap):** tests/unit/chat-meals.test.ts gains M1 (both detail lead variants across fixture names: "Pollo asado" → "Esto lleva…", "Ensalada de pollo" → "…lleva:"; a 3-step recipe shows "Ver receta completa") and M3 (soft-deleted add_on, soft-deleted add_on usage, soft-deleted mealOption in another slot for a dish asked by name; the fixture add-on gets a name distinct from its ingredient and the row asserts the ingredient name); optional L8 (another user's recipe with the same name is never the detail). tests/unit/chat-answer.test.ts:102-104: un-skip "Mi cena de hoy" (L4), optionally `BUTTON_TOPICS["Mi cena de hoy"]` = `OPTIONS_LEAD` (tests/shared/assistant-buttons.ts). L1 red row "a las 2.30 cena opción 2" → option 2 (code in T041). L3: fix the stale `SlotOptionsView.asked` comment (src/lib/domain/chat-meals.ts ~171). These are characterization rows except L1; mutation-check M1/M3 as the reviewer did.
+
 - [ ] T039 [US3] Tests REQ-13, REQ-14 periods
   - Unit (tests/unit/chat-dates.test.ts): every REQ-14 phrase → its period bounds with today passed in (cue and period-noun rules); no fallback for "Mi avance de la semana", "¿Cuántos días hice ejercicio?", "a la semana", "en la semana"; "en el mes" = this month. 1a2 review (LOW L4): a pre-2022 summer case, `serverToday(new Date("2022-07-01T05:30:00Z"))` = "2022-07-01" (CDT, UTC−5). 1c1 review: a row with a decimal or comma number in the phrase. Red first.
   - e2e, written (tests/e2e/assistant-progress.spec.ts): the `x-e2e-today` pin moves the period bounds in `resolved`; a pin header without the trace header changes no field shape.
@@ -488,6 +513,7 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
   - 1a2 review (LOW L4): `serverToday` calls `formatToParts` once per call (today once per part, chat-dates.ts:7).
   - 1c1 review: `normalizeText` splits decimals ("1,5 L" → "1 5 l"); parse numbers from the raw message, not from `words`.
 - [ ] T041 [US3] The route passes the pinned today from `testHooks()` (else `serverToday`); the resolver attaches the period to metric intents (src/app/api/rag/chat/route.ts, src/lib/domain/chat-intent.ts)
+  - 2c2 review (L1): the decimal regex at chat-intent.ts:57 scans the whole message ("a las 2.30 cena opción 2" reads option 2.3); anchor it to the option token (red row in the US2 cleanup rows above). Clock times also matter for the period parsing here.
 
 **Review checkpoint 3b1:** tsc + unit.
 
@@ -539,6 +565,7 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
   - 3a1 review: the weekly-progress weight item uses the same rule as T045 (`latestDate >= monday` and `beforeWeek !== null`).
   - 1c2 review (M6), owned here: tests/e2e/assistant-api.spec.ts asserts "¿Cuál es mi objetivo?" → "Tu objetivo: …" (lines 68, 199-200, 237-240, 260, 272; also the joined text at ~215 and the lead at ~230); rewrite them to the Goals answer when this builder lands. The plan-summary lead part of those tests (if it keeps the objective) changes again in T054.
   - 1d2 review: those same lines also assert a stale `Plan activo` source for "¿Cuál es mi objetivo?" (assistant-api.spec.ts :68, :199, :237, :260, :272); fix the source assertions together with the text (T054 for the plan-summary part).
+  - 2c2 review (L5, note): the option-detail follow-up "¿A qué hora es mi <slot>?" is owned by T051; if this task edits the topic follow-ups in chat-topics.ts, leave `slotOptions` to T051.
 
 **Checkpoint:** US3 code complete (REQ-13 to REQ-22), unit-green; parity (REQ-16) proven in Batch E.
 
@@ -547,7 +574,7 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
 **Batch 4a: greeting, variants, no-match, did-you-mean**, about 490 lines with tests (revision 9 added the REQ-26/REQ-29 answer rows; no clean task boundary; over the ~450 cap, decision pending: plan Batches)
 
 - [ ] T048 [US4] Tests REQ-23, REQ-26, REQ-28, REQ-29, REQ-3 text
-  - Carry-forward from 1e2 (a): if T036 did not already add them, `sweep()` gains the "¿Qué lleva <receta>?" rows (see T036).
+  - Carry-forward from 1e2 (a): closed by T036 (2c2 added the "¿Qué lleva <receta>?" sweep rows for the 6 non-generic recipes). Here the dish did-you-mean/not-found answers replace the placeholders T036 left.
   - Unit (tests/unit/chat-edges.test.ts): "hola" → greeting + 4 buttons; thanks; "Hola, ¿cuánto peso?" → weight. Pizza not-found quotes "pizza"; pollo → did-you-mean with 2 buttons (no distractor offered); "la opcion 1" → not found. The same question twice → the same variant; for each answer with variants, questions hitting different variants show identical numbers and units (REQ-28). Capital de Francia → no-match + 4 starters; a near recipe name → did-you-mean. No-match asserts the exact lead (one of the two spec Copy variants), exactly the 4 starter buttons, and no objective or meal name anywhere in the answer. 1a2 review (LOW L6): starters are not filtered by the repeat rule: greeting and no_match list all 4 starters even when the message equals a starter-like text. Negative assertion (tests/unit/chat-answer.test.ts): the old fallback texts "No encontré esa información en tu plan activo." and "No encontré esa información en el sistema." never appear. `sweep()` over greeting, no-match and did-you-mean buttons. Red first.
   - REQ-26/REQ-29 answer-text rows (analyze round 1, M1; tests/unit/chat-edges.test.ts, base fixture): "¿Qué lleva la pizza con atún?" → kind `did_you_mean`, lead "No encontré exactamente 'pizza con atún'. ¿Quisiste decir…?", exactly one button "Sándwich de atún" sending "¿Qué lleva Sándwich de atún?", no detail opened (no detail block, kind ≠ `detail`); "¿Qué lleva el agua?" → the water answer, not a REQ-26 reply (no "No encontré" lead, kind neither `did_you_mean` nor not-found); '<frase>' is the phrase as typed without the cue and leading article ("¿Qué lleva la Pizza Con Atún?" quotes "Pizza Con Atún", and the quote never starts with "la"/"el" or contains "lleva"); the three REQ-29 table rows at answer level, each the "¿Quisiste decir…?" lead with buttons in order: "una ensalada rica" → Ensalada de pollo; "pollo atún ensalada" → 3 buttons Ensalada de pollo, Pollo asado, Sándwich de atún; "estoy buscando algo rico con atún" → Sándwich de atún; a whole question that is exactly a recipe name, "Pollo asado" alone (no dish cue), → did-you-mean with "Pollo asado" first, never a detail.
   - e2e, written (tests/e2e/assistant-edges.spec.ts): through `ask()`, "hola", pollo did-you-mean, pizza not found, the same question twice, and one REQ-29 did-you-mean row ("pollo atún ensalada": the lead and the 3 buttons in order). Finalize the `sources` test in assistant-api.spec.ts: "¿Qué hago ahora?" → kind `no_match` and `sources` `[]`.
@@ -574,6 +601,7 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
 - [ ] T051 [US4] `reply()` 2-block rules: titles, one option block, follow-ups then overflow, a later clarify omitted (src/lib/domain/chat.ts)
   - 2a1 review (M1): replace the interim "buttons from the first block that has them" (chat.ts ~147) with the REQ-24 merge, per the T050 part 1 rows.
   - 2b1 carry-forward (b): today a 2-block answer shows only the first block's buttons while the second block's options lead promises options; the REQ-24 merge must fix it (add a T050 row: slot options as the second block keep their option buttons).
+  - 2c2 review (L5): option-detail answers have no follow-ups (`slotOptions` topic `followUps: []`, src/lib/domain/chat-topics.ts:39) while the spec lists "¿A qué hora es mi <slot>?"; add the follow-up (row in T050) and decide how it merges with the detail's block button "Ver receta completa" (`blockButtons`). If T047 touches chat-topics.ts first, keep the table pin (`SPEC_TOPICS`) in step.
 **Review checkpoint 4b1:** tsc + unit.
 
 **Batch 4b2: clarifications and missing data**, about 290 lines with tests
@@ -633,6 +661,7 @@ UI-only: e2e tests are written here and proven in Batch E (T076 run, T077 breaka
   - No replay after close/reopen or navigation; the scroll uses the final height.
 - [ ] T060 [US6] Type the first lead only (precomputed full-height layout); fades ≤200 ms; reduced motion; typed-once flag; hidden option count in the live region (src/components/shared/AssistantTurn.tsx, src/components/shared/assistant-chat.css)
   - 1b1a review (MEDIUM 2), owned here: block-level buttons render inside `.assistant-turn-live` (AssistantTurn.tsx:438, :476); move them outside the live region, leaving only the hidden option count and labels (plan UI rule, ux checklist v1.2, chat-polish REQ-17 as amended). Between T032 (2b1) and here, option buttons sit inside the region; no e2e runs before Batch E, so this lands before any tested UI sees them. e2e (with T059, tests/e2e/assistant-a11y.spec.ts): no `button` inside the live region, and the region holds "3 opciones" plus the labels.
+  - 2c2 review (L6): since T036 the detail's "Ver receta completa" link is also a block-level button inside `.assistant-turn-live` (AssistantTurn.tsx ~62-80); the move must cover link buttons too, and the e2e must assert no `a` or `button` inside the region.
 
 **Review checkpoint 6b2:** tsc + unit.
 
@@ -646,6 +675,7 @@ UI-only: e2e tests are written here and proven in Batch E (T076 run, T077 breaka
 - [ ] T062 [US6] Navigation handling (src/components/shared/AssistantTurn.tsx, src/components/shared/AssistantChat.tsx, src/components/app/assistant.tsx)
   - A link click closes the sheet at ≤640 px; on the same destination it only closes and focuses the FAB.
   - On desktop, after the path change, focus `main h1` (fallback `main`, tabIndex -1).
+  - 2c2 review (L6): confirm T060 moved the block-level buttons (incl. "Ver receta completa") out of `.assistant-turn-live`; if not, move them here before the navigation handling.
 
 **Checkpoint:** US6 code complete (REQ-32 to REQ-35); proven in Batch E.
 
@@ -656,7 +686,7 @@ UI-only: e2e tests are written here and proven in Batch E (T076 run, T077 breaka
 - [ ] T076 [setup] Full run and fix rounds (tests/e2e/*, plus the src/ files a fix needs)
   - Preconditions: no other Playwright run, `lsof -i :3200` empty, nothing in the background; the user's :3000 is not touched.
   - Run 1: one full `npm run test:e2e`, in the foreground. Then the T003 first-run check: `lsof -i :3200` empty and `psql -l` shows no `<name>-e2e`; if either is left over, stop and report. Look at T066 (dashboard baseline) first.
-  - Triage every failure in the batch note: (a) known failure on main; (b) the test contradicts spec v1.6 → fix the test; (c) code bug → fix it, with a unit test first (red, then green) when the cause is logic, otherwise the failing e2e is the proof; (d) snapshot-only diff → T057. In run 1 the `assistant-look` and `a-theme-visual` snapshots are expected red until T057. 1c2 review (M6): an assistant-noscope `MESSAGES` pass is not evidence (vacuous until T063 strengthens it). 1d2 review: check the re-check list in Batch note 1d2 (h4 section-title levels fixed in fb976a9 at assistant-next-step.spec.ts:105, :177 and assistant-answers.spec.ts:69, :88, :121; stale `Plan activo` sources owned by T047/T054; the Quesadillas assertion in assistant-match.spec.ts: verify the T026 part 2 fix).
+  - Triage every failure in the batch note: (a) known failure on main; (b) the test contradicts spec v1.6 → fix the test; (c) code bug → fix it, with a unit test first (red, then green) when the cause is logic, otherwise the failing e2e is the proof; (d) snapshot-only diff → T057. In run 1 the `assistant-look` and `a-theme-visual` snapshots are expected red until T057. 1c2 review (M6): an assistant-noscope `MESSAGES` pass is not evidence (vacuous until T063 strengthens it). 1d2 review: check the re-check list in Batch note 1d2 (h4 section-title levels fixed in fb976a9 at assistant-next-step.spec.ts:105, :177 and assistant-answers.spec.ts:69, :88, :121; stale `Plan activo` sources owned by T047/T054; the Quesadillas assertion in assistant-match.spec.ts: verify the T026 part 2 fix). 2c2 review: the US2 detail/option e2e rows (assistant-meals.spec.ts) run for the first time here, incl. the REQ-10 full-answer equality row; the a11y check that no block button (L6, "Ver receta completa") sits inside `.assistant-turn-live`.
   - Fix rounds (up to 3): path-limited commits citing the failing test and REQ; gate = tsc + `npm run test:unit` + a rerun of only the affected spec files, one at a time. Failures left after round 3 go to the user.
   - After T077 and T057: one final full `npm run test:e2e`. If it shows a new snapshot-only diff, the user is asked again for a refresh (same T057 procedure) before the checkpoint.
 - [ ] T077 [setup] Red-by-breaking demo for e2e-only behavior (Constitution 1, spec v1.6). Nothing is committed.
