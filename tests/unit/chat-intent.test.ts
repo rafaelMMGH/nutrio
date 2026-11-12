@@ -45,6 +45,11 @@ const ROWS: [string, string[]][] = [
   ["¿Cuándo desayuno?", ["mealTimes:desayuno"]],
   ["¿Cuál es mi horario?", ["mealTimes"]],
   ["Mis comidas", ["mealTimes"]],
+  // typos of the plural "comidas" are all meal times too (T080); the singular stays the slot
+  ["Mis comdias", ["mealTimes"]],
+  ["Mis comidsa", ["mealTimes"]],
+  ["Mis comidass", ["mealTimes"]],
+  ["Mi comida", ["slotOptions:comida"]],
   ["¿A qué hora es mi comida?", ["mealTimes:comida"]],
   ["horario y peso", ["weight"]],
   // slots
