@@ -368,8 +368,8 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
 
 **Batch 2b1: options builder**, about 300 lines with tests (revision 7 split of 2b)
 
-- [ ] T031 [US2] Tests REQ-9, REQ-10, REQ-11 (option buttons)
-  - **Part 1 done: 5ca5925; part 2 in batch 2b2.**
+- [x] T031 [US2] Tests REQ-9, REQ-10, REQ-11 (option buttons)
+  - **Part 1 done: 5ca5925; part 2 done: 510639d (red, 23 failing), post-red fixes in 379570e; see Batch note 2b2.**
   - Unit (tests/unit/chat-meals.test.ts): 5 options → 3 + "Ver más opciones"; page 2 → 4–5 + "Opciones anteriores"; 7 options → page 3 shows option 7 with "Opciones anteriores" only; page 9 → last page. Labels: "Opción 2: Pollo, Arroz, Brócoli…" (4 ingredients), exactly 3 → no "…", 0 → "Opción <n>". "cena opción 2", "cena opcion 2", "la 2 de la cena" equal; "cena opción 7" → "Tu cena tiene 4 opciones." + first page. REQ-11: "Segunda colación" lists the second slot's options with buttons sending "Segunda colación, opción <n>". REQ-3 row "la comida opcion 1": option selection, comida, option 1, `kind` neither `did_you_mean` nor `no_match`. `sweep()` over option and paging buttons. Red first.
   - e2e, written (tests/e2e/assistant-meals.spec.ts): one UI flow tapping through the pages (the user turn shows the sent message); "cena opción 2" through `ask()`.
   - Split: part 1 (just before T032) = page contents, labels and the out-of-range lead on the builder; part 2 (just before T033) = the selection/paging message rows, the REQ-3 row, the sweep and the e2e.
@@ -395,12 +395,25 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
 
 **Batch 2b2: option selection and paging**, about 180 lines with tests
 
-- [ ] T033 [US2] Resolver step 2: option selection and paging, incl. page 1 and no number = page 2 (src/lib/domain/chat-intent.ts)
+- [x] T033 [US2] Resolver step 2: option selection and paging, incl. page 1 and no number = page 2 (src/lib/domain/chat-intent.ts)
   - Carry-forward from 2a2 (b): "<slot> <n>" on a non-duplicated slot currently falls back to the slot (T030 reads n as an ordinal only for duplicated slots). Intercept it before the slot reading and read it as option n ("cena 2" → cena option 2), with a red row first; keep "colación 2" with two colaciones as the slot ordinal.
   - Optional, from 2a2 (d): pin or exclude "colación 2 am" (a bare number followed by am/pm read as an ordinal).
   - Carry-forwards from 2b1 (c)–(e): parse the page as an integer only (`slotOptions` does not sanitize NaN or 1.5); index options in the same filtered list the labels use (not `option_number`); this closes the interim loop where "Cena, opción 2" and "Cena, más opciones (página 2)" return the first page.
 
 **Review checkpoint 2b2:** tsc + unit.
+
+**Batch note 2b2 (done; T031 part 2, T033, plus the 2b1 (f) carry-forwards; commits b2cd0b2 (2b1 builder test gaps, green on arrival), 0892693 (`BUTTON_TOPICS`), 510639d (T031 part 2 tests, red, 23 failing), 379570e (T033 code plus post-red test fixes); docs commit 0b43ff5 sits before them; tip 379570e; reviewer PASS, no HIGH, 8 break-and-revert checks each failed the intended test; tsc clean, unit 555/555; no dependency change; src +55/-11, src+tests +246/-17 vs ~180 est plus carry-forwards):**
+
+- Landed: resolver step 2 in src/lib/domain/chat-intent.ts, before the dish step. Paging: "<slot>, más opciones [(página n)]"; no number = page 2; page 1 = the plain options answer; integer-only page; a huge page is clamped. Option selection: "<slot> opción n" and "la 2 de la cena". "<slot> <n>" is emitted as an ordinal plus the new optional `Intent.numbered`; `slotOptions` reads it as option n only when the slot is not duplicated ("colación 2" with two colaciones stays the slot ordinal). A number followed by am/pm is no ordinal (closes 2a2 (d)). `slotOptions` takes page/asked from the intent, so `BUILDERS` is unchanged. `BUTTON_TOPICS` gained the option, paging, masculine-ordinal and "Colación 11" buttons; the 2b1 (f) builder test gaps are closed. e2e rows (API flow, and a UI tap-through of the pages) are written, unrun; they assume cena has 5 options. The REQ-10 "same answer" rows compare buttons, not blocks, because the lead variant depends on the typed question.
+- Carry-forwards (recorded on T034, T036 where relevant):
+  - **MEDIUM-1:** restore full-answer equality (blocks) in the REQ-10 "same answer" rows (tests/unit/chat-meals.test.ts ~343, tests/e2e/assistant-meals.spec.ts:83) once the detail lands, or pick the lead variant independent of the typed text for option selection.
+  - **MEDIUM-2:** the e2e rows run at Batch E.
+  - **MEDIUM-3 (spec gap):** "colación opción 2" on a duplicated slot with no ordinal asks which colación and loses the option. Record as a known limit at the next spec-change, or accept (HANDOFF section 6).
+  - **MEDIUM-4 (interim):** an in-range option selection shows the options page 1 until T034/T036 open the detail. Do not demo.
+  - **LOW-1:** `selectionAt` is loose: "cena es la mejor opción 2 veces" and "comí 2 de la cena" read as option 2; "cena 2 veces" reads as option n (correct by REQ-11; add a probe row); "cena opción 2.5" reads as option 2 (no integer guard on the option); "cena opción 0" and "la 0 de la cena" are treated as in range (T034 must guard option 0); "cena más opciones 3" without "página" and "(página -1)" give page 2.
+  - **LOW-2 (accepted):** with several slots in one message only the first slot's selection is answered (at-most-one rule).
+  - **LOW-3:** "cena hora opción 2" answers the time because step 2 is skipped when `timed`; not pinned by a test.
+  - **LOW-4 (cosmetic):** a long doc comment near chat-intent.ts ~76 and a stray double blank line near ~41.
 
 **Batch 2c1: shared step splitter**, about 170 lines with tests (revision 7 split of 2c)
 
@@ -409,6 +422,12 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
   - Unit (tests/unit/chat-meals.test.ts): 12 ingredients all shown; steps 1–2 equal `recipeSteps(description)` 1–2, plus the "Ver receta completa" link to `/recipes/<id>`; "Extraído de plan.pdf" → the no-preparation item; complement "Agua natural · 1 vaso", none → no heading; by dish name, complements only if the recipe is in exactly one slot; ingredient formats with no unit and with neither; a generic-name lead; a single-option slot goes straight to the detail; a recipe with zero ingredients and zero steps still gets a detail answer (lead, no empty headings); every detail answer's `sources` equals `["Receta: <name>"]` (contract keeps `sources`); REQ-3 text: each found row shows the detail lead and "la comida opcion 1" shows comida option 1's detail; end-of-US2 `sweep()` over every existing Topics, slot, option, paging and "¿Qué lleva <receta>?" button.
   - Split: part 1 (just before T035) = the recipe-steps.test.ts rows and the recipe-page e2e; part 2 (just before T036, Batch 2c2) = the chat-meals.test.ts rows and the remaining e2e.
   - e2e, written (tests/e2e/assistant-meals.spec.ts): the recipe page shows the empty-steps state for the three import notes and keeps the accented split (display unchanged by T035); "Ver receta completa" opens `/recipes/<id>`; one detail answer through `ask()`.
+  - Carry-forwards from 2b2 (part 2 unless noted):
+    - MEDIUM-1: restore full-answer equality (blocks, not only buttons) in the REQ-10 "same answer" rows (tests/unit/chat-meals.test.ts ~343, tests/e2e/assistant-meals.spec.ts:83) once the detail lands; alternatively T036 picks the detail lead variant independent of the typed text.
+    - MEDIUM-4: in-range option selection currently shows options page 1; the rows for "cena opción 2" / "la 2 de la cena" → detail are red here and go green with T036.
+    - LOW-1: guard option 0 ("cena opción 0", "la 0 de la cena" → out-of-range, not in range) and non-integer options ("cena opción 2.5"); add probe rows for "cena 2 veces" (option n by REQ-11, pinned as intended), "comí 2 de la cena" and "cena es la mejor opción 2 veces" (decide: pin as current or tighten `selectionAt`), "cena más opciones 3" and "(página -1)" (pin as page 2 or tighten).
+    - LOW-3: add a row for "cena hora opción 2" (pin the time answer as current, or let step 2 win).
+    - MEDIUM-3 stays a spec item (HANDOFF section 6); add a row pinning the current clarify for "colación opción 2" so a later change is visible.
 - [ ] T035 [US2] Shared `recipeSteps(description)` using `normalizeText`, used by the recipe page (no display change) (src/lib/recipe-steps.ts, src/components/recipes/RecipeDetail.tsx)
   - 1c1: the step-splitter move to `normalizeText` was deferred here from T018.
 **Review checkpoint 2c1:** tsc + unit.
@@ -417,6 +436,7 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
 
 - [ ] T036 [US2] Detail builder: lead, uncapped "Ingredientes", "Preparación" (2 steps + link), "Acompaña con" from the slot's add-ons and `add_on` usages (src/lib/domain/chat-meals.ts)
   - Carry-forward from 1e2 (a), with T048 (whichever lands the dish builder first adds them): `sweep()` in tests/unit/chat-answer.test.ts gains "¿Qué lleva <receta>?" for each non-generic fixture recipe, each resolving to that recipe (red row before the builder).
+  - Carry-forwards from 2b2: open the detail for an in-range option selection (MEDIUM-4), indexing the same filtered option list the labels use (2b1 (d)); reject option 0 and non-integer options as out of range (LOW-1); either make the detail lead independent of the typed text or let T034 part 2 compare buttons plus content, so the REQ-10 rows can assert full-answer equality (MEDIUM-1). Optional LOW-4 cleanup in chat-intent.ts (long doc comment ~76, double blank line ~41) if the file is touched.
 
 **Checkpoint:** US2 code complete (REQ-7 to REQ-12), unit-green; e2e in Batch E.
 
