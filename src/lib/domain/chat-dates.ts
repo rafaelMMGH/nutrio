@@ -27,6 +27,7 @@ export type Period = {
 };
 
 const DAY_MS = 86_400_000;
+const MAX_LAST_DAYS = 3660;
 const dayOf = (key: string) => new Date(`${key}T00:00:00Z`);
 const keyOf = (date: Date) => date.toISOString().slice(0, 10);
 const addDays = (key: string, days: number) => keyOf(new Date(dayOf(key).getTime() + days * DAY_MS));
@@ -66,7 +67,8 @@ function phraseAt(tokens: string[], at: number, today: string): Period | undefin
   if (word === "mes" && next === "pasado") return { kind: "lastMonth", from: monthStart(year, month - 1), to: addDays(monthStart(year, month), -1) };
   if (word === "mes" && (prev === "este" || (prev === "el" && tokens[at - 2] === "en"))) return { kind: "thisMonth", from: monthStart(year, month), to: today };
   if ((word === "ultimos" || word === "ultimas") && /^\d+$/.test(next ?? "") && third === "dias") {
-    const count = Number(next);
+    // Capped (ten years) so no digit run can overflow Date; 400 and up keep their raw bounds for the T067/T068 clamp.
+    const count = Math.min(Number(next), MAX_LAST_DAYS);
     return count <= 1 ? day("today", today) : { kind: "lastDays", from: addDays(today, -(count - 1)), to: today };
   }
   if (word === "desde") {
