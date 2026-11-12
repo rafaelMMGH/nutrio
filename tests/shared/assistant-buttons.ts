@@ -4,8 +4,9 @@
 // Slot time buttons ("¿A qué hora es mi <slot ref>?", T028) and options buttons ("¿Cuál es mi <slot ref>?", masculine
 // ordinals and "Colación 11" included), the option buttons and the paging buttons (T032, T033) are here.
 
-const OPTIONS_LEAD = /opciones|elegir/;
-// An option button opens the option's detail ("<ref>, opción n lleva:") or, past the last option, says how many there are.
+// A slot with a single option answers with that option's detail ("<ref>, opción 1 lleva:").
+const OPTIONS_LEAD = /opciones|elegir|lleva/;
+// An option button opens the option's detail or, past the last option, says how many there are.
 const OPTION_LEAD = /lleva|opciones/;
 
 export const BUTTON_TOPICS: Record<string, { topic: string; lead?: RegExp }> = {

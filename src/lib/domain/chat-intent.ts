@@ -53,7 +53,10 @@ function selectionAt(question: string, tokens: string[], at: number): { page: nu
     return next === at;
   };
   for (let index = 0; index < tokens.length; index++) {
-    const option = integer(tokens[index]);
+    let option = integer(tokens[index]);
+    // The word split turns "2.5" into 2 and 5: read the decimal from the typed message so the builder can reject it.
+    const decimal = option === undefined ? undefined : new RegExp(`(?<![\\d.,])${option}[.,](\\d+)`).exec(question)?.[1];
+    if (decimal) option = Number(`${option}.${decimal}`);
     if (option !== undefined && ((isOption(tokens[index - 1]) && tokens[index + 1] !== "de") || reachesSlot(index + 1))) return { option };
   }
   return undefined;

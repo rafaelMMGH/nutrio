@@ -2,7 +2,7 @@ import type { AppDb, AppUser } from "@/lib/types";
 import { type Block, type Button, type ChatAnswer, type Intent, type ReplyKind, type Rich, type Section, normalizeText, STARTERS, words } from "@/lib/assistant";
 import { consolidateCart } from "@/lib/domain/cart";
 import { isGeneric } from "@/lib/domain/chat-dish";
-import { type Built, chooseSlot, planSlots, slotOptions, slotTimeLead } from "@/lib/domain/chat-meals";
+import { type Built, chooseSlot, planSlots, recipeDetail, slotOptions, slotTimeLead } from "@/lib/domain/chat-meals";
 import { resolve } from "@/lib/domain/chat-intent";
 import { greetingOf, TOPICS, type TopicId } from "@/lib/domain/chat-topics";
 import { activePlan } from "@/lib/domain/plans";
@@ -109,6 +109,11 @@ export function recipeList(db: AppDb, userId: string, question: string): Built {
 const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: string, intent: Intent) => Built>> = {
   mealTimes: (db, userId, _question, intent) => mealTimes(db, userId, intent),
   slotOptions: (db, userId, question, intent) => slotOptions(db, userId, intent, question),
+  // A dish found by name opens its detail; did-you-mean and not-found keep the interim answer until T048.
+  dish: (db, userId, _question, intent) => {
+    const recipe = intent.outcome === "found" ? db.recipes.find((item) => item.id === intent.recipeIds?.[0] && item.user_id === userId && !item.deleted_at) : undefined;
+    return recipe ? recipeDetail(db, userId, recipe) : pending("dish");
+  },
   cart: (db, userId) => cartSummary(db, userId),
   recipes: recipeList,
   plan: (db, userId, question) => planSummary(db, userId, normalizeText(question))
@@ -141,11 +146,12 @@ export function ragAnswer(db: AppDb, user: AppUser, message: string, _today: str
   const overflow = further.flatMap((intent) => TOPICS[intent.topic as TopicId].button ?? []);
   const asked = normalizeText(message);
   const builts = answered.map((topic, index) => BUILDERS[topic]?.(db, user.id, message, intents[index]) ?? pending(topic));
-  const blocks = builts.map((built, index): Block => ({ title: answered.length > 1 ? TOPICS[answered[index]].title : null, lead: built.lead, sections: built.sections ?? [], buttons: [] }));
+  const blocks = builts.map((built, index): Block => ({ title: answered.length > 1 ? TOPICS[answered[index]].title : null, lead: built.lead, sections: built.sections ?? [], buttons: built.blockButtons ?? [] }));
   // Repeat rule (chat-polish REQ-5): a follow-up that repeats the question just asked is not offered. Follow-ups only.
   // A button is offered once: an overflow topic can also be one of the follow-ups (REQ-24).
   const followUps = [...new Set([...TOPICS[answered[answered.length - 1]].followUps.filter((text) => normalizeText(text) !== asked), ...overflow])];
   // A builder that asks something (REQ-7, REQ-11, REQ-27) brings its own buttons in place of the follow-ups.
   const choice = builts.find((built) => built.buttons);
-  return reply(choice?.kind ?? "answer", blocks, choice?.buttons ?? followUps.map(questionButton), [...new Set(builts.flatMap((built) => built.sources ?? []))], trace ? intents : undefined);
+  const kind = choice?.kind ?? builts.find((built) => built.kind === "detail")?.kind ?? "answer";
+  return reply(kind, blocks, choice?.buttons ?? followUps.map(questionButton), [...new Set(builts.flatMap((built) => built.sources ?? []))], trace ? intents : undefined);
 }

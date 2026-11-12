@@ -1,13 +1,19 @@
 import { type Button, type Intent, type Rich, type Section, STARTERS, normalizeText } from "@/lib/assistant";
 import { isGeneric } from "@/lib/domain/chat-dish";
 import type { AppDb, Recipe } from "@/lib/types";
+import { formatQty } from "@/lib/domain/nutrition";
 import { activeSchedule, recipeDetails } from "@/lib/domain/plans";
+import { recipeSteps } from "@/lib/recipe-steps";
 
-// Slots of the active plan for the assistant (spec assistant-data-scope REQ-7, REQ-8, REQ-11): the slot list with its
-// refs, the word-to-slot mapping, the choice replies (several slots, almuerzo, slot not in the plan) and the time lead.
+// Slots of the active plan for the assistant (spec assistant-data-scope REQ-7, REQ-8, REQ-11, REQ-12): the slot list
+// with its refs, the word-to-slot mapping, the choice replies (several slots, almuerzo, slot not in the plan), the time
+// lead and the dish detail.
 
-/** What a builder returns; `ragAnswer` adds the kind and the follow-ups. `buttons` (a choice) replace the follow-ups. */
-export type Built = { lead: Rich; sections?: Section[]; sources?: string[]; buttons?: Button[]; kind?: "clarify" };
+/**
+ * What a builder returns; `ragAnswer` adds the kind and the follow-ups. `buttons` (a choice) replace the follow-ups;
+ * `blockButtons` (navigation) stay on the answer's block.
+ */
+export type Built = { lead: Rich; sections?: Section[]; sources?: string[]; buttons?: Button[]; blockButtons?: Button[]; kind?: "clarify" | "detail" };
 
 /** A meal type of the active plan. `ref` is its name, or with duplicate names its ordinal form ("Segunda colación"). */
 export type Slot = { id: string; name: string; time: string; ref: string };
@@ -114,6 +120,48 @@ function optionLabel(db: AppDb, recipe: Recipe, position: number): string {
   return `Opción ${position}: ${names.slice(0, 3).join(", ")}${names.length > 3 ? "…" : ""}`;
 }
 
+const DETAIL_LEADS: ((name: string) => Rich)[] = [
+  (name) => [{ text: name, highlight: true }, { text: " lleva:" }],
+  (name) => [{ text: "Esto lleva " }, { text: name, highlight: true }, { text: ":" }]
+];
+const NO_STEPS = "Esta receta no tiene preparación registrada.";
+const STEPS_SHOWN = 2;
+
+/** "<name> · **<amount>**", or the bare name when nothing is stored. A stored unit such as "al gusto" shows without a quantity. */
+function withAmount(name: string, quantity: number, unit: string): Rich {
+  const amount = [quantity > 0 ? formatQty(quantity) : "", unit].filter(Boolean).join(" ");
+  return amount ? [{ text: `${name} · ` }, { text: amount, highlight: true }] : [{ text: name }];
+}
+
+/** The slot's complements, one item per `add_on` usage (an add-on without usages is listed by its name). */
+function complements(db: AppDb, slotId: string): Rich[] {
+  return db.sharedAddOns.filter((addOn) => addOn.meal_type_id === slotId && !addOn.deleted_at).flatMap((addOn): Rich[] => {
+    const usages = db.ingredientUsages.filter((usage) => usage.source_type === "add_on" && usage.source_id === addOn.id && !usage.deleted_at);
+    if (!usages.length) return [[{ text: String(addOn.name) }]];
+    return usages.map((usage) => withAmount(db.ingredients.find((item) => item.id === usage.ingredient_id)?.canonical_name || usage.name_snapshot || "Complemento", usage.quantity, usage.unit));
+  });
+}
+
+/**
+ * REQ-12: the detail of a recipe. `spot` says which option of which slot opened it (its complements, and the lead of a
+ * generic name); a dish asked by name has none and shows complements only when the recipe is an option in one slot.
+ * The lead variant comes from the dish, so every way of asking gives the same answer (REQ-10).
+ */
+export function recipeDetail(db: AppDb, userId: string, recipe: Recipe, spot?: { slot: Slot; position: number }): Built {
+  const name = isGeneric(recipe.name) && spot ? `${spot.slot.ref}, opción ${spot.position}` : recipe.name;
+  const ingredients = recipeDetails(db, recipe).ingredients.map((item) => withAmount(item.name, item.quantity, item.unit));
+  const steps = recipeSteps(recipe.description);
+  const holding = spot ? [spot.slot] : (planSlots(db, userId)?.slots ?? []).filter((slot) => db.mealOptions.some((option) => option.meal_type_id === slot.id && option.recipe_id === recipe.id && !option.deleted_at));
+  const accompaniment = holding.length === 1 ? complements(db, holding[0].id) : [];
+  const sections: Section[] = [
+    ...(ingredients.length ? [{ title: "Ingredientes", items: ingredients }] : []),
+    { title: "Preparación", items: steps.length ? steps.slice(0, STEPS_SHOWN).map((step): Rich => [{ text: step }]) : [[{ text: NO_STEPS }]] },
+    ...(accompaniment.length ? [{ title: "Acompaña con", items: accompaniment }] : [])
+  ];
+  const blockButtons: Button[] = steps.length > STEPS_SHOWN ? [{ type: "link", label: "Ver receta completa", href: `/recipes/${recipe.id}` }] : [];
+  return { lead: pickVariant(DETAIL_LEADS, name)(name), sections, sources: [`Receta: ${recipe.name}`], blockButtons, kind: "detail" };
+}
+
 /** What the intent leaves out, the caller can set: tests pass these directly. */
 export type SlotOptionsView = {
   /** 1-based page; below 1 reads as 1 and past the last as the last (REQ-9). Default: the intent's page, else 1. */
@@ -124,8 +172,8 @@ export type SlotOptionsView = {
 
 /**
  * The options of the slot an intent names (REQ-9, REQ-10, REQ-11, REQ-27): a lead and one full-width button per option
- * of the page, then the paging buttons. A slot with one option, or an option in range, goes to the detail (T034, not
- * built yet): until then they are listed like any other.
+ * of the page, then the paging buttons. A slot with one option, or an option in range, goes to the detail (REQ-12);
+ * option 0, a decimal and a number past the last option say how many there are, then the first page.
  */
 export function slotOptions(db: AppDb, userId: string, intent: Intent, question: string, view: SlotOptionsView = {}): Built {
   const plan = planSlots(db, userId);
@@ -146,7 +194,11 @@ export function slotOptions(db: AppDb, userId: string, intent: Intent, question:
     .flatMap((option) => db.recipes.find((recipe) => recipe.id === option.recipe_id && !recipe.deleted_at) ?? []);
   if (!recipes.length) return { lead: [{ text: `Tu plan no tiene opciones para tu ${name}.` }], sources };
 
-  const outOfRange = asked !== undefined && asked > recipes.length;
+  const outOfRange = asked !== undefined && !(Number.isInteger(asked) && asked >= 1 && asked <= recipes.length);
+  if (!outOfRange && (asked !== undefined || recipes.length === 1)) {
+    const position = asked ?? 1;
+    return recipeDetail(db, userId, recipes[position - 1], { slot, position });
+  }
   const pages = Math.ceil(recipes.length / PAGE_SIZE);
   const current = outOfRange ? 1 : Math.min(Math.max(page, 1), pages);
   const first = (current - 1) * PAGE_SIZE;
