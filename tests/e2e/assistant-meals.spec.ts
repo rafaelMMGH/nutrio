@@ -1,5 +1,5 @@
 import type { Button, ChatAnswer } from "../../src/lib/assistant";
-import { ask, createChatUser, deleteChatUser, expect, openAssistant, resendSweep, seedPlan, test } from "./assistant-helpers";
+import { ask, createChatUser, deleteChatUser, expect, openAssistant, resendSweep, seedPlan, seedRecipes, test } from "./assistant-helpers";
 
 // REQ-7 (almuerzo), REQ-8 (slot times) and REQ-11 (duplicate slots) through POST /api/rag/chat as a seeded user.
 // Written, not run, until Batch E.
@@ -97,4 +97,20 @@ test("REQ-9 UI flow: tapping 'Ver más opciones' sends the paging message and sh
   await ui.panel.getByRole("button", { name: "Opciones anteriores" }).click();
   await expect(ui.userTurns.last()).toHaveText("Cena, más opciones (página 1)");
   await expect(ui.panel.getByRole("button", { name: "Ver más opciones" })).toBeVisible();
+});
+
+test("REQ-12 the recipe page keeps its preparation display: the import notes show the empty state, accented sentences stay split", async ({ chat }) => {
+  const ids = seedRecipes([
+    { name: "Nota importada", description: "Extraído de plan.pdf", ingredients: [{ name: "Pechuga de pollo", quantity: 200 }] },
+    { name: "Nota en mayúsculas", description: "EXTRAÍDO DE plan.pdf", ingredients: [{ name: "Pechuga de pollo", quantity: 200 }] },
+    { name: "Nota sin acento", description: "Extraido de plan.pdf", ingredients: [{ name: "Pechuga de pollo", quantity: 200 }] },
+    { name: "Con pasos", description: "¿Listo? Ásalo. Él sirve.", ingredients: [{ name: "Pechuga de pollo", quantity: 200 }] }
+  ]);
+  for (const name of ["Nota importada", "Nota en mayúsculas", "Nota sin acento"]) {
+    await chat.goto(`/recipes/${ids[name]}`);
+    await expect(chat.getByText("Tu plan no incluye instrucciones para esta receta."), name).toBeVisible();
+    await expect(chat.locator(".rx-steps li"), name).toHaveCount(0);
+  }
+  await chat.goto(`/recipes/${ids["Con pasos"]}`);
+  await expect(chat.locator(".rx-steps li p")).toHaveText(["¿Listo?", "Ásalo.", "Él sirve."]);
 });
