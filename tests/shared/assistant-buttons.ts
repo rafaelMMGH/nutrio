@@ -1,7 +1,10 @@
 // The Topics table's "Button" column (spec assistant-data-scope): the message other answers use to offer a topic, the
 // one topic it must resolve to under REQ-6, and a lead pattern once its builder exists. Shared by the unit sweep and
 // the e2e resendSweep, so a button that resolves to the wrong topic fails even though two calls always agree.
-// Slot time buttons ("¿A qué hora es mi <slot ref>?") are here (T028); the options versions ("¿Cuál es mi <slot ref>?") join with T032.
+// Slot time buttons ("¿A qué hora es mi <slot ref>?", T028) and options buttons ("¿Cuál es mi <slot ref>?", masculine
+// ordinals and "Colación 11" included), the option buttons and the paging buttons (T032, T033) are here.
+
+const OPTIONS_LEAD = /opciones|elegir/;
 
 export const BUTTON_TOPICS: Record<string, { topic: string; lead?: RegExp }> = {
   "Mi cena de hoy": { topic: "slotOptions" },
@@ -21,5 +24,20 @@ export const BUTTON_TOPICS: Record<string, { topic: string; lead?: RegExp }> = {
   "¿A qué hora es mi comida?": { topic: "mealTimes", lead: /horario de comida/ },
   "¿A qué hora es mi cena?": { topic: "mealTimes", lead: /horario de cena/ },
   "¿A qué hora es mi primera colación?": { topic: "mealTimes", lead: /horario de primera colación/ },
-  "¿A qué hora es mi segunda colación?": { topic: "mealTimes", lead: /horario de segunda colación/ }
+  "¿A qué hora es mi segunda colación?": { topic: "mealTimes", lead: /horario de segunda colación/ },
+  "¿Cuál es mi desayuno?": { topic: "slotOptions", lead: OPTIONS_LEAD },
+  "¿Cuál es mi colación?": { topic: "slotOptions", lead: OPTIONS_LEAD },
+  "¿Cuál es mi comida?": { topic: "slotOptions", lead: OPTIONS_LEAD },
+  "¿Cuál es mi cena?": { topic: "slotOptions", lead: OPTIONS_LEAD },
+  "¿Cuál es mi primera colación?": { topic: "slotOptions", lead: OPTIONS_LEAD },
+  "¿Cuál es mi segunda colación?": { topic: "slotOptions", lead: OPTIONS_LEAD },
+  "¿Cuál es mi primer desayuno?": { topic: "slotOptions", lead: OPTIONS_LEAD },
+  "¿Cuál es mi segundo desayuno?": { topic: "slotOptions", lead: OPTIONS_LEAD },
+  "¿Cuál es mi colación 11?": { topic: "slotOptions", lead: OPTIONS_LEAD },
+  ...Object.fromEntries(
+    ["Cena", "Comida", "Segunda colación", "Colación 11"].flatMap((ref) => [
+      ...[1, 2, 3, 4, 5, 6, 7].map((n) => [`${ref}, opción ${n}`, { topic: "slotOptions", lead: OPTIONS_LEAD }] as const),
+      ...[1, 2, 3].map((page) => [`${ref}, más opciones (página ${page})`, { topic: "slotOptions", lead: OPTIONS_LEAD }] as const)
+    ])
+  )
 };
