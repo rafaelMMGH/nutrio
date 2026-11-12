@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { STARTERS } from "@/lib/assistant";
+import { isGeneric } from "@/lib/domain/chat-dish";
 import { resolve } from "@/lib/domain/chat-intent";
 import { TOPICS } from "@/lib/domain/chat-topics";
+import type { Recipe } from "@/lib/types";
 import { BUTTON_TOPICS } from "../shared/assistant-buttons";
+import { memDb } from "./memdb";
 
 // Spec assistant-data-scope REQ-6 (resolution order), REQ-1 and REQ-5, asserted on `resolve()` alone: the answer-level
 // rows (text, buttons, overflow copy) belong to the ragAnswer tests. An intent reads "topic" or "topic:slot|metric|of".
@@ -119,4 +122,48 @@ test("at most 2 topics are answered; the rest are overflow, in question order (R
 
 test("the same topic named twice is one intent", () => {
   assert.deepEqual(found("peso, mi peso y báscula"), ["weight"]);
+});
+
+// REQ-6 steps 4 and 7 (T079): with the user's recipes, a dish phrase ends the answer with the matcher's outcome; a phrase
+// that is not a dish name falls through to the slot and topic readings. Recipes come filtered like `ragAnswer` does.
+const RECIPES = memDb().db.recipes.filter((recipe) => !isGeneric(recipe.name));
+const idOf = (name: string) => RECIPES.find((recipe) => recipe.name === name)!.id;
+const adHoc = (...names: string[]): Recipe[] => names.map((name, index) => ({ id: `r${index}`, user_id: "u", name, description: "", canonical_hash: `h${index}`, created_at: "", updated_at: "", deleted_at: null }));
+const withRecipes = (message: string, recipes: readonly Recipe[] = RECIPES) => resolve(message, recipes).intents;
+
+test("REQ-6 step 4: a dish phrase that matches ends the answer with the recipe id and the phrase as typed", () => {
+  assert.deepEqual(withRecipes("¿Qué lleva el pollo asao?"), [{ topic: "dish", outcome: "found", recipeIds: [idOf("Pollo asado")], phrase: "pollo asao" }]);
+  assert.deepEqual(withRecipes("¿Cómo se prepara el Sándwich de atún?"), [{ topic: "dish", outcome: "found", recipeIds: [idOf("Sándwich de atún")], phrase: "Sándwich de atún" }]);
+});
+
+test("REQ-6 step 4: several candidates are a did-you-mean in matcher order; no candidate is not-found", () => {
+  assert.deepEqual(withRecipes("¿Qué lleva el pollo?"), [{ topic: "dish", outcome: "didYouMean", recipeIds: [idOf("Pollo asado"), idOf("Ensalada de pollo")], phrase: "pollo" }]);
+  assert.deepEqual(withRecipes("¿Qué lleva la pizza?"), [{ topic: "dish", outcome: "notFound", phrase: "pizza" }]);
+  assert.deepEqual(withRecipes("¿Qué lleva ab?"), [{ topic: "dish", outcome: "notFound", phrase: "ab" }]);
+});
+
+test("REQ-6 step 4: a phrase that is not a dish name falls through to the slot or topic reading", () => {
+  assert.deepEqual(withRecipes("¿Qué lleva la cena?").map(label), ["slotOptions:cena"]);
+  assert.deepEqual(withRecipes("¿Qué lleva el agua?").map(label), ["water"]);
+  // A slot ref: slot rows complete in T028/T030, here it only must not be a dish.
+  assert.deepEqual(withRecipes("¿Qué lleva la segunda colación?").map(label), ["slotOptions:colacion"]);
+});
+
+test("REQ-6 step 7: a dish cue with an empty phrase and nothing else resolved is the clarify intent", () => {
+  assert.deepEqual(withRecipes("¿Qué lleva?"), [{ topic: "dish", outcome: "clarify", phrase: "" }]);
+});
+
+test("REQ-3 rule 1: an exact recipe name made of a slot word beats the slot reading", () => {
+  const recipes = adHoc("Cena de pollo");
+  assert.deepEqual(withRecipes("¿Qué lleva la cena de pollo?", recipes), [{ topic: "dish", outcome: "found", recipeIds: ["r0"], phrase: "cena de pollo" }]);
+  assert.deepEqual(withRecipes("¿Qué lleva la cena?", recipes).map(label), ["slotOptions:cena"]);
+});
+
+test("resolve(question) without recipes keeps the plain dish intent", () => {
+  assert.deepEqual(resolve("¿Qué lleva el pollo asado?").intents, [{ topic: "dish" }]);
+});
+
+// Open question 1c2 item 4, pinned as CURRENT behavior until the user answers: "receta de" is a dish cue, so "pollo" is a dish phrase.
+test("CURRENT: 'recetas de pollo' is a dish phrase with candidates, not a recipe-list filter", () => {
+  assert.deepEqual(withRecipes("recetas de pollo"), [{ topic: "dish", outcome: "didYouMean", recipeIds: [idOf("Pollo asado"), idOf("Ensalada de pollo")], phrase: "pollo" }]);
 });

@@ -286,3 +286,29 @@ test("REQ-24 the answered topics come from the resolver: a third topic with no b
   // Only the second block's follow-ups: the identity topic has no button to offer.
   assert.deepEqual(messagesOf(reply.buttons), ["¿Cuánta agua llevo?", "Mi peso"]);
 });
+
+// REQ-6 step 4 through ragAnswer (T079): the dish phrase is matched against the user's own, non-deleted, non-generic recipes.
+const dishIntent = (db: ReturnType<typeof memDb>["db"], user: ReturnType<typeof memDb>["user"], message: string) => ragAnswer(db, user, message, TODAY, { trace: true }).resolved?.[0];
+
+test("REQ-6 step 4: each non-generic fixture recipe is found by '¿Qué lleva <receta>?'", () => {
+  const { db, user } = memDb({ extras: true });
+  const named = db.recipes.filter((recipe) => !/ opcion \d+$/.test(recipe.name));
+  assert.equal(named.length, 9);
+  for (const recipe of named) assert.deepEqual(dishIntent(db, user, `¿Qué lleva ${recipe.name}?`), { topic: "dish", outcome: "found", recipeIds: [recipe.id], phrase: recipe.name }, recipe.name);
+});
+
+test("REQ-6 step 4: a soft-deleted recipe and another user's recipe are never found", () => {
+  const { db, user } = memDb();
+  const [pollo] = db.recipes.filter((recipe) => recipe.name === "Pollo asado");
+  pollo.deleted_at = "2026-02-01T00:00:00.000Z";
+  assert.equal(dishIntent(db, user, "¿Qué lleva el pollo asado?")?.outcome, "didYouMean");
+  assert.deepEqual(dishIntent(db, user, "¿Qué lleva el pollo asado?")?.recipeIds, [db.recipes.find((recipe) => recipe.name === "Ensalada de pollo")!.id]);
+  const tacos = db.recipes.find((recipe) => recipe.name === "Tacos de frijol")!;
+  tacos.user_id = "someone-else";
+  assert.deepEqual(dishIntent(db, user, "¿Qué lleva tacos de frijol?"), { topic: "dish", outcome: "notFound", phrase: "tacos de frijol" });
+});
+
+test("REQ-6 step 4: a generic option name is never a dish", () => {
+  const { db, user } = memDb();
+  assert.equal(dishIntent(db, user, "¿Qué lleva desayuno opcion 1?")?.outcome, "notFound");
+});

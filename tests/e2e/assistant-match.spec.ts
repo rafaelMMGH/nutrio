@@ -1,4 +1,4 @@
-import { ask, createChatUser, deleteChatUser, expect, seedCart, seedPlan, seedRecipes, test } from "./assistant-helpers";
+import { ask, chatUserId, createChatUser, deleteChatUser, expect, seedCart, seedPlan, softDeleteRecipe, test } from "./assistant-helpers";
 
 // REQ-1 and REQ-2 through the real API: one Given with its answer text, a typo that still resolves and a word that must not.
 // The full tables run as unit tests (tests/unit/chat-answer.test.ts); `resolved` is only a diagnostic next to the text.
@@ -6,7 +6,6 @@ import { ask, createChatUser, deleteChatUser, expect, seedCart, seedPlan, seedRe
 test.beforeAll(() => createChatUser("match"));
 test.afterAll(() => deleteChatUser());
 test.beforeEach(() => {
-  seedRecipes([{ name: "Quesadillas", ingredients: [{ name: "Tortilla", quantity: 2, unit: "pza" }] }]);
   seedPlan({ times: "all", fixture: true });
   seedCart(3);
 });
@@ -35,11 +34,31 @@ test("REQ-6 'plan' beside 'recetas' is the possessor: only the Recipes answer, f
   const { body } = await ask(chatContext.request, "¿Qué recetas hay en mi plan?", { trace: true });
   expect(body.resolved?.map((intent) => intent.topic)).toEqual(["recipes"]);
   expect(body.sources).toEqual(["Recetario"]);
-  expect(body.answer).toContain("Quesadillas");
+  // seedPlan({ fixture: true }) replaces the recipe book with the fixture; its first recipe leads the capped list.
+  expect(body.answer).toContain("Desayuno opcion 1");
 });
 
 test("REQ-6 'ingredientes' with a cart cue is the cart alone", async ({ chatContext }) => {
   const { body } = await ask(chatContext.request, "¿Qué ingredientes necesito comprar?", { trace: true });
   expect(body.resolved?.map((intent) => intent.topic)).toEqual(["cart"]);
   expect(body.answer).toContain("Esto es lo que tienes en tu carrito.");
+});
+
+const POLLO_ID = () => `${chatUserId()}-rec-pollo-asado`;
+
+test("REQ-6 step 4: '¿Qué lleva el pollo asado?' resolves to the recipe", async ({ chatContext }) => {
+  const { body } = await ask(chatContext.request, "¿Qué lleva el pollo asado?", { trace: true });
+  expect(body.resolved).toEqual([{ topic: "dish", outcome: "found", recipeIds: [POLLO_ID()], phrase: "pollo asado" }]);
+});
+
+test("REQ-6 step 4: '¿Qué lleva la pizza?' resolves to not-found", async ({ chatContext }) => {
+  const { body } = await ask(chatContext.request, "¿Qué lleva la pizza?", { trace: true });
+  expect(body.resolved).toEqual([{ topic: "dish", outcome: "notFound", phrase: "pizza" }]);
+});
+
+test("REQ-3 a soft-deleted recipe is not found by its name", async ({ chatContext }) => {
+  softDeleteRecipe(POLLO_ID());
+  const { body } = await ask(chatContext.request, "¿Qué lleva el pollo asado?", { trace: true });
+  expect(body.resolved?.[0]?.outcome).not.toBe("found");
+  expect(body.resolved?.[0]?.recipeIds ?? []).not.toContain(POLLO_ID());
 });
