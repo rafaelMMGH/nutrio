@@ -82,11 +82,11 @@ function phraseAt(tokens: string[], at: number, today: string): Period | "unreco
     const head = next === "el" ? third : next;
     const dateShaped = (["hoy", "ayer", "antier", "anteayer", ...WEEKDAYS] as string[]).includes(head ?? "") || /^\d/.test(head ?? "");
     if (!dateShaped) return undefined;
-    const [dayText, monthName, afterMonth] = tokens.slice(at + 1).filter((token) => token !== "el" && token !== "de");
+    const [dayText, monthName, afterMonth] = tokens.slice(at + 1).filter((token) => token !== "el" && token !== "de" && token !== "del");
     const month = (MONTHS as readonly string[]).indexOf(monthName ?? "");
     const found = month >= 0 && /^\d{1,2}$/.test(dayText ?? "") ? latestDate(Number(dayText), month, today) : undefined;
-    // An explicit year ("desde el 5 de noviembre de 2024") is not read, and must not be dropped silently.
-    return found && !/^\d{4}$/.test(afterMonth ?? "") ? { kind: "since", from: found, to: today } : "unrecognized";
+    // An explicit year ("de 2024", "del 2024", "del año pasado") is not read, and must not be dropped silently.
+    return found && !/^\d{4}$|^ano$/.test(afterMonth ?? "") ? { kind: "since", from: found, to: today } : "unrecognized";
   }
   return undefined;
 }
@@ -113,7 +113,6 @@ export function parsePeriod(message: string, today: string): Period | "unrecogni
 const WEEKDAY_NAMES = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
 const WEEKDAY_ABBREVIATIONS = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"];
 const MONTH_ABBREVIATIONS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
-const MONTH_NAMES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
 const MAX_DAYS = 366;
 
 /** The lead line when a period was cut to the last 366 days (REQ-14). */
@@ -157,7 +156,7 @@ export function periodLabel(period: Period, today: string): string {
     case "lastDays": return range(`Últimos ${spanDays(period)} días`);
     case "since": {
       const [month, dayNumber] = [Number(period.from.slice(5, 7)) - 1, Number(period.from.slice(8, 10))];
-      return range(`Desde el ${dayNumber} de ${MONTH_NAMES[month]}`);
+      return range(`Desde el ${dayNumber} de ${MONTHS[month]}`);
     }
   }
 }
