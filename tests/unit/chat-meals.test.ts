@@ -492,6 +492,15 @@ test("REQ-12 by dish name a soft-deleted option of the same recipe in another sl
   assert.deepEqual(itemsOf(reply, "Acompaña con"), ["Agua natural · 1 vaso"]);
 });
 
+test("REQ-3 a dish found by name never opens another user's row, even one with the same id stored first", () => {
+  const reply = askWith("¿Qué lleva el pollo asado?", (db) => {
+    const own = db.recipes.find((recipe) => recipe.name === "Pollo asado")!;
+    db.recipes.unshift({ ...own, user_id: "someone-else", description: "Receta ajena." });
+  });
+  assert.equal(reply.kind, "detail");
+  assert.deepEqual(itemsOf(reply, "Preparación"), recipeSteps("Sazona el pollo. Hornea 30 minutos. Sirve con limón.").slice(0, 2));
+});
+
 test("REQ-11 a single-option slot goes straight to its detail; with no ingredients or steps there are no empty headings", () => {
   const only = (tweak: (db: AppDb) => void = () => {}) => askWith("¿Qué hay de desayuno?", (db) => {
     const breakfast = db.mealTypes.find((meal) => meal.name === "Desayuno")!;
