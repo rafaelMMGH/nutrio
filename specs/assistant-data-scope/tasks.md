@@ -369,22 +369,36 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
 **Batch 2b1: options builder**, about 300 lines with tests (revision 7 split of 2b)
 
 - [ ] T031 [US2] Tests REQ-9, REQ-10, REQ-11 (option buttons)
+  - **Part 1 done: 5ca5925; part 2 in batch 2b2.**
   - Unit (tests/unit/chat-meals.test.ts): 5 options → 3 + "Ver más opciones"; page 2 → 4–5 + "Opciones anteriores"; 7 options → page 3 shows option 7 with "Opciones anteriores" only; page 9 → last page. Labels: "Opción 2: Pollo, Arroz, Brócoli…" (4 ingredients), exactly 3 → no "…", 0 → "Opción <n>". "cena opción 2", "cena opcion 2", "la 2 de la cena" equal; "cena opción 7" → "Tu cena tiene 4 opciones." + first page. REQ-11: "Segunda colación" lists the second slot's options with buttons sending "Segunda colación, opción <n>". REQ-3 row "la comida opcion 1": option selection, comida, option 1, `kind` neither `did_you_mean` nor `no_match`. `sweep()` over option and paging buttons. Red first.
   - e2e, written (tests/e2e/assistant-meals.spec.ts): one UI flow tapping through the pages (the user turn shows the sent message); "cena opción 2" through `ask()`.
   - Split: part 1 (just before T032) = page contents, labels and the out-of-range lead on the builder; part 2 (just before T033) = the selection/paging message rows, the REQ-3 row, the sweep and the e2e.
   - Carry-forward from 1e2 (b): re-scope the test "REQ-6 step 4: a generic option name is never a dish" (tests/unit/chat-answer.test.ts:311), which pins "¿Qué lleva desayuno opcion 1?" → notFound, to the REQ-10 reading in the same commit as the REQ-3 row "la comida opcion 1" (deferred here from T026, carry-forward (c)).
   - Part 2 (analyze round 1, M2 follow-up): extend the T028 part 2 row "¿Qué lleva la segunda colación?" (unit and e2e) with the second colación's option labels in plan order.
   - Carry-forward from 2a2 (a): that row currently asserts only the resolved slotOptions / colación / ordinal 2 and the no-not-found kind. Once T032 lands, also assert the slot's title/lead (unit and e2e), together with the option labels above.
-- [ ] T032 [US2] Options builder: lead variants, `layout: "option"` buttons in plan order, labels, paging messages, out-of-range (src/lib/domain/chat-meals.ts)
+- [x] T032 [US2] Options builder: lead variants, `layout: "option"` buttons in plan order, labels, paging messages, out-of-range (src/lib/domain/chat-meals.ts)
   - Carry-forward from 2a2 (a): the options lead/title makes the "¿Qué lleva la segunda colación?" title/lead assertion possible (added in T031 part 2).
-  - Carry-forward from 2a2 (c): the button sweep covers only slot time buttons; add the options buttons and the masculine-ordinal / "Colación 11" buttons to `BUTTON_TOPICS` (tests/shared/assistant-buttons.ts) here.
+  - Carry-forward from 2a2 (c): the button sweep covers only slot time buttons; add the options buttons and the masculine-ordinal / "Colación 11" buttons to `BUTTON_TOPICS` (tests/shared/assistant-buttons.ts) here. (Not done in 2b1; moved to batch 2b2, see Batch note 2b1 (f).)
+
 **Review checkpoint 2b1:** tsc + unit.
+
+**Batch note 2b1 (done; T031 part 1, T032, plus the 2a2 (d) `ORDINAL_WORDS` fix; commits 315346d (L2 red), 940188f (L2 fix: `ORDINAL_WORDS` is a Map, so Object property names are no ordinal), 5ca5925 (T031 part 1 tests, red: `slotOptions` export missing; amended once before moving on, history linear), f949d75 (T032 code); docs commit 90cd7ad sits between; tip f949d75; reviewer PASS, no HIGH; tsc clean, unit 529/529; no dependency change; src+tests +188/-11 vs ~300 est):**
+
+- Landed: `slotOptions(db, userId, intent, question, { page, asked })` and `SlotOptionsView` in src/lib/domain/chat-meals.ts, wired at `BUILDERS.slotOptions` in chat.ts. `Slot` gained `id`. A slot with no options says "Tu plan no tiene opciones para tu <slot>."; a count of 1 reads "1 opción". One `layout: "option"` button per option, message "<Ref>, opción <n>" (n absolute, in plan order); paging buttons "<Ref>, más opciones (página n)", with "Ver más opciones" before "Opciones anteriores" (the spec does not fix the order). The page is clamped; `asked` > count gives "Tu <slot> tiene <n> opciones." plus page 1. Three REQ-9 lead variants, chosen by the private `pickVariant` (hash of the normalized question; deterministic, no `Math.random`/`Date`). A single-option slot lists its one option for now (the detail redirect is T034).
+- Carry-forwards:
+  - **(a)** `pickVariant` is private to chat-meals.ts and gives all four starter-button questions the same variant (index 2). Export or move it when T049 and the other REQ-28 sites arrive; T048/T049 should improve variety.
+  - **(b)** REQ-24 interim merge: in a 2-block answer only the first block's buttons show, while the second block's lead promises options. T051 owns it (T050 rows). Do not ship between batches.
+  - **(c)** `slotOptions` does not sanitize `page` (NaN, 1.5): T033 must parse integers only.
+  - **(d)** Option labels use the position in the filtered option list, not `option_number`. T033 and T034 must index the same filtered list.
+  - **(e)** Interim loop: "Cena, opción 2" and "Cena, más opciones (página 2)" return the slot's first page until T033.
+  - **(f)** Being closed in 2b2 (with T031 part 2 and T033): `BUTTON_TOPICS` entries for the options buttons (and the 2a2 (c) masculine/"Colación 11" buttons), plus builder test gaps (`option_number` order, soft-deleted options skipped, 1-page cases, the variants actually used).
 
 **Batch 2b2: option selection and paging**, about 180 lines with tests
 
 - [ ] T033 [US2] Resolver step 2: option selection and paging, incl. page 1 and no number = page 2 (src/lib/domain/chat-intent.ts)
   - Carry-forward from 2a2 (b): "<slot> <n>" on a non-duplicated slot currently falls back to the slot (T030 reads n as an ordinal only for duplicated slots). Intercept it before the slot reading and read it as option n ("cena 2" → cena option 2), with a red row first; keep "colación 2" with two colaciones as the slot ordinal.
   - Optional, from 2a2 (d): pin or exclude "colación 2 am" (a bare number followed by am/pm read as an ordinal).
+  - Carry-forwards from 2b1 (c)–(e): parse the page as an integer only (`slotOptions` does not sanitize NaN or 1.5); index options in the same filtered list the labels use (not `option_number`); this closes the interim loop where "Cena, opción 2" and "Cena, más opciones (página 2)" return the first page.
 
 **Review checkpoint 2b2:** tsc + unit.
 
@@ -512,6 +526,7 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
   - Revision 8: REQ-29 calls `rankDish` from T027 (matcher rows already in T026 part 1); this task adds the step-8 call and the did-you-mean/not-found builders in chat.ts only. src/lib/domain/chat-dish.ts is not changed here (revision 9, analyze L6).
   - 1c2 review (M4): greeting and thanks words go through the REQ-2 matcher (fuzzy, phrases) instead of the exact `GREETING_WORDS` set; rows in T048.
   - 2a1 review (M2): carry the slot-times variant "Tu <slot> es: **<time>**." in the variant picker (src/lib/domain/chat-meals.ts `slotTimeLead`); rows in T048.
+  - 2b1 carry-forward (a): `pickVariant` is private to chat-meals.ts and gives all four starter-button questions the same variant (index 2). Export or move it so every REQ-28 site shares one picker, and improve variety (rows in T048).
 
 **Review checkpoint 4a:** tsc + unit.
 
@@ -526,6 +541,7 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
   - Split: part 1 (just before T051) = the multi-topic rows and the literal 2-block `answer`; part 2 (just before T052, Batch 4b2) = clarify, REQ-27 rows, the sweep and the e2e.
 - [ ] T051 [US4] `reply()` 2-block rules: titles, one option block, follow-ups then overflow, a later clarify omitted (src/lib/domain/chat.ts)
   - 2a1 review (M1): replace the interim "buttons from the first block that has them" (chat.ts ~147) with the REQ-24 merge, per the T050 part 1 rows.
+  - 2b1 carry-forward (b): today a 2-block answer shows only the first block's buttons while the second block's options lead promises options; the REQ-24 merge must fix it (add a T050 row: slot options as the second block keep their option buttons).
 **Review checkpoint 4b1:** tsc + unit.
 
 **Batch 4b2: clarifications and missing data**, about 290 lines with tests
