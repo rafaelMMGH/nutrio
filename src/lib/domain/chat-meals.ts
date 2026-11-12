@@ -166,7 +166,7 @@ export function recipeDetail(db: AppDb, userId: string, recipe: Recipe, spot?: {
 export type SlotOptionsView = {
   /** 1-based page; below 1 reads as 1 and past the last as the last (REQ-9). Default: the intent's page, else 1. */
   page?: number;
-  /** An option number the user asked for; only a number beyond the slot's options changes the reply (REQ-10). Default: the intent's option. */
+  /** An option number the user asked for: in range it opens that option's detail, anything else (0, a decimal, past the last) says how many there are (REQ-10). Default: the intent's option. */
   asked?: number;
 };
 
