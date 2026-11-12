@@ -253,6 +253,7 @@ test("REQ-11 '<slot> <n>' is flagged as a bare number, for the plan to read as o
 // REQ-14 (T041): the resolver attaches the period the date parser found to the metric intents, with today passed in.
 const TODAY = "2026-10-28";
 const periods = (message: string, today: string | null = TODAY) => resolve(message, undefined, today ?? undefined).intents.map((intent) => [intent.topic, intent.period?.kind, intent.period?.from, intent.period?.to]);
+const noPeriod = (message: string, today: string | null = TODAY) => resolve(message, undefined, today ?? undefined).intents.map((intent) => [intent.topic, intent.period]);
 
 test("REQ-14 the period is attached to water, exercise, weight and meals-done intents", () => {
   assert.deepEqual(periods("¿Cuánta agua tomé ayer?"), [["water", "yesterday", "2026-10-27", "2026-10-27"]]);
@@ -263,10 +264,10 @@ test("REQ-14 the period is attached to water, exercise, weight and meals-done in
 });
 
 test("REQ-14 no period without a recognized phrase, without today, or on topics that are not metrics", () => {
-  assert.deepEqual(periods("¿Cuánta agua llevo?"), [["water", undefined, undefined, undefined]]);
-  assert.deepEqual(periods("¿Cuánta agua tomé hace dos semanas?"), [["water", undefined, undefined, undefined]]);
-  assert.deepEqual(periods("¿Cuánta agua tomé ayer?", null), [["water", undefined, undefined, undefined]]);
-  assert.deepEqual(periods("¿Cuál es mi meta de peso ayer?"), [["goals", undefined, undefined, undefined]]);
-  assert.deepEqual(periods("¿Qué lleva la cena ayer?"), [["slotOptions", undefined, undefined, undefined]]);
-  assert.deepEqual(periods("Mi avance de la semana"), [["weekly", undefined, undefined, undefined]]);
+  assert.deepEqual(noPeriod("¿Cuánta agua llevo?"), [["water", undefined]]);
+  assert.deepEqual(noPeriod("¿Cuánta agua tomé hace dos semanas?"), [["water", undefined]]);
+  assert.deepEqual(noPeriod("¿Cuánta agua tomé ayer?", null), [["water", undefined]]);
+  assert.deepEqual(noPeriod("¿Cuál es mi meta de peso ayer?"), [["goals", undefined]]);
+  assert.deepEqual(noPeriod("¿Qué lleva la cena ayer?"), [["slotOptions", undefined]]);
+  assert.deepEqual(noPeriod("Mi avance de la semana"), [["weekly", undefined]]);
 });
