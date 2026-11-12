@@ -49,6 +49,12 @@ const PHRASES: [string, string, ReturnType<typeof period>][] = [
   ["desde el 5 de octubre", TODAY, period("since", "2026-10-05", TODAY)],
   ["desde el 28 de octubre", TODAY, period("since", TODAY, TODAY)],
   ["desde el 29 de febrero", TODAY, period("since", "2024-02-29", TODAY)],
+  // 2100 is not a leap year: the latest 29 February is 2096, four years back.
+  ["desde el 29 de febrero", "2100-03-01", period("since", "2096-02-29", "2100-03-01")],
+  // Raw bounds up to a sane limit (T067/T068 clamp from the span); a huge count is capped so no date overflows.
+  ["últimos 400 días", TODAY, period("lastDays", "2025-09-24", TODAY)],
+  ["últimos 999999999 días", TODAY, period("lastDays", "2016-10-21", TODAY)],
+  ["últimos 99999999999999999999 días", TODAY, period("lastDays", "2016-10-21", TODAY)],
   // A comma or decimal number elsewhere in the message does not disturb the phrase (it is read from the typed text).
   ["tomé 1,5 L ayer", TODAY, period("yesterday", "2026-10-27")],
   ["a las 2.30 hoy", TODAY, period("today", TODAY)]
