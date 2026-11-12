@@ -10,7 +10,7 @@ const OPTIONS_LEAD = /opciones|elegir|lleva/;
 const OPTION_LEAD = /lleva|opciones/;
 
 export const BUTTON_TOPICS: Record<string, { topic: string; lead?: RegExp }> = {
-  "Mi cena de hoy": { topic: "slotOptions" },
+  "Mi cena de hoy": { topic: "slotOptions", lead: OPTIONS_LEAD },
   // The non-generic recipes of the fixture: each "¿Qué lleva <receta>?" opens that recipe's detail (T036).
   ...Object.fromEntries(
     ["Pollo asado", "Ensalada de pollo", "Sándwich de atún", "Atole de avena", "Chilaquiles verdes", "Tacos de frijol"].map((name) => [`¿Qué lleva ${name}?`, { topic: "dish", lead: /lleva/ }] as const)
