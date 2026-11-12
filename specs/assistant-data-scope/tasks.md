@@ -418,6 +418,7 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
 **Batch 2c1: shared step splitter**, about 170 lines with tests (revision 7 split of 2c)
 
 - [ ] T034 [US2] Tests REQ-12, REQ-11 (single option), REQ-3 text
+  - **Part 1 done: a87a443; part 2 in batch 2c2.**
   - Unit (tests/unit/recipe-steps.test.ts): `recipeSteps` returns no steps for "Extraído de plan.pdf", "EXTRAÍDO DE plan.pdf" and "Extraido de plan.pdf"; "¿Listo? Ásalo. Él sirve." keeps its split. Red first.
   - Unit (tests/unit/chat-meals.test.ts): 12 ingredients all shown; steps 1–2 equal `recipeSteps(description)` 1–2, plus the "Ver receta completa" link to `/recipes/<id>`; "Extraído de plan.pdf" → the no-preparation item; complement "Agua natural · 1 vaso", none → no heading; by dish name, complements only if the recipe is in exactly one slot; ingredient formats with no unit and with neither; a generic-name lead; a single-option slot goes straight to the detail; a recipe with zero ingredients and zero steps still gets a detail answer (lead, no empty headings); every detail answer's `sources` equals `["Receta: <name>"]` (contract keeps `sources`); REQ-3 text: each found row shows the detail lead and "la comida opcion 1" shows comida option 1's detail; end-of-US2 `sweep()` over every existing Topics, slot, option, paging and "¿Qué lleva <receta>?" button.
   - Split: part 1 (just before T035) = the recipe-steps.test.ts rows and the recipe-page e2e; part 2 (just before T036, Batch 2c2) = the chat-meals.test.ts rows and the remaining e2e.
@@ -428,15 +429,26 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
     - LOW-1: guard option 0 ("cena opción 0", "la 0 de la cena" → out-of-range, not in range) and non-integer options ("cena opción 2.5"); add probe rows for "cena 2 veces" (option n by REQ-11, pinned as intended), "comí 2 de la cena" and "cena es la mejor opción 2 veces" (decide: pin as current or tighten `selectionAt`), "cena más opciones 3" and "(página -1)" (pin as page 2 or tighten).
     - LOW-3: add a row for "cena hora opción 2" (pin the time answer as current, or let step 2 win).
     - MEDIUM-3 stays a spec item (HANDOFF section 6); add a row pinning the current clarify for "colación opción 2" so a later change is visible.
-- [ ] T035 [US2] Shared `recipeSteps(description)` using `normalizeText`, used by the recipe page (no display change) (src/lib/recipe-steps.ts, src/components/recipes/RecipeDetail.tsx)
+- [x] T035 [US2] Shared `recipeSteps(description)` using `normalizeText`, used by the recipe page (no display change) (src/lib/recipe-steps.ts, src/components/recipes/RecipeDetail.tsx)
   - 1c1: the step-splitter move to `normalizeText` was deferred here from T018.
 **Review checkpoint 2c1:** tsc + unit.
+
+**Batch note 2c1 (done; T034 part 1, T035; commits a87a443 (T034 part 1 tests, red: module src/lib/recipe-steps missing; tests/unit/recipe-steps.test.ts with 3 tests, plus a recipe-page e2e in tests/e2e/assistant-meals.spec.ts) and 5dcd43a (T035 code); docs commit 05b3d57 sits between them; tip 5dcd43a; reviewer PASS, no HIGH/MEDIUM, 5 break-and-revert mutations each failed the intended test; the reviewer verified that the code-writer's `git checkout -p` slip lost nothing; tsc clean, unit 558/558; no dependency change; +49/-10 vs ~170 est):**
+
+- Landed: `recipeSteps(description = "")` moved from src/components/recipes/RecipeDetail.tsx to src/lib/recipe-steps.ts. The import-note guard is now `normalizeText(text).startsWith("extraido de")`, so case and accents no longer matter; the split regex is unchanged. RecipeDetail.tsx imports it and dropped its local `steps()` and the unused normalize import. Display is unchanged for real data.
+- Reviewer probed 22 inputs. Five punctuation/whitespace variants ("Extraído  de" with a double space, "Extraído, de", "¡Extraído de", "- Extraído de", "Extraído\nde") now give no steps, because `normalizeText` collapses non-letter runs. This is intended: the importer writes "Extraído de <file>".
+- e2e written, unrun (Batch E); the selectors `.rx-steps li p` match the markup.
+- Carry-forwards / LOW:
+  - **LOW-1:** the comment at src/lib/recipe-steps.ts:3-4 says the assistant shares the function; true only once T036 lands. Keep it if T036 follows immediately (2c2); otherwise reword.
+  - **LOW-2 (no change):** the unit test is a characterization test; its only fail-first proof is the missing module.
+  - **LOW-3 (note only):** numbered steps ("1. Picar la cebolla. 2. Freír.") split as ["Picar la cebolla. 2.", ...]. Existing quirk, not a regression.
 
 **Batch 2c2: dish detail**, about 340 lines with tests
 
 - [ ] T036 [US2] Detail builder: lead, uncapped "Ingredientes", "Preparación" (2 steps + link), "Acompaña con" from the slot's add-ons and `add_on` usages (src/lib/domain/chat-meals.ts)
   - Carry-forward from 1e2 (a), with T048 (whichever lands the dish builder first adds them): `sweep()` in tests/unit/chat-answer.test.ts gains "¿Qué lleva <receta>?" for each non-generic fixture recipe, each resolving to that recipe (red row before the builder).
   - Carry-forwards from 2b2: open the detail for an in-range option selection (MEDIUM-4), indexing the same filtered option list the labels use (2b1 (d)); reject option 0 and non-integer options as out of range (LOW-1); either make the detail lead independent of the typed text or let T034 part 2 compare buttons plus content, so the REQ-10 rows can assert full-answer equality (MEDIUM-1). Optional LOW-4 cleanup in chat-intent.ts (long doc comment ~76, double blank line ~41) if the file is touched.
+  - Carry-forward from 2c1 (LOW-1): the detail builder imports `recipeSteps` from src/lib/recipe-steps.ts, which makes its comment (lines 3-4, "the assistant shares it") true; if T036 does not use it, reword the comment.
 
 **Checkpoint:** US2 code complete (REQ-7 to REQ-12), unit-green; e2e in Batch E.
 
