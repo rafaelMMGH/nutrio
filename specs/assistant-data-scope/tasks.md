@@ -325,11 +325,11 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
 
 **Batch 2a1: slots and times**, about 330 lines with tests (revision 7 split of 2a)
 
-- [ ] T028 [US2] Tests REQ-7, REQ-8, REQ-11 (duplicates)
+- [x] T028 [US2] Tests REQ-7, REQ-8, REQ-11 (duplicates)
   - Unit (tests/unit/chat-meals.test.ts): REQ-7 almuerzo question and buttons (1 or 2), merienda/snack → colación, not in plan; REQ-8 one slot's time highlighted, a slot without a time, all slots; REQ-11 two colaciones → 2 buttons with "(<time>)", "colación 2" and "segunda colacion", 11 slots → "Colación 11", masculine ordinals; `sweep()` over every "<Slot ref>" and almuerzo-clarify button; answer text for the slot Givens of REQ-1 and REQ-6. Red first.
   - e2e, written (tests/e2e/assistant-meals.spec.ts): an almuerzo question and the duplicate-colación buttons through `ask()`; one REQ-8 slot-time row through `ask()` covering a single slot's time highlighted, a slot without a time, and all slots.
   - Split: part 1 (just before T029) = REQ-7, REQ-8 and the REQ-11 labels/ordinals on the slot builders; part 2 (just before T030) = typed ordinals, "colación 2", "segunda colacion", the sweep and the e2e.
-  - **Part 1 done** (commit a930790, tests red: module missing; reviewer PASS in 2a1; see Batch note 2a1). **Part 2 in batch 2a2** (with T030 and the 2a1 fixes L1, M4; L3 gaps).
+  - **Part 1 done** (commit a930790, tests red: module missing; reviewer PASS in 2a1; see Batch note 2a1). **Part 2 done** (commit 65ab143, tests red, tsc-exempt; L3 rows in 0503efd; reviewer PASS in 2a2; see Batch note 2a2). The answer-level row below asserts only the resolved slotOptions/colación/ordinal 2; the title/lead and option labels move to T031 part 2 / T032 (Batch note 2a2, carry-forward (a)).
   - Part 2 answer-level row (analyze round 1, M2; REQ-11 with REQ-6 step 4 fallthrough, resolve-level row in T026 part 2): unit (tests/unit/chat-meals.test.ts) `ragAnswer("¿Qué lleva la segunda colación?")` lists the second colación slot's options (its option labels, in plan order) and gives no not-found reply (kind neither `did_you_mean` nor `no_match`); e2e, written (tests/e2e/assistant-meals.spec.ts), the same question through `ask()` with the same assertions. Ordering: the options builder lands in T032 (2b1), after this part, so here the row asserts the no-not-found kind plus `resolved` slotOptions for the second colación and the slot's title/lead; the option-label assertion is added in T031 part 2 (just before T033), keeping each batch tip green.
 - [x] T029 [US2] Slots (src/lib/domain/chat-meals.ts)
   - Slot list from `activeSchedule`, word-to-slot mapping, almuerzo/merienda/snack rules.
@@ -352,9 +352,19 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
 
 **Batch 2a2: slot resolution**, about 170 lines with tests
 
-- [ ] T030 [US2] Resolver: slot words, typed ordinals and "<slot> <n>" for duplicated slots (src/lib/domain/chat-intent.ts)
+- [x] T030 [US2] Resolver: slot words, typed ordinals and "<slot> <n>" for duplicated slots (src/lib/domain/chat-intent.ts)
 
 **Review checkpoint 2a2:** tsc + unit.
+
+**Batch note 2a2 (done; T028 part 2, T030, plus the 2a1 fixes L1, M4 and the L3 gaps; commits 5cc2ec6 (L1 red), 04113f5 (L1 fix), cc48320 (M4 e2e assertion), 65ab143 (T028 part 2 tests, red, tsc-exempt), 1d705c4 (T030 code), 0503efd (L3 rows); tip 0503efd; reviewer PASS, no HIGH/MEDIUM; tsc clean, unit 517/517; no dependency change; src+tests +200/-13 by the reviewer's numstat (code-writer reported +185/-12) vs ~170 est plus the small fixes):**
+
+- Landed: `Intent` gains an optional `ordinal`. The resolver reads an ordinal word before or after a slot word, or a number right after one ("colación 2", "segunda colacion", "colación segunda"). `chooseSlot` takes an optional ordinal: on a duplicated slot it picks that slot; out of range it re-asks ("Tienes 2 colaciones. ¿Cuál?"); on a single slot it is ignored. The 2a1 dead end (M3, duplicate-slot buttons looping on the clarify) is fixed; options-version buttons still reach the D3 placeholder until T032. Plural "snacks" maps like "snack". M4: the zero-meals e2e also asserts the schedule answer (title fixed). L3 rows: merienda without colación, masculine ordinal past ten, starters with no slots.
+- Tests: new tests/e2e/assistant-meals.spec.ts (4 tests); tests/shared/assistant-buttons.ts gains the slot time buttons. e2e unrun until Batch E.
+- Carry-forwards:
+  - **(a)** The T028 part 2 row "¿Qué lleva la segunda colación?" (unit and e2e) asserts only the resolved slotOptions / colación / ordinal 2 and the no-not-found kind; the slot's title/lead is not assertable until the options builder exists. Recorded in T031 part 2 / T032: add the title/lead and the option labels in plan order.
+  - **(b)** "<slot> <n>" on a non-duplicated slot falls back to the slot (the number is ignored). T033 must intercept it before the slot reading and read it as option n (recorded in T033).
+  - **(c)** The sweep covers only the slot time buttons. Options buttons and the masculine/"Colación 11" buttons join `BUTTON_TOPICS` at T032 (recorded in T032).
+  - **(d) LOW:** `ORDINAL_WORDS` is a plain object, so "constructor" looks up `Object`; being fixed in 2b1. The ordinal lookup is greedy in both directions ("desayuno primera colación" → desayuno ordinal 1; "colación segunda cena" → colación 2); it only matters with no conjunction between slot words; not needed now. A bare number after a slot word counts as an ordinal even when it is a clock time ("colación 2 am"); acceptable per REQ-11; optionally pin it with a row or exclude a following am/pm (candidate for T033's rows).
 
 **Batch 2b1: options builder**, about 300 lines with tests (revision 7 split of 2b)
 
@@ -364,12 +374,17 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
   - Split: part 1 (just before T032) = page contents, labels and the out-of-range lead on the builder; part 2 (just before T033) = the selection/paging message rows, the REQ-3 row, the sweep and the e2e.
   - Carry-forward from 1e2 (b): re-scope the test "REQ-6 step 4: a generic option name is never a dish" (tests/unit/chat-answer.test.ts:311), which pins "¿Qué lleva desayuno opcion 1?" → notFound, to the REQ-10 reading in the same commit as the REQ-3 row "la comida opcion 1" (deferred here from T026, carry-forward (c)).
   - Part 2 (analyze round 1, M2 follow-up): extend the T028 part 2 row "¿Qué lleva la segunda colación?" (unit and e2e) with the second colación's option labels in plan order.
+  - Carry-forward from 2a2 (a): that row currently asserts only the resolved slotOptions / colación / ordinal 2 and the no-not-found kind. Once T032 lands, also assert the slot's title/lead (unit and e2e), together with the option labels above.
 - [ ] T032 [US2] Options builder: lead variants, `layout: "option"` buttons in plan order, labels, paging messages, out-of-range (src/lib/domain/chat-meals.ts)
+  - Carry-forward from 2a2 (a): the options lead/title makes the "¿Qué lleva la segunda colación?" title/lead assertion possible (added in T031 part 2).
+  - Carry-forward from 2a2 (c): the button sweep covers only slot time buttons; add the options buttons and the masculine-ordinal / "Colación 11" buttons to `BUTTON_TOPICS` (tests/shared/assistant-buttons.ts) here.
 **Review checkpoint 2b1:** tsc + unit.
 
 **Batch 2b2: option selection and paging**, about 180 lines with tests
 
 - [ ] T033 [US2] Resolver step 2: option selection and paging, incl. page 1 and no number = page 2 (src/lib/domain/chat-intent.ts)
+  - Carry-forward from 2a2 (b): "<slot> <n>" on a non-duplicated slot currently falls back to the slot (T030 reads n as an ordinal only for duplicated slots). Intercept it before the slot reading and read it as option n ("cena 2" → cena option 2), with a red row first; keep "colación 2" with two colaciones as the slot ordinal.
+  - Optional, from 2a2 (d): pin or exclude "colación 2 am" (a bare number followed by am/pm read as an ordinal).
 
 **Review checkpoint 2b2:** tsc + unit.
 
