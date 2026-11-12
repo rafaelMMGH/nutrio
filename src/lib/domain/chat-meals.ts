@@ -1,6 +1,7 @@
-import { type Button, type Rich, type Section, STARTERS, normalizeText } from "@/lib/assistant";
-import type { AppDb } from "@/lib/types";
-import { activeSchedule } from "@/lib/domain/plans";
+import { type Button, type Intent, type Rich, type Section, STARTERS, normalizeText } from "@/lib/assistant";
+import { isGeneric } from "@/lib/domain/chat-dish";
+import type { AppDb, Recipe } from "@/lib/types";
+import { activeSchedule, recipeDetails } from "@/lib/domain/plans";
 
 // Slots of the active plan for the assistant (spec assistant-data-scope REQ-7, REQ-8, REQ-11): the slot list with its
 // refs, the word-to-slot mapping, the choice replies (several slots, almuerzo, slot not in the plan) and the time lead.
@@ -9,7 +10,7 @@ import { activeSchedule } from "@/lib/domain/plans";
 export type Built = { lead: Rich; sections?: Section[]; sources?: string[]; buttons?: Button[]; kind?: "clarify" };
 
 /** A meal type of the active plan. `ref` is its name, or with duplicate names its ordinal form ("Segunda colación"). */
-export type Slot = { name: string; time: string; ref: string };
+export type Slot = { id: string; name: string; time: string; ref: string };
 export type SlotPlan = { planName: string; slots: Slot[] };
 
 const FEMININE = ["Primera", "Segunda", "Tercera", "Cuarta", "Quinta", "Sexta", "Séptima", "Octava", "Novena", "Décima"];
@@ -33,7 +34,7 @@ export function planSlots(db: AppDb, userId: string): SlotPlan | null {
     const position = (seen.get(key) ?? 0) + 1;
     seen.set(key, position);
     const duplicated = keys.filter((other) => other === key).length > 1;
-    return { name: meal.name, time: meal.time_window || "", ref: duplicated ? ordinalRef(meal.name, key, position) : meal.name };
+    return { id: meal.id, name: meal.name, time: meal.time_window || "", ref: duplicated ? ordinalRef(meal.name, key, position) : meal.name };
   });
   return { planName: schedule.plan_name, slots };
 }
@@ -87,4 +88,72 @@ export function chooseSlot(plan: SlotPlan, word: string, ask: SlotAsk, ordinal?:
 export function slotTimeLead(slot: Slot): Rich {
   const ref = slot.ref.toLowerCase();
   return slot.time ? [{ text: `Tu horario de ${ref}: ` }, { text: slot.time, highlight: true }, { text: "." }] : [{ text: `Tu plan no tiene horario para tu ${ref}.` }];
+}
+
+const PAGE_SIZE = 3;
+const LEADS: ((slot: string) => string)[] = [
+  (slot) => `Estas son tus opciones de ${slot}:`,
+  (slot) => `Para tu ${slot} puedes elegir:`,
+  (slot) => `Tus opciones de ${slot} son:`
+];
+
+/** REQ-28: the same question always picks the same variant. */
+function pickVariant<T>(variants: T[], question: string): T {
+  let hash = 0;
+  for (const char of normalizeText(question)) hash = (hash * 31 + char.charCodeAt(0)) % 997;
+  return variants[hash % variants.length];
+}
+
+const countOptions = (count: number) => `${count} ${count === 1 ? "opción" : "opciones"}`;
+
+/** REQ-9: the recipe name, or for a generic name "Opción <n>: <first 3 ingredients>" ("…" only above 3). */
+function optionLabel(db: AppDb, recipe: Recipe, position: number): string {
+  if (!isGeneric(recipe.name)) return recipe.name;
+  const names = recipeDetails(db, recipe).ingredients.map((item) => item.name);
+  if (!names.length) return `Opción ${position}`;
+  return `Opción ${position}: ${names.slice(0, 3).join(", ")}${names.length > 3 ? "…" : ""}`;
+}
+
+export type SlotOptionsView = {
+  /** 1-based page; below 1 reads as 1 and past the last as the last (REQ-9). */
+  page?: number;
+  /** An option number the user asked for; only a number beyond the slot's options changes the reply (REQ-10). */
+  asked?: number;
+};
+
+/**
+ * The options of the slot an intent names (REQ-9, REQ-10, REQ-11, REQ-27): a lead and one full-width button per option
+ * of the page, then the paging buttons. A slot with one option goes to the detail (T034, not built yet): until then
+ * it is listed like any other.
+ */
+export function slotOptions(db: AppDb, userId: string, intent: Intent, question: string, { page = 1, asked }: SlotOptionsView = {}): Built {
+  const plan = planSlots(db, userId);
+  if (!plan) return { lead: [{ text: "No tienes un plan activo." }] };
+  // The resolver always names the slot of a slotOptions intent.
+  const chosen = chooseSlot(plan, intent.slot ?? "", "options", intent.ordinal);
+  if ("built" in chosen) return chosen.built;
+  const { slot } = chosen;
+  const sources = [`Plan activo: ${plan.planName}`];
+  const name = slot.ref.toLowerCase();
+  const recipes = db.mealOptions
+    .filter((option) => option.meal_type_id === slot.id && !option.deleted_at)
+    .sort((a, b) => a.option_number - b.option_number)
+    .flatMap((option) => db.recipes.find((recipe) => recipe.id === option.recipe_id && !recipe.deleted_at) ?? []);
+  if (!recipes.length) return { lead: [{ text: `Tu plan no tiene opciones para tu ${name}.` }], sources };
+
+  const outOfRange = asked !== undefined && asked > recipes.length;
+  const pages = Math.ceil(recipes.length / PAGE_SIZE);
+  const current = outOfRange ? 1 : Math.min(Math.max(page, 1), pages);
+  const first = (current - 1) * PAGE_SIZE;
+  const buttons: Button[] = recipes.slice(first, first + PAGE_SIZE).map((recipe, index) => ({
+    type: "question",
+    label: optionLabel(db, recipe, first + index + 1),
+    message: `${slot.ref}, opción ${first + index + 1}`,
+    layout: "option"
+  }));
+  const pageButton = (label: string, target: number): Button => ({ type: "question", label, message: `${slot.ref}, más opciones (página ${target})` });
+  if (current < pages) buttons.push(pageButton("Ver más opciones", current + 1));
+  if (current > 1) buttons.push(pageButton("Opciones anteriores", current - 1));
+  const lead = outOfRange ? `Tu ${name} tiene ${countOptions(recipes.length)}.` : pickVariant(LEADS, question)(name);
+  return { lead: [{ text: lead }], buttons, sources };
 }

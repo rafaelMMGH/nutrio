@@ -2,7 +2,7 @@ import type { AppDb, AppUser } from "@/lib/types";
 import { type Block, type Button, type ChatAnswer, type Intent, type ReplyKind, type Rich, type Section, normalizeText, STARTERS, words } from "@/lib/assistant";
 import { consolidateCart } from "@/lib/domain/cart";
 import { isGeneric } from "@/lib/domain/chat-dish";
-import { type Built, chooseSlot, planSlots, slotTimeLead } from "@/lib/domain/chat-meals";
+import { type Built, chooseSlot, planSlots, slotOptions, slotTimeLead } from "@/lib/domain/chat-meals";
 import { resolve } from "@/lib/domain/chat-intent";
 import { greetingOf, TOPICS, type TopicId } from "@/lib/domain/chat-topics";
 import { activePlan } from "@/lib/domain/plans";
@@ -108,6 +108,7 @@ export function recipeList(db: AppDb, userId: string, question: string): Built {
 
 const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: string, intent: Intent) => Built>> = {
   mealTimes: (db, userId, _question, intent) => mealTimes(db, userId, intent),
+  slotOptions: (db, userId, question, intent) => slotOptions(db, userId, intent, question),
   cart: (db, userId) => cartSummary(db, userId),
   recipes: recipeList,
   plan: (db, userId, question) => planSummary(db, userId, normalizeText(question))
