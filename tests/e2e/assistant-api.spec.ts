@@ -232,7 +232,7 @@ test.describe("builders", () => {
     expect(body.answer).not.toContain("Recomendaciones");
   });
 
-  test("REQ-1 a plan with zero meals omits the Comidas section in the plan and meal-times answers, and the lead stays", async ({ chatContext }) => {
+  test("REQ-1 a plan with zero meals omits the Comidas section in the plan answer, and the slot-time and schedule answers say the plan has none", async ({ chatContext }) => {
     seedPlan({ times: "all", meals: [] });
     const plan = await answer(chatContext, "¿Cuál es mi objetivo?");
     expect(plainOf(plan.blocks[0].lead)).toBe(`Tu objetivo: ${OBJECTIVE}`);
@@ -243,6 +243,10 @@ test.describe("builders", () => {
     expect(plainOf(times.blocks[0].lead)).toBe("Tu plan no tiene comida.");
     expect(times.blocks[0].sections).toEqual([]);
     expect(times.answer).not.toContain("Comidas");
+
+    const schedule = await answer(chatContext, "¿Cuál es mi horario?");
+    expect(plainOf(schedule.blocks[0].lead)).toBe("Tu plan no tiene horarios para tus comidas.");
+    expect(schedule.blocks[0].sections).toEqual([]);
   });
 
   test("REQ-1 a plan with no supplements says so", async ({ chatContext }) => {
