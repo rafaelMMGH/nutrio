@@ -71,12 +71,15 @@ export function planFixture(meals: string[], { extras = false }: { extras?: bool
   return placed;
 }
 
-/** A complement on the first slot ("Agua natural · 1 vaso") and a quantity-only one on the last; each gets an `add_on` usage. None without meals. */
+/**
+ * A complement on the first slot ("Agua natural · 1 vaso") and a quantity-only one on the last; each gets an `add_on` usage.
+ * The add-on `name` differs from its `ingredient`, so a test can tell which one an answer shows. None without meals.
+ */
 export function addOnSpecs(meals: string[]) {
   if (!meals.length) return [];
   return [
-    { name: "Agua natural", slot: 0, quantity: 1, unit: "vaso" },
-    { name: "Fruta de temporada", slot: meals.length - 1, quantity: 2, unit: "" }
+    { name: "Complemento del desayuno", ingredient: "Agua natural", slot: 0, quantity: 1, unit: "vaso" },
+    { name: "Complemento de la cena", ingredient: "Fruta de temporada", slot: meals.length - 1, quantity: 2, unit: "" }
   ];
 }
 

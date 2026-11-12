@@ -54,8 +54,8 @@ test("slots, option numbers and the recipes outside the plan", () => {
 test("add-ons: one on the first slot, a quantity-only one on the last, each with an add_on usage", () => {
   const { db } = memDb();
   assert.deepEqual(db.sharedAddOns.map((addOn) => [addOn.name, addOn.meal_type_id]), [
-    ["Agua natural", db.mealTypes[0].id],
-    ["Fruta de temporada", db.mealTypes[3].id]
+    ["Complemento del desayuno", db.mealTypes[0].id],
+    ["Complemento de la cena", db.mealTypes[3].id]
   ]);
   const usages = db.ingredientUsages.filter((usage) => usage.source_type === "add_on");
   assert.deepEqual(usages.map((usage) => [usage.quantity, usage.unit]), [[1, "vaso"], [2, ""]]);

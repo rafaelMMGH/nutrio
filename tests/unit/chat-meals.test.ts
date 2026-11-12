@@ -468,6 +468,23 @@ test("REQ-12 by dish name the complements show only when the recipe is an option
   assert.equal(itemsOf(ask("¿Qué lleva Chilaquiles verdes?"), "Acompaña con"), undefined);
 });
 
+test("REQ-12 a soft-deleted add-on is not listed; a soft-deleted usage leaves the add-on listed by its own name", () => {
+  const gone = askWith("Desayuno, opción 1", (db) => { db.sharedAddOns[0].deleted_at = "2026-02-01T00:00:00.000Z"; });
+  assert.equal(itemsOf(gone, "Acompaña con"), undefined);
+  const usageGone = askWith("Desayuno, opción 1", (db) => {
+    db.ingredientUsages.find((usage) => usage.source_id === db.sharedAddOns[0].id)!.deleted_at = "2026-02-01T00:00:00.000Z";
+  });
+  assert.deepEqual(itemsOf(usageGone, "Acompaña con"), ["Complemento del desayuno"]);
+});
+
+test("REQ-12 by dish name a soft-deleted option of the same recipe in another slot does not hide the complements", () => {
+  const reply = askWith("¿Qué lleva el atole de avena?", (db) => {
+    const atole = db.mealOptions.find((option) => option.recipe_id.endsWith("atole-de-avena"))!;
+    db.mealOptions.push({ ...atole, id: "x-deleted", meal_type_id: db.mealTypes.find((meal) => meal.name === "Comida")!.id, deleted_at: "2026-02-01T00:00:00.000Z" });
+  });
+  assert.deepEqual(itemsOf(reply, "Acompaña con"), ["Agua natural · 1 vaso"]);
+});
+
 test("REQ-11 a single-option slot goes straight to its detail; with no ingredients or steps there are no empty headings", () => {
   const only = (tweak: (db: AppDb) => void = () => {}) => askWith("¿Qué hay de desayuno?", (db) => {
     const breakfast = db.mealTypes.find((meal) => meal.name === "Desayuno")!;

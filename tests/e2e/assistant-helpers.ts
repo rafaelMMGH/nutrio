@@ -184,12 +184,12 @@ export type SeedPlan = {
 /** A complement on the first slot and a quantity-only one on the last (`addOnSpecs`), each with an `add_on` usage. */
 function addOnStatements(versionId: string, meals: string[]): string[] {
   const userId = currentUser().id;
-  return addOnSpecs(meals).flatMap(({ name, slot, quantity, unit }) => {
+  return addOnSpecs(meals).flatMap(({ name, ingredient, slot, quantity, unit }) => {
     const addOnId = `${versionId}-addon-${slug(name)}`;
-    const ingredientId = `${userId}-ing-${slug(name)}`;
+    const ingredientId = `${userId}-ing-${slug(ingredient)}`;
     return [
       `insert into shared_add_ons (id, plan_version_id, meal_type_id, name, applies_to_all_options, required, notes, canonical_hash, created_at) values (${lit(addOnId)}, ${lit(versionId)}, ${lit(`${versionId}-meal-${slot}`)}, ${lit(name)}, true, false, '', ${lit(slug(name))}, now())`,
-      `insert into ingredients (id, user_id, canonical_name, category, primary_unit, created_at, updated_at) values (${lit(ingredientId)}, ${lit(userId)}, ${lit(name)}, 'Otros', ${lit(unit)}, now(), now()) on conflict (id) do nothing`,
+      `insert into ingredients (id, user_id, canonical_name, category, primary_unit, created_at, updated_at) values (${lit(ingredientId)}, ${lit(userId)}, ${lit(ingredient)}, 'Otros', ${lit(unit)}, now(), now()) on conflict (id) do nothing`,
       `insert into ingredient_usages (id, ingredient_id, source_type, source_id, quantity, unit, notes, is_optional, confidence_score, requires_review, created_at) values (${lit(`${addOnId}-use`)}, ${lit(ingredientId)}, 'add_on', ${lit(addOnId)}, ${quantity}, ${lit(unit)}, '', false, 1, false, now())`
     ];
   });

@@ -152,9 +152,9 @@ export function memDb({
     db.planVersionRecipes.push({ id: `${recipeId}-pvr`, plan_version_id: versionId, recipe_id: recipeId, meal_type_id: mealId, option_number: option, created_at: STAMP, deleted_at: null });
   }
   if (fixture) {
-    for (const { name: addOnName, slot, quantity, unit } of addOnSpecs(meals)) {
+    for (const { name: addOnName, ingredient, slot, quantity, unit } of addOnSpecs(meals)) {
       const addOnId = `${versionId}-addon-${slug(addOnName)}`;
-      const ingredientId = `${USER_ID}-ing-${slug(addOnName)}`;
+      const ingredientId = `${USER_ID}-ing-${slug(ingredient)}`;
       db.sharedAddOns.push({
         id: addOnId,
         plan_version_id: versionId,
@@ -169,7 +169,7 @@ export function memDb({
       });
       // `on conflict do nothing`: an ingredient that already exists keeps its category and unit.
       if (!db.ingredients.some((row) => row.id === ingredientId)) {
-        db.ingredients.push({ id: ingredientId, user_id: USER_ID, canonical_name: addOnName, category: "Otros", primary_unit: unit, created_at: STAMP, updated_at: STAMP, deleted_at: null });
+        db.ingredients.push({ id: ingredientId, user_id: USER_ID, canonical_name: ingredient, category: "Otros", primary_unit: unit, created_at: STAMP, updated_at: STAMP, deleted_at: null });
       }
       db.ingredientUsages.push(usage(`${addOnId}-use`, ingredientId, "add_on", addOnId, quantity, unit));
     }
