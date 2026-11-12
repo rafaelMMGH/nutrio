@@ -1,6 +1,8 @@
 // Shared by the assistant UI and the chat API (spec assistant-chat-polish). Pure on purpose: no db or Node imports,
 // so both the client bundle and the server can load it.
 
+import type { Period } from "@/lib/domain/chat-dates";
+
 /** Longest message, in UTF-16 code units, counted on the trimmed text (REQ-10). */
 export const MAX_MESSAGE = 500;
 /** Length from which the composer shows the "n/500" counter. */
@@ -66,7 +68,8 @@ export type Intent = {
   recipeIds?: string[];
   option?: number;
   page?: number;
-  period?: string;
+  /** Metric questions: the period the message names (REQ-14); absent means the metric's default. */
+  period?: Period;
 };
 
 export type ChatAnswer = {

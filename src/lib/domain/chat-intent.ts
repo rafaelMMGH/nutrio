@@ -1,4 +1,5 @@
 import { type Intent, words } from "@/lib/assistant";
+import { parsePeriod } from "@/lib/domain/chat-dates";
 import { matchDish } from "@/lib/domain/chat-dish";
 import { isPlural, matchWord } from "@/lib/domain/chat-match";
 import { greetingOf, topicHits, type TopicHit, type TopicId } from "@/lib/domain/chat-topics";
@@ -52,12 +53,16 @@ function selectionAt(question: string, tokens: string[], at: number): { page: nu
     while (ARTICLES.includes(tokens[next])) next++;
     return next === at;
   };
+  // The typed words line up with the tokens (both split on letters and digits); the decimal is read after the option's own word.
+  const typed = [...question.matchAll(/[\p{L}\p{N}]+/gu)];
   for (let index = 0; index < tokens.length; index++) {
     let option = integer(tokens[index]);
+    if (option === undefined || !((isOption(tokens[index - 1]) && tokens[index + 1] !== "de") || reachesSlot(index + 1))) continue;
     // The word split turns "2.5" into 2 and 5: read the decimal from the typed message so the builder can reject it.
-    const decimal = option === undefined ? undefined : new RegExp(`(?<![\\d.,])${option}[.,](\\d+)`).exec(question)?.[1];
+    const word = typed.length === tokens.length ? typed[index] : undefined;
+    const decimal = word && /^[.,](\d+)/.exec(question.slice(word.index + word[0].length))?.[1];
     if (decimal) option = Number(`${option}.${decimal}`);
-    if (option !== undefined && ((isOption(tokens[index - 1]) && tokens[index + 1] !== "de") || reachesSlot(index + 1))) return { option };
+    return { option };
   }
   return undefined;
 }
@@ -80,10 +85,11 @@ function dishPhrase(question: string, tokens: string[], hit: TopicHit): { text: 
  * REQ-6 in order. Step 1 greeting, step 2 (option selection and paging) and step 3 identity are here. Step 4 (a dish named by its recipe, REQ-3) runs when the caller passes the
  * user's recipes: a dish phrase ends the answer; a phrase that is not a dish name falls through to the topics, and
  * a dish cue still unresolved at the end is step 7. Without recipes the dish cue is a plain "dish" intent. When nothing
- * is found the caller continues with step 8 (did-you-mean over the question, no-match).
+ * is found the caller continues with step 8 (did-you-mean over the question, no-match). With `today`, the period the
+ * message names (REQ-14) is attached to the metric intents.
  * Phrases (identity, dish cues, meals done, multi-word synonyms) consume their words before any single word counts.
  */
-export function resolve(question: string, recipes?: readonly Recipe[]): Resolution {
+export function resolve(question: string, recipes?: readonly Recipe[], today?: string): Resolution {
   if (greetingOf(question)) return only({ topic: "greeting" });
   const tokens = words(question);
   const hits = topicHits(tokens);
@@ -114,6 +120,8 @@ export function resolve(question: string, recipes?: readonly Recipe[]): Resoluti
     if (match.dishName) return only({ topic: "dish", outcome: "notFound", phrase: dish.typed });
   }
 
+  const named = today ? parsePeriod(question, today) : undefined;
+  const dated = (intent: Intent): Intent => (typeof named === "object" ? { ...intent, period: named } : intent);
   const items: { at: number; intent: Intent }[] = [];
   const add = (at: number | undefined, intent: Intent) => at !== undefined && items.push({ at, intent });
 
@@ -124,8 +132,8 @@ export function resolve(question: string, recipes?: readonly Recipe[]): Resoluti
 
   // Goal word + metric = that goal only; a goal word beside "plan" and no metric is the Plan topic (below).
   const goalAt = topicAt("goals");
-  for (const metric of METRICS) add(topicAt(metric), goalAt === undefined ? { topic: metric } : { topic: "goals", metric });
-  add(topicAt("mealsDone"), { topic: "mealsDone" });
+  for (const metric of METRICS) add(topicAt(metric), goalAt === undefined ? dated({ topic: metric }) : { topic: "goals", metric });
+  add(topicAt("mealsDone"), dated({ topic: "mealsDone" }));
   if (goalAt !== undefined && !METRICS.some((metric) => topicAt(metric) !== undefined) && topicAt("plan") === undefined) add(goalAt, { topic: "goals" });
   if (!METRIC_TOPICS.some((topic) => topicAt(topic) !== undefined)) add(topicAt("weekly"), { topic: "weekly" });
   add(topicAt("cart"), { topic: "cart" });

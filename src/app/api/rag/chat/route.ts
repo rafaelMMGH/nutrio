@@ -24,7 +24,7 @@ export async function POST(request: Request) {
     const hooks = testHooks(request.headers, process.env);
     const db = await loadFor(auth.user, "chat");
     if (hooks.fail) throw new Error("Injected chat failure (x-e2e-fail)");
-    return json(ragAnswer(db, auth.user, body.message, serverToday(new Date()), { trace: hooks.trace }));
+    return json(ragAnswer(db, auth.user, body.message, hooks.today ?? serverToday(new Date()), { trace: hooks.trace }));
   } catch (error) {
     console.error("[api/rag/chat]", { userId: auth.user.id, messageLength: body.message.length }, error);
     return json({ error: "Internal error" }, 500);

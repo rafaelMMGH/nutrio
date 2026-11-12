@@ -124,10 +124,11 @@ const pending = (topic: TopicId): Built => ({ lead: textLead(`Pronto podré resp
 
 /**
  * The answer to one message: depends only on the message, the user's data and `today` (REQ-5). `trace` adds the
- * resolved intents for the e2e suite (plan D2). `today` is read once the date-based topics exist (US3). The topics
+ * resolved intents for the e2e suite (plan D2). `today` dates the metric questions
+ * (REQ-14); their builders read it from US3 on. The topics
  * are the resolver's (REQ-6): at most two are answered, the rest are offered as buttons.
  */
-export function ragAnswer(db: AppDb, user: AppUser, message: string, _today: string, { trace = false }: { trace?: boolean } = {}): ChatAnswer {
+export function ragAnswer(db: AppDb, user: AppUser, message: string, today: string, { trace = false }: { trace?: boolean } = {}): ChatAnswer {
   const starters = STARTERS.map(questionButton);
   const greeting = greetingOf(message);
   if (greeting) {
@@ -137,7 +138,7 @@ export function ragAnswer(db: AppDb, user: AppUser, message: string, _today: str
 
   // REQ-3: only the user's own, live, non-generic recipes can be named; the array is already in seq order.
   const recipes = db.recipes.filter((recipe) => recipe.user_id === user.id && !recipe.deleted_at && !isGeneric(recipe.name));
-  const { intents, overflow: further } = resolve(message, recipes);
+  const { intents, overflow: further } = resolve(message, recipes, today);
   if (!intents.length) return reply("no_match", standalone("No entendí tu pregunta. Puedo ayudarte con:"), starters, [], trace ? [] : undefined);
 
   // The resolver only returns topics of the table.
