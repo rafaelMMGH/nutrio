@@ -329,14 +329,26 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
   - Unit (tests/unit/chat-meals.test.ts): REQ-7 almuerzo question and buttons (1 or 2), merienda/snack → colación, not in plan; REQ-8 one slot's time highlighted, a slot without a time, all slots; REQ-11 two colaciones → 2 buttons with "(<time>)", "colación 2" and "segunda colacion", 11 slots → "Colación 11", masculine ordinals; `sweep()` over every "<Slot ref>" and almuerzo-clarify button; answer text for the slot Givens of REQ-1 and REQ-6. Red first.
   - e2e, written (tests/e2e/assistant-meals.spec.ts): an almuerzo question and the duplicate-colación buttons through `ask()`; one REQ-8 slot-time row through `ask()` covering a single slot's time highlighted, a slot without a time, and all slots.
   - Split: part 1 (just before T029) = REQ-7, REQ-8 and the REQ-11 labels/ordinals on the slot builders; part 2 (just before T030) = typed ordinals, "colación 2", "segunda colacion", the sweep and the e2e.
+  - **Part 1 done** (commit a930790, tests red: module missing; reviewer PASS in 2a1; see Batch note 2a1). **Part 2 in batch 2a2** (with T030 and the 2a1 fixes L1, M4; L3 gaps).
   - Part 2 answer-level row (analyze round 1, M2; REQ-11 with REQ-6 step 4 fallthrough, resolve-level row in T026 part 2): unit (tests/unit/chat-meals.test.ts) `ragAnswer("¿Qué lleva la segunda colación?")` lists the second colación slot's options (its option labels, in plan order) and gives no not-found reply (kind neither `did_you_mean` nor `no_match`); e2e, written (tests/e2e/assistant-meals.spec.ts), the same question through `ask()` with the same assertions. Ordering: the options builder lands in T032 (2b1), after this part, so here the row asserts the no-not-found kind plus `resolved` slotOptions for the second colación and the slot's title/lead; the option-label assertion is added in T031 part 2 (just before T033), keeping each batch tip green.
-- [ ] T029 [US2] Slots (src/lib/domain/chat-meals.ts)
+- [x] T029 [US2] Slots (src/lib/domain/chat-meals.ts)
   - Slot list from `activeSchedule`, word-to-slot mapping, almuerzo/merienda/snack rules.
   - Slot refs and ordinals (feminine/masculine, >10), slot buttons (times vs options message); slot times builder and variants.
   - T013 review (M2): the "meal times" real-API test (tests/e2e/assistant-answers.spec.ts:117-125) still expects the heading "Comidas" and the source "Basado en: Plan activo:"; update it to the "Horarios" block when this builder replaces the old meal-times answer.
   - 1c2 review round 2 (LOW): filling TOPICS titles/buttons here updates `SPEC_TOPICS` in tests/unit/chat-answer.test.ts in the same commit (see T027 note).
   - 1c2 review (M6), owned here: tests/e2e/assistant-api.spec.ts "¿A qué hora es la cena?" (lines 261, 273, 277) and "¿Cuándo desayuno?" (line 298) assert the old meal-times answer and sources; rewrite them to the slot-time builder's text and sources.
 **Review checkpoint 2a1:** tsc + unit.
+
+**Batch note 2a1 (done; T028 part 1, T029; commits a930790 (T028 part 1 tests, red: chat-meals module missing) and 9fd81fa (T029 code); tip 9fd81fa; reviewer PASS; tsc clean, unit 495/495; no dependency change; 248 added / 18 deleted vs ~330 estimated):**
+
+- Landed: src/lib/domain/chat-meals.ts (new) with `planSlots`, `chooseSlot`, `slotTimeLead` and the types `Built`, `Slot`, `SlotPlan`. chat.ts: `Built` moved to chat-meals.ts; `mealTimes` answers the named slot, or lists all slots when none is named; builders receive the intent; in `ragAnswer` a builder's own buttons and a `clarify` kind replace the topic follow-ups. Slots are now read from `activeSchedule` (`mealTypes`). The e2e rows (T029 M6 rewrite in assistant-api.spec.ts, T013 M2 in assistant-answers.spec.ts) were rewritten but not run (Batch E).
+- Carry-forwards from the review:
+  - **M1 (MEDIUM):** in a 2-block answer the buttons come from the first block that has any (chat.ts ~147), so REQ-24 is only partly met; T051 owns the rule. T050 part 1 must include rows for a clarify plus another topic, and a not-in-plan answer plus a second block, and decide whether follow-ups and overflow survive in each (recorded in T050/T051).
+  - **M2 (MEDIUM):** there is no "Tu <slot> es: **<time>**." variant yet; REQ-28 variants belong to T048/T049, and T049 must carry the slot-times variant. The new 2a1 tests assert the canonical copy "Tu horario de cena: …"; T048/T049 must make them variant-agnostic (recorded in T048/T049).
+  - **M3 (MEDIUM, interim dead end):** duplicate-slot buttons loop back to the same clarify until T030 (2a2) resolves "<slot> <n>"; options-version buttons reach the D3 placeholder until T032 (2b1). Do not ship or demo the branch between batches.
+  - **L2 (LOW):** tests/unit/chat-meals.test.ts:52 pins "No tienes un plan activo."; T052 flips it to the spec Copy no-active-plan reply; prefer asserting `sources` is `[]` there (recorded in T052).
+  - **L5 (LOW, open question):** whether the all-times list section title stays "Comidas"; confirm with the user or at the next review (HANDOFF section 6).
+  - **L1, M4 and the L3 test gaps** are being fixed in batch 2a2 (code-writer running), with T028 part 2 and T030.
 
 **Batch 2a2: slot resolution**, about 170 lines with tests
 
@@ -479,10 +491,12 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
   - REQ-26/REQ-29 answer-text rows (analyze round 1, M1; tests/unit/chat-edges.test.ts, base fixture): "¿Qué lleva la pizza con atún?" → kind `did_you_mean`, lead "No encontré exactamente 'pizza con atún'. ¿Quisiste decir…?", exactly one button "Sándwich de atún" sending "¿Qué lleva Sándwich de atún?", no detail opened (no detail block, kind ≠ `detail`); "¿Qué lleva el agua?" → the water answer, not a REQ-26 reply (no "No encontré" lead, kind neither `did_you_mean` nor not-found); '<frase>' is the phrase as typed without the cue and leading article ("¿Qué lleva la Pizza Con Atún?" quotes "Pizza Con Atún", and the quote never starts with "la"/"el" or contains "lleva"); the three REQ-29 table rows at answer level, each the "¿Quisiste decir…?" lead with buttons in order: "una ensalada rica" → Ensalada de pollo; "pollo atún ensalada" → 3 buttons Ensalada de pollo, Pollo asado, Sándwich de atún; "estoy buscando algo rico con atún" → Sándwich de atún; a whole question that is exactly a recipe name, "Pollo asado" alone (no dish cue), → did-you-mean with "Pollo asado" first, never a detail.
   - e2e, written (tests/e2e/assistant-edges.spec.ts): through `ask()`, "hola", pollo did-you-mean, pizza not found, the same question twice, and one REQ-29 did-you-mean row ("pollo atún ensalada": the lead and the 3 buttons in order). Finalize the `sources` test in assistant-api.spec.ts: "¿Qué hago ahora?" → kind `no_match` and `sources` `[]`.
   - 1c2 review (M4): greetings and thanks are exact-only today (`GREETING_WORDS`), but REQ-2 makes "buenos días" a fuzzy multi-word entry and Greeting is a Topics row like any other. Rows: "grasias" (1 edit, 7 letters), "gracia" (singular of gracias), "buenso dias" (swap), "buenas tarde", "buenos dia" → greeting/thanks; "hoal" stays `no_match` (4 letters, exact only). T049 routes greetings through `matchWord`/`matchPhrases`.
+  - 2a1 review (M2), with T049: rows for the REQ-28 slot-times variant ("Tu <slot> es: **<time>**."); make the 2a1 slot-time tests in tests/unit/chat-meals.test.ts (canonical "Tu horario de cena: …") and the rewritten e2e rows variant-agnostic (either spec Copy variant).
   - T013 review (M1), with T049: the REQ-29 no-match test in tests/e2e/assistant-next-step.spec.ts:113-118 hard-codes the first lead variant and the 4 starters; make it variant-agnostic (either spec Copy variant, since REQ-28 picks one by hashing the question).
 - [ ] T049 [US4] Builders and variant picker; REQ-29 matching on the whole question minus stop words (src/lib/domain/chat.ts)
   - Revision 8: REQ-29 calls `rankDish` from T027 (matcher rows already in T026 part 1); this task adds the step-8 call and the did-you-mean/not-found builders in chat.ts only. src/lib/domain/chat-dish.ts is not changed here (revision 9, analyze L6).
   - 1c2 review (M4): greeting and thanks words go through the REQ-2 matcher (fuzzy, phrases) instead of the exact `GREETING_WORDS` set; rows in T048.
+  - 2a1 review (M2): carry the slot-times variant "Tu <slot> es: **<time>**." in the variant picker (src/lib/domain/chat-meals.ts `slotTimeLead`); rows in T048.
 
 **Review checkpoint 4a:** tsc + unit.
 
@@ -493,14 +507,17 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
   - e2e, written (tests/e2e/assistant-edges.spec.ts): the multi-topic question and "¿Cuánto llevo?" through `ask()`; one no-active-plan slot question.
   - 1a2 review (LOW L5): once 2-block answers exist (T051), one literal assertion of a 2-block plain `answer` string (both blocks concatenated, D7); applies to T048–T050 wherever a 2-block answer is first produced.
   - 1b2b review (MEDIUM): in tests/e2e/assistant-api.spec.ts `answer()` (~line 61) add `expect(body.blocks, message).toHaveLength(1)` (its comment says "with one block"; for lead/sections it is the exact equivalent of the old flattening), before REQ-24 adds 2-block answers; do it in the first earlier batch that touches the file, if any.
+  - 2a1 review (M1), part 1: rows for a clarify plus another topic, and a not-in-plan slot answer plus a second block; each row decides and asserts whether follow-ups and overflow buttons survive (today chat.ts ~147 takes the buttons of the first block that has any).
   - Split: part 1 (just before T051) = the multi-topic rows and the literal 2-block `answer`; part 2 (just before T052, Batch 4b2) = clarify, REQ-27 rows, the sweep and the e2e.
 - [ ] T051 [US4] `reply()` 2-block rules: titles, one option block, follow-ups then overflow, a later clarify omitted (src/lib/domain/chat.ts)
+  - 2a1 review (M1): replace the interim "buttons from the first block that has them" (chat.ts ~147) with the REQ-24 merge, per the T050 part 1 rows.
 **Review checkpoint 4b1:** tsc + unit.
 
 **Batch 4b2: clarifications and missing data**, about 290 lines with tests
 
 - [ ] T052 [US4] Clarify replies and the missing-data replies tested in T050 only (src/lib/domain/chat-meals.ts, src/lib/domain/chat-metrics.ts)
   - 1c2 review (M6), owned here: tests/e2e/assistant-api.spec.ts:117-118 ("¿Cuál es el objetivo de mi plan?" → "No tienes un plan activo.") and :307 use the old copy; rewrite to the spec Copy no-active-plan reply ("Aún no tienes…") for the topic each question resolves to.
+  - 2a1 review (L2): tests/unit/chat-meals.test.ts:52 pins "No tienes un plan activo."; flip it to the spec Copy reply in the T050 red commit, and prefer asserting `sources` is `[]` over the exact old text.
 
 **Checkpoint:** US4 code complete (REQ-23 to REQ-29), unit-green.
 
