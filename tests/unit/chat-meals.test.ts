@@ -432,6 +432,13 @@ test("REQ-12 two steps or fewer have no link, and an import note or nothing show
   }
 });
 
+test("REQ-12 the detail lead has both variants across dishes, and three steps show the link", () => {
+  assert.equal(ask("¿Qué lleva Pollo asado?").answer.split("\n")[0], "Esto lleva Pollo asado:");
+  assert.equal(ask("¿Qué lleva Ensalada de pollo?").answer.split("\n")[0], "Ensalada de pollo lleva:");
+  const reply = askWith("¿Qué lleva el pollo asado?", (db) => { db.recipes.find((recipe) => recipe.name === "Pollo asado")!.description = "Uno. Dos. Tres."; });
+  assert.deepEqual(links(reply).map((button) => button.label), ["Ver receta completa"]);
+});
+
 test("REQ-12 ingredient formats: quantity and unit, quantity only, neither, and stored text such as 'al gusto'", () => {
   const reply = askWith("¿Qué lleva el pollo asado?", (db) => setIngredients(db, "Pollo asado", [["Huevo", 2, "pieza"], ["Aguacate", 1, ""], ["Sal", 0, ""], ["Limón", 0, "al gusto"]]));
   assert.deepEqual(itemsOf(reply, "Ingredientes"), ["Huevo · 2 pieza", "Aguacate · 1", "Sal", "Limón · al gusto"]);
