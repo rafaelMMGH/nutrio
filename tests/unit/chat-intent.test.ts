@@ -201,3 +201,9 @@ test("REQ-11 a slot word without an ordinal carries none, and each slot word tak
   assert.deepEqual(resolve("mi colación").intents, [{ topic: "slotOptions", slot: "colacion" }]);
   assert.deepEqual(resolve("primera colación y cena").intents, [{ topic: "slotOptions", slot: "colacion", ordinal: 1 }, { topic: "slotOptions", slot: "cena" }]);
 });
+
+test("REQ-11 a word that names an Object property beside a slot word is no ordinal", () => {
+  for (const word of ["constructor", "toString", "__proto__", "hasOwnProperty"]) {
+    assert.deepEqual(resolve(`mi ${word} colación`).intents, [{ topic: "slotOptions", slot: "colacion" }], word);
+  }
+});
