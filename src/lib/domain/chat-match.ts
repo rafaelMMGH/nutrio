@@ -27,6 +27,9 @@ function distance(a: string, b: string): number {
   return rows[a.length][b.length];
 }
 
+/** Whether a word, typo or not, is as near the plural spelling of an entry as its singular one or nearer (a tie reads as plural, as in "comidsa"). */
+export const isPlural = (word: string, entry: string) => distance(word, `${entry}s`) <= distance(word, entry);
+
 export const isExact = (word: string, entry: string) => (entry.endsWith("*") ? word.startsWith(entry.slice(0, -1)) : forms(entry).includes(word));
 
 /**

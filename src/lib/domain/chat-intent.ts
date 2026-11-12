@@ -1,5 +1,6 @@
 import { type Intent, words } from "@/lib/assistant";
 import { matchDish } from "@/lib/domain/chat-dish";
+import { isPlural } from "@/lib/domain/chat-match";
 import { greetingOf, topicHits, type TopicHit, type TopicId } from "@/lib/domain/chat-topics";
 import type { Recipe } from "@/lib/types";
 
@@ -45,8 +46,8 @@ export function resolve(question: string, recipes?: readonly Recipe[]): Resoluti
 
   const first = (match: (hit: TopicHit) => boolean) => hits.find(match)?.at;
   const topicAt = (topic: TopicId) => first((hit) => hit.topic === topic);
-  // "comidas" in the plural is the whole day's meals, not the slot "comida" (Topics: all meal times).
-  const allMeals = (hit: TopicHit) => hit.topic === "slotOptions" && tokens[hit.at] === "comidas";
+  // "comidas" in the plural, typos included, is the whole day's meals, not the slot "comida" (Topics: all meal times).
+  const allMeals = (hit: TopicHit) => hit.topic === "slotOptions" && hit.entry === "comida" && isPlural(tokens[hit.at], hit.entry);
   const slotHits = hits.filter((hit) => hit.topic === "slotOptions" && !allMeals(hit));
   const timeAt = first((hit) => hit.topic === "mealTimes" || allMeals(hit));
   const timed = hits.some((hit) => hit.topic === "mealTimes");
