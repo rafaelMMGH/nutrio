@@ -1,6 +1,6 @@
 import { type Intent, words } from "@/lib/assistant";
 import { matchDish } from "@/lib/domain/chat-dish";
-import { isPlural } from "@/lib/domain/chat-match";
+import { isPlural, matchWord } from "@/lib/domain/chat-match";
 import { greetingOf, topicHits, type TopicHit, type TopicId } from "@/lib/domain/chat-topics";
 import type { Recipe } from "@/lib/types";
 
@@ -23,10 +23,40 @@ const ORDINAL_WORDS = new Map<string, number>(
     .flatMap((forms, index) => forms.map((form): [string, number] => [form, index + 1]))
 );
 
+/** Tokens after a bare number that make it a clock time ("colación 2 am"), not a position. */
+const MERIDIEMS = new Set(["am", "pm"]);
+
 /** The position a slot word carries: an ordinal word before or after it ("segunda colación"), or a number after it ("colación 2"). */
-function ordinalAt(tokens: string[], at: number): { ordinal?: number } {
-  const ordinal = ORDINAL_WORDS.get(tokens[at - 1]) ?? ORDINAL_WORDS.get(tokens[at + 1]) ?? (/^\d{1,3}$/.test(tokens[at + 1] ?? "") ? Number(tokens[at + 1]) : undefined);
-  return ordinal ? { ordinal } : {};
+function ordinalAt(tokens: string[], at: number): { ordinal?: number; numbered?: boolean } {
+  const word = ORDINAL_WORDS.get(tokens[at - 1]) ?? ORDINAL_WORDS.get(tokens[at + 1]);
+  if (word) return { ordinal: word };
+  const number = /^\d{1,3}$/.test(tokens[at + 1] ?? "") && !MERIDIEMS.has(tokens[at + 2]) ? Number(tokens[at + 1]) : 0;
+  return number ? { ordinal: number, numbered: true } : {};
+}
+
+const integer = (token: string | undefined) => (token !== undefined && /^\d+$/.test(token) ? Number(token) : undefined);
+// The page number is read from the typed message: the word split would turn "3.5" into the page 3.
+const PAGE_NUMBER = /p[aá]gina\s+(\d+)(?![\p{L}\d]|[.,]\d)/iu;
+
+/**
+ * REQ-9, REQ-10: what a message does with the options of the slot at `at`. "<slot>, más opciones" is a page (the typed
+ * number, or 2); "opción <n>" and "<n> de la <slot>" pick option n. Nothing of the sort gives undefined.
+ */
+function selectionAt(question: string, tokens: string[], at: number): { page: number } | { option: number } | undefined {
+  const isOption = (token: string | undefined) => token !== undefined && matchWord(token, ["opcion"]).length > 0;
+  if (tokens.some((token, index) => token === "mas" && isOption(tokens[index + 1]))) return { page: Number(PAGE_NUMBER.exec(question)?.[1] ?? 2) };
+  // "de" then articles then the slot word: "la 2 de la cena".
+  const reachesSlot = (from: number) => {
+    if (tokens[from] !== "de") return false;
+    let next = from + 1;
+    while (ARTICLES.includes(tokens[next])) next++;
+    return next === at;
+  };
+  for (let index = 0; index < tokens.length; index++) {
+    const option = integer(tokens[index]);
+    if (option !== undefined && ((isOption(tokens[index - 1]) && tokens[index + 1] !== "de") || reachesSlot(index + 1))) return { option };
+  }
+  return undefined;
 }
 
 const ARTICLES = ["el", "la", "los", "las", "un", "una"];
@@ -44,8 +74,7 @@ function dishPhrase(question: string, tokens: string[], hit: TopicHit): { text: 
 }
 
 /**
- * REQ-6 in order. Step 1 greeting and step 3 identity are here; step 2 (option selection and paging, US2) comes before
- * the topics and is left to that task. Step 4 (a dish named by its recipe, REQ-3) runs when the caller passes the
+ * REQ-6 in order. Step 1 greeting, step 2 (option selection and paging) and step 3 identity are here. Step 4 (a dish named by its recipe, REQ-3) runs when the caller passes the
  * user's recipes: a dish phrase ends the answer; a phrase that is not a dish name falls through to the topics, and
  * a dish cue still unresolved at the end is step 7. Without recipes the dish cue is a plain "dish" intent. When nothing
  * is found the caller continues with step 8 (did-you-mean over the question, no-match).
@@ -63,6 +92,14 @@ export function resolve(question: string, recipes?: readonly Recipe[]): Resoluti
   const slotHits = hits.filter((hit) => hit.topic === "slotOptions" && !allMeals(hit));
   const timeAt = first((hit) => hit.topic === "mealTimes" || allMeals(hit));
   const timed = hits.some((hit) => hit.topic === "mealTimes");
+
+  // Step 2: option selection and paging of a slot ends the answer, ahead of the dish cue and the slot reading.
+  if (!timed) {
+    for (const hit of slotHits) {
+      const selection = selectionAt(question, tokens, hit.at);
+      if (selection) return only({ topic: "slotOptions", slot: SLOT_OF_VERB[hit.entry] ?? hit.entry, ...ordinalAt(tokens, hit.at), ...selection });
+    }
+  }
 
   // Step 4: a dish cue plus a dish name ends the answer with the matcher's outcome.
   const dishHit = recipes && hits.find((hit) => hit.topic === "dish");

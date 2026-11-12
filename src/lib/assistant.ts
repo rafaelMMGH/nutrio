@@ -53,6 +53,8 @@ export type Intent = {
   slot?: string;
   /** Which of several same-named slots a typed ordinal or "<slot> <n>" names (1-based, REQ-11); the plan decides if it applies. */
   ordinal?: number;
+  /** The ordinal was a bare number ("colación 2"): on a slot that is not duplicated it means option n (REQ-11). */
+  numbered?: boolean;
   /** Goals narrowed to one metric ("meta de peso"). */
   metric?: "weight" | "exercise" | "water";
   /** What an identity question asks for. */

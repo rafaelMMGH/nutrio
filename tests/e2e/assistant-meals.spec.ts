@@ -80,7 +80,7 @@ test("REQ-9 and REQ-10 typed selection and paging: 'cena opción 2', paging butt
 
   const typed = await ask(chatContext.request, "cena opción 2", { trace: true });
   expect(typed.body.resolved).toEqual([{ topic: "slotOptions", slot: "cena", option: 2 }]);
-  expect((await ask(chatContext.request, "la 2 de la cena")).body.blocks).toEqual(typed.body.blocks);
+  expect((await ask(chatContext.request, "la 2 de la cena")).body.buttons).toEqual(typed.body.buttons);
   const past = await ask(chatContext.request, "cena opción 7");
   expect(past.body.answer).toContain("Tu cena tiene 5 opciones.");
 });

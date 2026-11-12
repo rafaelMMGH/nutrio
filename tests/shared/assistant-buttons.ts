@@ -29,8 +29,9 @@ export const BUTTON_TOPICS: Record<string, { topic: string; lead?: RegExp }> = {
   "¿Cuál es mi colación?": { topic: "slotOptions", lead: OPTIONS_LEAD },
   "¿Cuál es mi comida?": { topic: "slotOptions", lead: OPTIONS_LEAD },
   "¿Cuál es mi cena?": { topic: "slotOptions", lead: OPTIONS_LEAD },
-  "¿Cuál es mi primera colación?": { topic: "slotOptions", lead: OPTIONS_LEAD },
-  "¿Cuál es mi segunda colación?": { topic: "slotOptions", lead: OPTIONS_LEAD },
+  ...Object.fromEntries(
+    ["primera", "segunda", "tercera", "cuarta", "quinta", "sexta", "séptima", "octava", "novena", "décima"].map((ordinal) => [`¿Cuál es mi ${ordinal} colación?`, { topic: "slotOptions", lead: OPTIONS_LEAD }] as const)
+  ),
   "¿Cuál es mi primer desayuno?": { topic: "slotOptions", lead: OPTIONS_LEAD },
   "¿Cuál es mi segundo desayuno?": { topic: "slotOptions", lead: OPTIONS_LEAD },
   "¿Cuál es mi colación 11?": { topic: "slotOptions", lead: OPTIONS_LEAD },

@@ -114,25 +114,30 @@ function optionLabel(db: AppDb, recipe: Recipe, position: number): string {
   return `Opción ${position}: ${names.slice(0, 3).join(", ")}${names.length > 3 ? "…" : ""}`;
 }
 
+/** What the intent leaves out, the caller can set: tests pass these directly. */
 export type SlotOptionsView = {
-  /** 1-based page; below 1 reads as 1 and past the last as the last (REQ-9). */
+  /** 1-based page; below 1 reads as 1 and past the last as the last (REQ-9). Default: the intent's page, else 1. */
   page?: number;
-  /** An option number the user asked for; only a number beyond the slot's options changes the reply (REQ-10). */
+  /** An option number the user asked for; only a number beyond the slot's options changes the reply (REQ-10). Default: the intent's option. */
   asked?: number;
 };
 
 /**
  * The options of the slot an intent names (REQ-9, REQ-10, REQ-11, REQ-27): a lead and one full-width button per option
- * of the page, then the paging buttons. A slot with one option goes to the detail (T034, not built yet): until then
- * it is listed like any other.
+ * of the page, then the paging buttons. A slot with one option, or an option in range, goes to the detail (T034, not
+ * built yet): until then they are listed like any other.
  */
-export function slotOptions(db: AppDb, userId: string, intent: Intent, question: string, { page = 1, asked }: SlotOptionsView = {}): Built {
+export function slotOptions(db: AppDb, userId: string, intent: Intent, question: string, view: SlotOptionsView = {}): Built {
   const plan = planSlots(db, userId);
   if (!plan) return { lead: [{ text: "No tienes un plan activo." }] };
   // The resolver always names the slot of a slotOptions intent.
   const chosen = chooseSlot(plan, intent.slot ?? "", "options", intent.ordinal);
   if ("built" in chosen) return chosen.built;
   const { slot } = chosen;
+  // A bare number ("cena 2") is option n unless the slot is duplicated, where it was the slot's ordinal (REQ-11).
+  const bareOption = intent.numbered && slotsNamed(plan.slots, intent.slot ?? "").length === 1 ? intent.ordinal : undefined;
+  const asked = view.asked ?? intent.option ?? bareOption;
+  const page = view.page ?? intent.page ?? 1;
   const sources = [`Plan activo: ${plan.planName}`];
   const name = slot.ref.toLowerCase();
   const recipes = db.mealOptions
