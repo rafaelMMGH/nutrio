@@ -218,7 +218,10 @@ const OPTION_ROWS: [string, object][] = [
   ["la comida opcion 1", { slot: "comida", option: 1 }],
   ["¿Qué lleva desayuno opcion 1?", { slot: "desayuno", option: 1 }],
   ["Segunda colación, opción 2", { slot: "colacion", ordinal: 2, option: 2 }],
-  ["Colación 11, opción 3", { slot: "colacion", ordinal: 11, numbered: true, option: 3 }]
+  ["Colación 11, opción 3", { slot: "colacion", ordinal: 11, numbered: true, option: 3 }],
+  // 2c2 L1: a decimal elsewhere in the message (a clock time) is not the option's decimal.
+  ["a las 2.30 cena opción 2", { slot: "cena", option: 2 }],
+  ["la 2 de la cena a las 8,30", { slot: "cena", option: 2 }]
 ];
 for (const [message, expected] of OPTION_ROWS) {
   test(`REQ-10 resolve "${message}" -> option selection`, () => {
@@ -245,4 +248,25 @@ test("REQ-11 '<slot> <n>' is flagged as a bare number, for the plan to read as o
   assert.deepEqual(resolve("cena 2").intents, [{ topic: "slotOptions", slot: "cena", ordinal: 2, numbered: true }]);
   assert.deepEqual(resolve("colación 2 am").intents, [{ topic: "slotOptions", slot: "colacion" }]);
   assert.deepEqual(resolve("segunda colación").intents, [{ topic: "slotOptions", slot: "colacion", ordinal: 2 }]);
+});
+
+// REQ-14 (T041): the resolver attaches the period the date parser found to the metric intents, with today passed in.
+const TODAY = "2026-10-28";
+const periods = (message: string, today: string | undefined = TODAY) => resolve(message, undefined, today).intents.map((intent) => [intent.topic, intent.period?.kind, intent.period?.from, intent.period?.to]);
+
+test("REQ-14 the period is attached to water, exercise, weight and meals-done intents", () => {
+  assert.deepEqual(periods("¿Cuánta agua tomé ayer?"), [["water", "yesterday", "2026-10-27", "2026-10-27"]]);
+  assert.deepEqual(periods("¿Cuántos días hice ejercicio esta semana?"), [["exercise", "thisWeek", "2026-10-26", TODAY]]);
+  assert.deepEqual(periods("¿Cuánto pesaba el lunes?"), [["weight", "weekday", "2026-10-26", "2026-10-26"]]);
+  assert.deepEqual(periods("¿Cuántas comidas llevo hoy?"), [["mealsDone", "today", TODAY, TODAY]]);
+  assert.deepEqual(periods("agua y ejercicio ayer"), [["water", "yesterday", "2026-10-27", "2026-10-27"], ["exercise", "yesterday", "2026-10-27", "2026-10-27"]]);
+});
+
+test("REQ-14 no period without a recognized phrase, without today, or on topics that are not metrics", () => {
+  assert.deepEqual(periods("¿Cuánta agua llevo?"), [["water", undefined, undefined, undefined]]);
+  assert.deepEqual(periods("¿Cuánta agua tomé hace dos semanas?"), [["water", undefined, undefined, undefined]]);
+  assert.deepEqual(periods("¿Cuánta agua tomé ayer?", undefined), [["water", undefined, undefined, undefined]]);
+  assert.deepEqual(periods("¿Cuál es mi meta de peso ayer?"), [["goals", undefined, undefined, undefined]]);
+  assert.deepEqual(periods("¿Qué lleva la cena ayer?"), [["slotOptions", undefined, undefined, undefined]]);
+  assert.deepEqual(periods("Mi avance de la semana"), [["weekly", undefined, undefined, undefined]]);
 });

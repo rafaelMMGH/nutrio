@@ -322,3 +322,11 @@ test("REQ-6 steps 2 and 4: a generic option name is never a dish; '<slot> opcion
   const { db, user } = memDb();
   assert.deepEqual(dishIntent(db, user, "¿Qué lleva desayuno opcion 1?"), { topic: "slotOptions", slot: "desayuno", option: 1 });
 });
+
+// REQ-13, REQ-14: ragAnswer parses dates against the `today` it is given, so a pinned today moves the period bounds.
+test("the trace carries the period computed from the given today", () => {
+  const { db, user } = memDb();
+  const periodOf = (today: string) => ragAnswer(db, user, "¿Cuánta agua tomé ayer?", today, { trace: true }).resolved?.[0]?.period;
+  assert.deepEqual(periodOf("2026-10-28"), { kind: "yesterday", from: "2026-10-27", to: "2026-10-27" });
+  assert.deepEqual(periodOf("2026-03-13"), { kind: "yesterday", from: "2026-03-12", to: "2026-03-12" });
+});
