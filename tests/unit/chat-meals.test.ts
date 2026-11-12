@@ -122,3 +122,7 @@ test("REQ-11 eleven colaciones: the tenth and eleventh buttons read 'Décima col
   assert.equal(labels.length, 11);
   assert.deepEqual(labels.slice(9), ["Décima colación (Entre 10 a 11 am)", "Colación 11 (Entre 2 a 3 pm)"]);
 });
+
+test("REQ-11 two snacks read '2 snacks' (the loanword takes only an s)", () => {
+  assert.equal(ask("¿A qué hora es mi snack?", { meals: ["Desayuno", "Snack", "Snack"] }).answer, "Tienes 2 snacks. ¿Cuál?");
+});
