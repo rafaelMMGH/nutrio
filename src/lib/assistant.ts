@@ -55,6 +55,10 @@ export type Intent = {
   metric?: "weight" | "exercise" | "water";
   /** What an identity question asks for. */
   of?: "name" | "plan";
+  /** Dish questions: the recipe found, the candidates offered or nothing found; "clarify" is a dish cue with an empty phrase. */
+  outcome?: "found" | "didYouMean" | "notFound" | "clarify";
+  /** Dish questions: the phrase as typed, without the cue and the leading article (REQ-26). */
+  phrase?: string;
   recipeIds?: string[];
   option?: number;
   page?: number;

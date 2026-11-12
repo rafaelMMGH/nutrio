@@ -1,6 +1,7 @@
 import type { AppDb, AppUser } from "@/lib/types";
 import { type Block, type Button, type ChatAnswer, type Intent, type ReplyKind, type Rich, type Section, normalizeText, STARTERS, words } from "@/lib/assistant";
 import { consolidateCart } from "@/lib/domain/cart";
+import { isGeneric } from "@/lib/domain/chat-dish";
 import { resolve } from "@/lib/domain/chat-intent";
 import { greetingOf, TOPICS, type TopicId } from "@/lib/domain/chat-topics";
 import { activePlan } from "@/lib/domain/plans";
@@ -125,7 +126,9 @@ export function ragAnswer(db: AppDb, user: AppUser, message: string, _today: str
     return reply("greeting", standalone(lead), starters, [], trace ? [{ topic: "greeting" }] : undefined);
   }
 
-  const { intents, overflow: further } = resolve(message);
+  // REQ-3: only the user's own, live, non-generic recipes can be named; the array is already in seq order.
+  const recipes = db.recipes.filter((recipe) => recipe.user_id === user.id && !recipe.deleted_at && !isGeneric(recipe.name));
+  const { intents, overflow: further } = resolve(message, recipes);
   if (!intents.length) return reply("no_match", standalone("No entendí tu pregunta. Puedo ayudarte con:"), starters, [], trace ? [] : undefined);
 
   // The resolver only returns topics of the table.

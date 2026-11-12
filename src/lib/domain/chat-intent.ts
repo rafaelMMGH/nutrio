@@ -1,5 +1,7 @@
 import { type Intent, words } from "@/lib/assistant";
+import { matchDish } from "@/lib/domain/chat-dish";
 import { greetingOf, topicHits, type TopicHit, type TopicId } from "@/lib/domain/chat-topics";
+import type { Recipe } from "@/lib/types";
 
 // Intent resolution of the assistant (spec assistant-data-scope REQ-6). Pure: the message is the only input. The
 // vocabulary says which words belong to which topic (chat-topics.ts); this file applies the combination rules.
@@ -14,15 +16,29 @@ const METRICS = ["weight", "exercise", "water"] as const;
 /** Topics that answer a question about a number: weekly progress and the ambiguous "llevo" give way to them. */
 const METRIC_TOPICS: TopicId[] = [...METRICS, "mealsDone"];
 
+const ARTICLES = ["el", "la", "los", "las", "un", "una"];
+
 const only = (...intents: Intent[]): Resolution => ({ intents, overflow: [] });
+
+/** The words after the dish cue minus the leading article, normalized (`text`, for the matcher) and as typed (REQ-26). */
+function dishPhrase(question: string, tokens: string[], hit: TopicHit): { text: string; typed: string } {
+  const from = hit.at + hit.entry.split(" ").length;
+  const typedWords = question.match(/[\p{L}\p{N}]+/gu);
+  // Both lists split on the same characters; if they ever disagree, fall back to the normalized words.
+  const source = typedWords?.length === tokens.length ? typedWords : tokens;
+  const skip = ARTICLES.includes(tokens[from]) ? 1 : 0;
+  return { text: tokens.slice(from + skip).join(" "), typed: source.slice(from + skip).join(" ") };
+}
 
 /**
  * REQ-6 in order. Step 1 greeting and step 3 identity are here; step 2 (option selection and paging, US2) comes before
- * the topics and step 4 (a dish named by its recipe, T027) refines the "dish" and slot intents below, so both are
- * left to those tasks. When nothing is found the caller continues with step 7 (did-you-mean) and step 8 (no-match).
+ * the topics and is left to that task. Step 4 (a dish named by its recipe, REQ-3) runs when the caller passes the
+ * user's recipes: a dish phrase ends the answer; a phrase that is not a dish name falls through to the topics, and
+ * a dish cue still unresolved at the end is step 7. Without recipes the dish cue is a plain "dish" intent. When nothing
+ * is found the caller continues with step 8 (did-you-mean over the question, no-match).
  * Phrases (identity, dish cues, meals done, multi-word synonyms) consume their words before any single word counts.
  */
-export function resolve(question: string): Resolution {
+export function resolve(question: string, recipes?: readonly Recipe[]): Resolution {
   if (greetingOf(question)) return only({ topic: "greeting" });
   const tokens = words(question);
   const hits = topicHits(tokens);
@@ -35,13 +51,23 @@ export function resolve(question: string): Resolution {
   const timeAt = first((hit) => hit.topic === "mealTimes" || allMeals(hit));
   const timed = hits.some((hit) => hit.topic === "mealTimes");
 
+  // Step 4: a dish cue plus a dish name ends the answer with the matcher's outcome.
+  const dishHit = recipes && hits.find((hit) => hit.topic === "dish");
+  const dish = dishHit ? dishPhrase(question, tokens, dishHit) : undefined;
+  if (recipes && dish) {
+    const match = matchDish(dish.text, recipes);
+    if (match.kind === "found") return only({ topic: "dish", outcome: "found", recipeIds: [match.recipe.id], phrase: dish.typed });
+    if (match.kind === "didYouMean") return only({ topic: "dish", outcome: "didYouMean", recipeIds: match.candidates.map((recipe) => recipe.id), phrase: dish.typed });
+    if (match.dishName) return only({ topic: "dish", outcome: "notFound", phrase: dish.typed });
+  }
+
   const items: { at: number; intent: Intent }[] = [];
   const add = (at: number | undefined, intent: Intent) => at !== undefined && items.push({ at, intent });
 
   for (const hit of hits.filter(({ topic }) => topic === "identity")) add(hit.at, { topic: "identity", of: hit.entry.includes("plan") ? "plan" : "name" });
   // Time word + slot = slot times; a slot alone (or with a dish cue, which the slot reading wins) = its options.
   for (const hit of slotHits) add(hit.at, { topic: timed ? "mealTimes" : "slotOptions", slot: SLOT_OF_VERB[hit.entry] ?? hit.entry });
-  if (!slotHits.length) add(topicAt("dish"), { topic: "dish" });
+  if (!slotHits.length && !recipes) add(topicAt("dish"), { topic: "dish" });
 
   // Goal word + metric = that goal only; a goal word beside "plan" and no metric is the Plan topic (below).
   const goalAt = topicAt("goals");
@@ -59,6 +85,8 @@ export function resolve(question: string): Resolution {
     if (timeAt !== undefined) return only({ topic: "mealTimes" });
     if (topicAt("ambiguous") !== undefined) return only({ topic: "ambiguous" });
     if (topicAt("plan") !== undefined) return only({ topic: "plan" });
+    // Step 7: the dish cue is left unresolved, so an empty phrase asks which dish and any other phrase is not found.
+    if (dish) return only(dish.typed ? { topic: "dish", outcome: "notFound", phrase: dish.typed } : { topic: "dish", outcome: "clarify", phrase: "" });
     return only();
   }
 
