@@ -49,12 +49,12 @@ const ASKS = { times: "¿A qué hora es mi", options: "¿Cuál es mi" } as const
 export type SlotAsk = keyof typeof ASKS;
 
 const slotButton = (slot: Slot, ask: SlotAsk, label = slot.ref, text = slot.ref): Button => ({ type: "question", label, message: `${ASKS[ask]} ${text.toLowerCase()}?` });
-/** "colación" → "colaciones" (the accent goes), "desayuno" → "desayunos", "luz" → "luces". */
+/** "colación" → "colaciones" (the accent goes), "desayuno" → "desayunos", "snack" → "snacks", "luz" → "luces". */
 function plural(name: string): string {
   const lower = name.toLowerCase();
   if (lower.endsWith("ón")) return `${lower.slice(0, -2)}ones`;
   if (lower.endsWith("z")) return `${lower.slice(0, -1)}ces`;
-  return /[aeiou]$/.test(lower) ? `${lower}s` : `${lower}es`;
+  return /[aeiouk]$/.test(lower) ? `${lower}s` : `${lower}es`;
 }
 const withAccent = (word: string) => (word === "colacion" ? "colación" : word);
 
