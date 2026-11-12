@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import type { ChatAnswer } from "@/lib/assistant";
+import { STARTERS, type ChatAnswer } from "@/lib/assistant";
 import { ragAnswer } from "@/lib/domain/chat";
 import { chooseSlot, planSlots } from "@/lib/domain/chat-meals";
 import { PLAN_NAME } from "../shared/assistant-fixture";
@@ -170,4 +170,18 @@ test("REQ-5 every slot button of the duplicate, almuerzo and not-in-plan replies
   assert.deepEqual(swept("¿A qué hora es mi colación?", { meals: DUPLICATED }), ["¿A qué hora es mi primera colación?", "¿A qué hora es mi segunda colación?"]);
   assert.deepEqual(swept("¿A qué hora es mi almuerzo?", {}), ["¿A qué hora es mi desayuno?", "¿A qué hora es mi comida?"]);
   assert.deepEqual(swept("¿A qué hora es mi almuerzo?", { meals: ["Colación", "Cena"] }), ["¿A qué hora es mi colación?", "¿A qué hora es mi cena?"]);
+});
+
+test("REQ-7 merienda with neither a merienda nor a colación slot gets the not-in-plan reply", () => {
+  assert.equal(ask("¿A qué hora es mi merienda?", { meals: ["Desayuno", "Cena"] }).answer, "Tu plan no tiene merienda.");
+});
+
+test("REQ-11 the masculine ordinals also end at ten: the eleventh desayuno is 'Desayuno 11'", () => {
+  assert.equal(refsOf(Array(11).fill("Desayuno"))[10], "Desayuno 11");
+});
+
+test("REQ-27 a plan with no slots offers the starters instead of slot buttons", () => {
+  const reply = ask("¿A qué hora es mi cena?", { meals: [] });
+  assert.equal(reply.answer, "Tu plan no tiene cena.");
+  assert.deepEqual(questions(reply).map((button) => button.message), STARTERS);
 });
