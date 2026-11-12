@@ -5,9 +5,15 @@
 // ordinals and "Colación 11" included), the option buttons and the paging buttons (T032, T033) are here.
 
 const OPTIONS_LEAD = /opciones|elegir/;
+// An option button opens the option's detail ("<ref>, opción n lleva:") or, past the last option, says how many there are.
+const OPTION_LEAD = /lleva|opciones/;
 
 export const BUTTON_TOPICS: Record<string, { topic: string; lead?: RegExp }> = {
   "Mi cena de hoy": { topic: "slotOptions" },
+  // The non-generic recipes of the fixture: each "¿Qué lleva <receta>?" opens that recipe's detail (T036).
+  ...Object.fromEntries(
+    ["Pollo asado", "Ensalada de pollo", "Sándwich de atún", "Atole de avena", "Chilaquiles verdes", "Tacos de frijol"].map((name) => [`¿Qué lleva ${name}?`, { topic: "dish", lead: /lleva/ }] as const)
+  ),
   "Mi carrito": { topic: "cart", lead: /carrito/ },
   "¿Qué recetas hay en mi plan?": { topic: "recipes", lead: /recetas/ },
   "¿Cuál es mi horario?": { topic: "mealTimes", lead: /horarios/ },
@@ -37,7 +43,7 @@ export const BUTTON_TOPICS: Record<string, { topic: string; lead?: RegExp }> = {
   "¿Cuál es mi colación 11?": { topic: "slotOptions", lead: OPTIONS_LEAD },
   ...Object.fromEntries(
     ["Cena", "Comida", "Segunda colación", "Colación 11"].flatMap((ref) => [
-      ...[1, 2, 3, 4, 5, 6, 7].map((n) => [`${ref}, opción ${n}`, { topic: "slotOptions", lead: OPTIONS_LEAD }] as const),
+      ...[1, 2, 3, 4, 5, 6, 7].map((n) => [`${ref}, opción ${n}`, { topic: "slotOptions", lead: OPTION_LEAD }] as const),
       ...[1, 2, 3].map((page) => [`${ref}, más opciones (página ${page})`, { topic: "slotOptions", lead: OPTIONS_LEAD }] as const)
     ])
   )

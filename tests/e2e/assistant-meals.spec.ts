@@ -80,7 +80,8 @@ test("REQ-9 and REQ-10 typed selection and paging: 'cena opción 2', paging butt
 
   const typed = await ask(chatContext.request, "cena opción 2", { trace: true });
   expect(typed.body.resolved).toEqual([{ topic: "slotOptions", slot: "cena", option: 2 }]);
-  expect((await ask(chatContext.request, "la 2 de la cena")).body.buttons).toEqual(typed.body.buttons);
+  // The detail lead depends on the dish, not on the typed text: the whole answer is the same.
+  expect((await ask(chatContext.request, "la 2 de la cena", { trace: true })).body).toEqual(typed.body);
   const past = await ask(chatContext.request, "cena opción 7");
   expect(past.body.answer).toContain("Tu cena tiene 5 opciones.");
 });
@@ -113,4 +114,28 @@ test("REQ-12 the recipe page keeps its preparation display: the import notes sho
   }
   await chat.goto(`/recipes/${ids["Con pasos"]}`);
   await expect(chat.locator(".rx-steps li p")).toHaveText(["¿Listo?", "Ásalo.", "Él sirve."]);
+});
+
+test("REQ-12 a detail answer through ask(): lead, uncapped ingredients, two steps and the recipe link", async ({ chatContext }) => {
+  seedPlan({ times: "all", fixture: true });
+  const { status, body } = await ask(chatContext.request, "¿Qué lleva el pollo asado?", { trace: true });
+  expect(status).toBe(200);
+  expect(body.kind).toBe("detail");
+  expect(body.resolved?.[0]).toMatchObject({ topic: "dish", outcome: "found" });
+  expect(body.sources).toEqual(["Receta: Pollo asado"]);
+  expect(body.blocks[0].sections.map((section) => section.title)).toEqual(["Ingredientes", "Preparación"]);
+  expect(body.blocks[0].sections[1].items).toHaveLength(2);
+  expect(body.blocks[0].buttons).toEqual([{ type: "link", label: "Ver receta completa", href: expect.stringMatching(/^\/recipes\/.+/) }]);
+  await resendSweep(chatContext.request, [body]);
+});
+
+test("REQ-12 'Ver receta completa' opens the recipe page", async ({ chat }) => {
+  seedPlan({ times: "all", fixture: true });
+  await chat.goto("/");
+  const ui = await openAssistant(chat);
+  await ui.input.fill("¿Qué lleva el pollo asado?");
+  await ui.send.click();
+  await ui.panel.getByRole("link", { name: "Ver receta completa" }).click();
+  await expect(chat).toHaveURL(/\/recipes\/.+/);
+  await expect(chat.getByRole("heading", { name: "Pollo asado" }).first()).toBeVisible();
 });

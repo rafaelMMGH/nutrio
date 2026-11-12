@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { STARTERS, type Button, type ChatAnswer } from "@/lib/assistant";
 import { ragAnswer } from "@/lib/domain/chat";
+import { recipeSteps } from "@/lib/recipe-steps";
 import { type Built, chooseSlot, planSlots, slotOptions, type SlotOptionsView } from "@/lib/domain/chat-meals";
 import type { AppDb } from "@/lib/types";
 import { PLAN_NAME } from "../shared/assistant-fixture";
@@ -277,10 +278,9 @@ test("REQ-9 a soft-deleted option or recipe is skipped, and the labels count the
   assert.deepEqual(skipped((db) => { db.recipes.find((recipe) => recipe.id === second.recipe_id)!.deleted_at = "2026-02-01T00:00:00.000Z"; }), withoutSecond);
 });
 
-test("REQ-9 exactly one page: 3 options have no paging buttons, and 1 option is listed alone (the detail is T034)", () => {
+test("REQ-9 exactly one page: 3 options have no paging buttons", () => {
   const keep = (count: number) => (db: AppDb) => { const own = cenaOptions(db); db.mealOptions = db.mealOptions.filter((option) => !own.includes(option) || own.indexOf(option) < count); };
   assert.deepEqual(labels(options("cena", {}, undefined, keep(3))), ["Opción 1: Huevo, Aguacate", "Opción 2: Avena, Canela", "Opción 3: Frijoles, Sal"]);
-  assert.deepEqual(labels(options("cena", {}, undefined, keep(1))), ["Opción 1: Huevo, Aguacate"]);
 });
 
 test("REQ-28 the lead variants are all in use: different questions reach each of the three", () => {
@@ -342,8 +342,8 @@ const buttonLabels = (reply: ChatAnswer) => questions(reply).map((button) => but
 test("REQ-10 'cena opción 2', 'cena opcion 2', 'la 2 de la cena' and the option button give the same answer", () => {
   const button = ask("Cena, opción 2");
   assert.deepEqual(button.resolved, [{ topic: "slotOptions", slot: "cena", option: 2 }]);
-  // Until the option detail (T034) the answer is the list, whose lead variant depends on the typed question: compare the buttons.
-  for (const typed of ["cena opción 2", "cena opcion 2", "la 2 de la cena"]) assert.deepEqual(ask(typed).buttons, button.buttons, typed);
+  // The detail lead is picked from the dish, not from the typed text, so the whole answer is the same.
+  for (const typed of ["cena opción 2", "cena opcion 2", "la 2 de la cena"]) assert.deepEqual(ask(typed), button, typed);
 });
 
 test("REQ-10 an option number beyond the slot's options says how many there are, then the first page", () => {
@@ -381,4 +381,155 @@ test("REQ-3 'la comida opcion 1' is option selection on comida, not a dish and n
   const reply = ask("la comida opcion 1");
   assert.deepEqual(reply.resolved, [{ topic: "slotOptions", slot: "comida", option: 1 }]);
   assert.ok(!["did_you_mean", "no_match"].includes(reply.kind), reply.kind);
+});
+
+// REQ-12 (T034 part 2, T036): the detail of an option or a dish, through ragAnswer.
+const DETAIL_LEAD = (name: string) => new RegExp(`^(${name} lleva:|Esto lleva ${name}:)$`);
+const itemsOf = (reply: ChatAnswer, title: string) => reply.blocks[0].sections.find((section) => section.title === title)?.items.map((item) => item.map((span) => span.text).join(""));
+const links = (reply: ChatAnswer) => reply.blocks[0].buttons.filter((button) => button.type === "link");
+
+/** An answer over a db the test adjusts first. */
+function askWith(message: string, tweak: (db: AppDb) => void, options?: MemDbOptions) {
+  const { db, user } = memDb(options);
+  tweak(db);
+  return ragAnswer(db, user, message, TODAY, { trace: true });
+}
+
+/** Replaces a recipe's ingredients: `[name, quantity, unit]` rows. */
+function setIngredients(db: AppDb, recipeName: string, rows: [string, number, string][]) {
+  const recipe = db.recipes.find((item) => item.name === recipeName)!;
+  db.ingredientUsages = db.ingredientUsages.filter((usage) => usage.source_id !== recipe.id);
+  rows.forEach(([name, quantity, unit], index) => {
+    const ingredient = { ...db.ingredients[0], id: `x-ing-${index}`, canonical_name: name };
+    db.ingredients.push(ingredient);
+    db.ingredientUsages.push({ ...db.ingredientUsages[0], id: `x-use-${index}`, ingredient_id: ingredient.id, source_id: recipe.id, quantity, unit });
+  });
+}
+
+test("REQ-12 twelve ingredients all show; steps 1-2 are the recipe page's and 'Ver receta completa' links to the recipe", () => {
+  const description = "Uno. Dos. Tres. Cuatro.";
+  const rows = Array.from({ length: 12 }, (_, index): [string, number, string] => [`Ingrediente ${index + 1}`, index + 1, "g"]);
+  const reply = askWith("¿Qué lleva el pollo asado?", (db) => {
+    db.recipes.find((recipe) => recipe.name === "Pollo asado")!.description = description;
+    setIngredients(db, "Pollo asado", rows);
+  });
+  assert.equal(reply.kind, "detail");
+  assert.equal(itemsOf(reply, "Ingredientes")?.length, 12);
+  assert.deepEqual(itemsOf(reply, "Preparación"), recipeSteps(description).slice(0, 2));
+  const { db } = memDb();
+  assert.deepEqual(links(reply), [{ type: "link", label: "Ver receta completa", href: `/recipes/${db.recipes.find((recipe) => recipe.name === "Pollo asado")!.id}` }]);
+  assert.deepEqual(reply.sources, ["Receta: Pollo asado"]);
+  assert.equal(reply.answer.split("\n").length, 1 + 1 + 12 + 1 + 2);
+});
+
+test("REQ-12 two steps or fewer have no link, and an import note or nothing shows the no-preparation item", () => {
+  const withNote = (description: string) => askWith("¿Qué lleva el pollo asado?", (db) => { db.recipes.find((recipe) => recipe.name === "Pollo asado")!.description = description; });
+  assert.deepEqual(links(withNote("Uno. Dos.")), []);
+  for (const description of ["Extraído de plan.pdf", "EXTRAÍDO DE plan.pdf", ""]) {
+    const reply = withNote(description);
+    assert.deepEqual(itemsOf(reply, "Preparación"), ["Esta receta no tiene preparación registrada."], description);
+    assert.deepEqual(links(reply), [], description);
+  }
+});
+
+test("REQ-12 ingredient formats: quantity and unit, quantity only, neither, and stored text such as 'al gusto'", () => {
+  const reply = askWith("¿Qué lleva el pollo asado?", (db) => setIngredients(db, "Pollo asado", [["Huevo", 2, "pieza"], ["Aguacate", 1, ""], ["Sal", 0, ""], ["Limón", 0, "al gusto"]]));
+  assert.deepEqual(itemsOf(reply, "Ingredientes"), ["Huevo · 2 pieza", "Aguacate · 1", "Sal", "Limón · al gusto"]);
+  const [first] = reply.blocks[0].sections[0].items;
+  assert.deepEqual(first, [{ text: "Huevo · " }, { text: "2 pieza", highlight: true }]);
+  assert.deepEqual(reply.blocks[0].sections[0].items[2], [{ text: "Sal" }]);
+});
+
+test("REQ-12 a generic name leads with '<Slot ref>, opción <n>' highlighted; a recipe name leads with the name", () => {
+  const generic = ask("Cena, opción 2");
+  assert.match(generic.answer.split("\n")[0], DETAIL_LEAD("Cena, opción 2"));
+  assert.deepEqual(generic.blocks[0].lead.filter((span) => span.highlight).map((span) => span.text), ["Cena, opción 2"]);
+  assert.deepEqual(generic.sources, ["Receta: Cena opcion 2"]);
+  const named = ask("¿Qué lleva el pollo asado?");
+  assert.match(named.answer.split("\n")[0], DETAIL_LEAD("Pollo asado"));
+  assert.deepEqual(named.blocks[0].lead.filter((span) => span.highlight).map((span) => span.text), ["Pollo asado"]);
+});
+
+test("REQ-12 'Acompaña con' lists the slot's complements with amounts, and is absent when there are none", () => {
+  const breakfast = ask("Desayuno, opción 1");
+  assert.deepEqual(itemsOf(breakfast, "Acompaña con"), ["Agua natural · 1 vaso"]);
+  assert.deepEqual(breakfast.blocks[0].sections.at(-1)?.items[0], [{ text: "Agua natural · " }, { text: "1 vaso", highlight: true }]);
+  assert.deepEqual(itemsOf(ask("Cena, opción 1"), "Acompaña con"), ["Fruta de temporada · 2"]);
+  assert.equal(itemsOf(ask("Comida, opción 1"), "Acompaña con"), undefined);
+});
+
+test("REQ-12 by dish name the complements show only when the recipe is an option in exactly one slot", () => {
+  assert.deepEqual(itemsOf(ask("¿Qué lleva el atole de avena?"), "Acompaña con"), ["Agua natural · 1 vaso"]);
+  const twice = askWith("¿Qué lleva el atole de avena?", (db) => {
+    const atole = db.mealOptions.find((option) => option.recipe_id.endsWith("atole-de-avena"))!;
+    db.mealOptions.push({ ...atole, id: "x-second", meal_type_id: db.mealTypes.find((meal) => meal.name === "Comida")!.id });
+  });
+  assert.equal(itemsOf(twice, "Acompaña con"), undefined);
+  assert.equal(itemsOf(ask("¿Qué lleva Chilaquiles verdes?"), "Acompaña con"), undefined);
+});
+
+test("REQ-11 a single-option slot goes straight to its detail; with no ingredients or steps there are no empty headings", () => {
+  const only = (tweak: (db: AppDb) => void = () => {}) => askWith("¿Qué hay de desayuno?", (db) => {
+    const breakfast = db.mealTypes.find((meal) => meal.name === "Desayuno")!;
+    db.mealOptions = db.mealOptions.filter((option) => option.meal_type_id !== breakfast.id || option.option_number === 1);
+    tweak(db);
+  });
+  const reply = only();
+  assert.equal(reply.kind, "detail");
+  assert.deepEqual(reply.resolved, [{ topic: "slotOptions", slot: "desayuno" }]);
+  assert.match(reply.answer.split("\n")[0], DETAIL_LEAD("Desayuno, opción 1"));
+  const bare = only((db) => {
+    const recipe = db.recipes.find((item) => item.name === "Desayuno opcion 1")!;
+    recipe.description = "";
+    db.ingredientUsages = db.ingredientUsages.filter((usage) => usage.source_id !== recipe.id);
+  });
+  assert.equal(bare.kind, "detail");
+  assert.deepEqual(bare.blocks[0].sections.map((section) => section.title), ["Preparación", "Acompaña con"]);
+  assert.ok(bare.blocks[0].sections.every((section) => section.items.length > 0));
+});
+
+test("REQ-10 an in-range option opens its detail, indexed like the labels: a soft-deleted option does not count", () => {
+  const reply = askWith("cena opción 2", (db) => { cenaOptions(db)[1].deleted_at = "2026-02-01T00:00:00.000Z"; });
+  assert.equal(reply.kind, "detail");
+  assert.match(reply.answer.split("\n")[0], DETAIL_LEAD("Cena, opción 2"));
+  assert.deepEqual(itemsOf(reply, "Ingredientes"), ["Frijoles · 1 taza", "Sal"]);
+  assert.equal(ask("Segunda colación, opción 2", { meals: DUPLICATED }).kind, "detail");
+});
+
+test("REQ-10 option 0 and a decimal option are out of range: how many there are, then the first page", () => {
+  for (const typed of ["cena opción 0", "la 0 de la cena", "cena opción 2.5", "cena opción 2,5"]) {
+    const reply = ask(typed);
+    assert.equal(reply.kind, "answer", typed);
+    assert.equal(reply.blocks[0].lead[0].text, "Tu cena tiene 5 opciones.", typed);
+    assert.deepEqual(buttonLabels(reply), buttonLabels(ask("¿Cuál es mi cena?")), typed);
+  }
+});
+
+test("pinned (LOW-1, LOW-3, MEDIUM-3): '<slot> 2 veces' is option n, a time word wins over an option, a duplicated slot asks which", () => {
+  const twice = ask("cena 2 veces");
+  assert.equal(twice.kind, "detail");
+  assert.match(twice.answer.split("\n")[0], DETAIL_LEAD("Cena, opción 2"));
+  assert.equal(ask("cena 12 veces").blocks[0].lead[0].text, "Tu cena tiene 5 opciones.");
+  assert.equal(ask("cena hora opción 2").answer, "Tu horario de cena: Entre 8 a 9 pm.");
+  const clarify = ask("colación opción 2", { meals: DUPLICATED });
+  assert.equal(clarify.kind, "clarify");
+  assert.equal(clarify.answer, "Tienes 2 colaciones. ¿Cuál?");
+});
+
+test("REQ-3 each found dish shows the detail lead, and 'la comida opcion 1' shows comida option 1's detail", () => {
+  for (const name of ["Pollo asado", "Ensalada de pollo", "Sándwich de atún", "Atole de avena", "Chilaquiles verdes", "Tacos de frijol"]) {
+    const reply = ask(`¿Qué lleva ${name}?`);
+    assert.equal(reply.kind, "detail", name);
+    assert.match(reply.answer.split("\n")[0], DETAIL_LEAD(name), name);
+    assert.deepEqual(reply.sources, [`Receta: ${name}`], name);
+  }
+  const comida = ask("la comida opcion 1");
+  assert.equal(comida.kind, "detail");
+  assert.match(comida.answer.split("\n")[0], DETAIL_LEAD("Comida, opción 1"));
+});
+
+test("REQ-5 the detail's own buttons and every option, paging and follow-up button of the US2 answers resolve and repeat", () => {
+  const { db, user } = memDb();
+  const answers = ["¿Cuál es mi cena?", "Cena, más opciones (página 2)", "Cena, opción 2", "¿Qué lleva el pollo asado?", "¿Cuál es mi comida?"].map((message) => ragAnswer(db, user, message, TODAY));
+  assert.ok(sweep(db, user, answers, TODAY).length >= 8);
 });

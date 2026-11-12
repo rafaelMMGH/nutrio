@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { Block, ChatAnswer } from "@/lib/assistant";
 import { ragAnswer, recipeList } from "@/lib/domain/chat";
+import { isGeneric } from "@/lib/domain/chat-dish";
 import { memDb, sweep } from "./memdb";
 
 // The answer path of the chat over in-memory data (plan D10): the same ragAnswer the route calls, with today passed in.
@@ -106,6 +107,16 @@ test("REQ-5 every starter and follow-up with a builder resolves to its Button-co
   const { db, user } = memDb({ cart: 3 });
   const answers = ["hola", "Mi carrito", "¿Cuál es mi horario?", "¿Cuál es mi plan?"].map((message) => ragAnswer(db, user, message, TODAY));
   assert.deepEqual(sweep(db, user, answers, TODAY, { skip: PENDING }).sort(), ["Mi carrito", "¿Qué suplementos tomo?", "¿Qué recetas hay en mi plan?"].sort());
+});
+
+test("REQ-5 every '¿Qué lleva <receta>?' of a non-generic fixture recipe resolves to that recipe and gives the same detail", () => {
+  const { db, user } = memDb();
+  const recipes = db.recipes.filter((recipe) => !isGeneric(recipe.name));
+  assert.equal(recipes.length, 6);
+  const buttons = recipes.map((recipe) => ({ type: "question" as const, label: recipe.name, message: `¿Qué lleva ${recipe.name}?` }));
+  const offered: ChatAnswer = { ...ragAnswer(db, user, "¿Qué recetas hay en mi plan?", TODAY), buttons };
+  assert.deepEqual(sweep(db, user, [offered], TODAY), buttons.map((button) => button.message));
+  for (const recipe of recipes) assert.deepEqual(ragAnswer(db, user, `¿Qué lleva ${recipe.name}?`, TODAY, { trace: true }).resolved?.[0].recipeIds, [recipe.id], recipe.name);
 });
 
 test("the sweep fails on an empty set and on a placeholder", () => {
