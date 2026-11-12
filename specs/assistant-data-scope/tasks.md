@@ -516,22 +516,41 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
 - Break-and-restore proof (code-writer): M1 two mutants, M3 three mutants plus one extra, L4 two, L8 one; each failed the intended test and was restored.
 - Left open: L1 red row "a las 2.30 cena opción 2" → option 2, with its code, in T041 (batch 3b1).
 
-- [ ] T039 [US3] Tests REQ-13, REQ-14 periods
+- [x] T039 [US3] Tests REQ-13, REQ-14 periods
   - Unit (tests/unit/chat-dates.test.ts): every REQ-14 phrase → its period bounds with today passed in (cue and period-noun rules); no fallback for "Mi avance de la semana", "¿Cuántos días hice ejercicio?", "a la semana", "en la semana"; "en el mes" = this month. 1a2 review (LOW L4): a pre-2022 summer case, `serverToday(new Date("2022-07-01T05:30:00Z"))` = "2022-07-01" (CDT, UTC−5). 1c1 review: a row with a decimal or comma number in the phrase. Red first.
   - e2e, written (tests/e2e/assistant-progress.spec.ts): the `x-e2e-today` pin moves the period bounds in `resolved`; a pin header without the trace header changes no field shape.
-- [ ] T040 [US3] Date parser: cue and period-noun rules, the phrase table → `Period` (src/lib/domain/chat-dates.ts)
+- [x] T040 [US3] Date parser: cue and period-noun rules, the phrase table → `Period` (src/lib/domain/chat-dates.ts)
   - 1a2 review (LOW L4): `serverToday` calls `formatToParts` once per call (today once per part, chat-dates.ts:7).
   - 1c1 review: `normalizeText` splits decimals ("1,5 L" → "1 5 l"); parse numbers from the raw message, not from `words`.
-- [ ] T041 [US3] The route passes the pinned today from `testHooks()` (else `serverToday`); the resolver attaches the period to metric intents (src/app/api/rag/chat/route.ts, src/lib/domain/chat-intent.ts)
+- [x] T041 [US3] The route passes the pinned today from `testHooks()` (else `serverToday`); the resolver attaches the period to metric intents (src/app/api/rag/chat/route.ts, src/lib/domain/chat-intent.ts)
   - 2c2 review (L1): the decimal regex at chat-intent.ts:57 scans the whole message ("a las 2.30 cena opción 2" reads option 2.3); anchor it to the option token (the red row "a las 2.30 cena opción 2" → option 2 is written in T041, before the code; it was not part of cleanup batch 2c3). Clock times also matter for the period parsing here.
+  - **Done** (red 2527da3/d58435c, code 6a4550f/70d608b, fix round e979def, 85ef437, 4ce6b7b; see Batch note 3b1). L1 closed inside T041.
 
 **Review checkpoint 3b1:** tsc + unit.
 
+**Batch note 3b1 (done; T039, T040, T041 plus the 2c2 L1 fix; commits on top of bd0237d: 2527da3, 6a4550f, d58435c, 70d608b, then fix round e979def, 85ef437, 4ce6b7b; tip 4ce6b7b; tsc clean, unit 614/614; no dependency change; +225/-21 in 9 files for the first four commits (reviewer count) vs ~420 estimated):**
+
+- Review history: round 1 FAIL (one HIGH, HIGH-1 below); fixed; round 2 PASS, no finding above LOW.
+- 2527da3 (T039, red): REQ-14 phrase table, cue rows, the pre-2022 CDT `serverToday` row; new tests/e2e/assistant-progress.spec.ts (unrun: the `x-e2e-today` pin moves the period bounds in `resolved`; a pin without the trace header changes no field shape).
+- 6a4550f (T040): `parsePeriod(message, today)` returns `Period | "unrecognized" | undefined`, `Period = { kind, from, to }`, kinds `today`, `yesterday`, `beforeYesterday`, `weekday`, `thisWeek`, `lastWeek`, `thisMonth`, `lastMonth`, `lastDays`, `since`. Always-cue words come from the shared `DATE_CUES` plus "últimos"/"últimas"; a period noun is a cue only beside "esta"/"este"/"anterior" or a number; "en el mes" = this month. Numbers are read from the typed text, so "1,5" and "2.30" stay one token. `serverToday` formats once via `formatToParts`.
+- d58435c (T041, red, tsc-exempt, 3 failing) and 70d608b (T041 code): `resolve(question, recipes?, today?)` attaches `period` to the water, exercise, weight and meals-done intents when a phrase is recognized; goals, weekly, slot topics, `"unrecognized"` and a missing today get none. `Intent.period` changed from string to `Period`. `ragAnswer` uses its `today` argument; the route passes `hooks.today ?? serverToday(new Date())`. L1: the option decimal is read from the characters right after the option's own token, so "a las 2.30 cena opción 2" gives option 2.
+- Fix round: e979def (red rows: a huge last-N-days count, 400 keeps raw bounds, the 2100 leap lookback); 85ef437 (HIGH-1: the "últimos N" count is capped at `MAX_LAST_DAYS = 3660` in chat-dates.ts, so no digit run can make `addDays` throw; 400 keeps raw bounds; T068 clamps from the span); 4ce6b7b (`noPeriod` helper; six no-period assertions now expect `period` undefined).
+- Break-and-restore: ~14 mutants in round 1, all killed except three survivors (`unrecognizedAttached`, `leapLookback`, the L1 alignment guard); the first two were killed in the fix round. The L1 alignment guard `typed.length === tokens.length` stays untested (safe as written, LOW). `formatToParts` once has no behavior test (performance only). The route's `hooks.today ??` is covered only by the unrun e2e.
+- Carry-forwards:
+  - (a) → T067/T068: `parsePeriod` caps N at 3660, so REQ-14's clamp wording is "any N above 366 clamps"; T068's span clamp (more than 366 days becomes the last 366 plus the clamp line) works for every capped value.
+  - (b) → user ruling before 3b2 (Batch 3b2 pre-note; HANDOFF section 6): trailing tokens after a recognized phrase are ignored, giving silent wrong answers.
+  - (c) → Batch E: the assistant-progress.spec.ts e2e rows and the route's `hooks.today` wiring are proven only there.
+  - (d) MEDIUM test-weakness note: the decimal rows live in tests/unit/chat-meals.test.ts, so a mutation check for L1 must run the full unit suite, not chat-dates/chat-intent tests alone.
+
 **Batch 3b2: period labels, clamp, fallback**, about 350 lines with tests
+
+**Pre-note 3b2 (open user ruling, carry-forward (b) of Batch note 3b1; needed before T067's rows are written):** the parser ignores trailing tokens after a recognized phrase, so these give silent wrong answers: "el lunes pasado" → the latest Monday; "el miércoles pasado" on a Wednesday → today; "desde el lunes" → that Monday only; "desde ayer" → yesterday only; "esta semana pasada" → this week; "en el mes de enero" → this month; "hoy y ayer" → today only; "desde el 5 de noviembre de 2024" ignores the year. Singular "últimos 1 día" is unrecognized while N ≤ 1 maps to today. The spec's REQ-14 table is silent on all of these. Reviewer's recommendation: return `"unrecognized"` (so the fallback line shows) for weekday + "pasado"/"pasada", "desde" + a non-date, and an explicit year after "desde el D de <mes>". Needs a spec-change or a one-line user ruling; T067 then adds a row per ruled case.
 
 - [ ] T067 [US3] Unit tests REQ-14 labels (tests/unit/chat-dates.test.ts)
   - Every REQ-14 row → its label (es-MX); year suffix; future-day cut; "últimos 400 días" → 366 days plus the clamp flag; fallback for "hace dos semanas", "31 de febrero", "el mes anterior". Red first. (e2e for REQ-14 text: T042.)
+  - 3b1 carry-forward (a): `parsePeriod` caps N at 3660 (`MAX_LAST_DAYS`), so the clamp rule REQ-14 should state is "any N above 366 clamps"; add a row with N above the cap (e.g. a long digit run) that still gives the last 366 days plus the clamp flag. Rows for the ruled cases of Pre-note 3b2.
 - [ ] T068 [US3] Labels (es-MX abbreviations in code), year suffix, future-day cut, clamp, fallback line (src/lib/domain/chat-dates.ts)
+  - 3b1 carry-forward (a): clamp from the span (more than 366 days becomes the last 366 plus the clamp line); this works for every capped N up to 3660. Implement the user's ruling on Pre-note 3b2 here.
 
 **Review checkpoint 3b2:** tsc + unit. The 3a worktree is merged before 3c starts.
 
