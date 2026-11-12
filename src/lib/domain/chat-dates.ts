@@ -78,6 +78,10 @@ function phraseAt(tokens: string[], at: number, today: string): Period | "unreco
     return count <= 1 ? day("today", today) : { kind: "lastDays", from: addDays(today, -(count - 1)), to: today };
   }
   if (word === "desde") {
+    // Only a date-shaped follower is rejected; "desde luego" / "desde mi casa" keep the scan going so a later phrase wins.
+    const head = next === "el" ? third : next;
+    const dateShaped = (["hoy", "ayer", "antier", "anteayer", ...WEEKDAYS] as string[]).includes(head ?? "") || /^\d/.test(head ?? "");
+    if (!dateShaped) return undefined;
     const [dayText, monthName, afterMonth] = tokens.slice(at + 1).filter((token) => token !== "el" && token !== "de");
     const month = (MONTHS as readonly string[]).indexOf(monthName ?? "");
     const found = month >= 0 && /^\d{1,2}$/.test(dayText ?? "") ? latestDate(Number(dayText), month, today) : undefined;
