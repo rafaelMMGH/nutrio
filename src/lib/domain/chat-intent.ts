@@ -18,14 +18,14 @@ const METRICS = ["weight", "exercise", "water"] as const;
 const METRIC_TOPICS: TopicId[] = [...METRICS, "mealsDone"];
 
 /** Ordinal words of a slot ref (Terms), normalized: both genders, "primero" and "tercero" included. */
-const ORDINAL_WORDS: Record<string, number> = Object.fromEntries(
+const ORDINAL_WORDS = new Map<string, number>(
   [["primera", "primer", "primero"], ["segunda", "segundo"], ["tercera", "tercer", "tercero"], ["cuarta", "cuarto"], ["quinta", "quinto"], ["sexta", "sexto"], ["septima", "septimo"], ["octava", "octavo"], ["novena", "noveno"], ["decima", "decimo"]]
-    .flatMap((forms, index) => forms.map((form) => [form, index + 1]))
+    .flatMap((forms, index) => forms.map((form): [string, number] => [form, index + 1]))
 );
 
 /** The position a slot word carries: an ordinal word before or after it ("segunda colación"), or a number after it ("colación 2"). */
 function ordinalAt(tokens: string[], at: number): { ordinal?: number } {
-  const ordinal = ORDINAL_WORDS[tokens[at - 1]] ?? ORDINAL_WORDS[tokens[at + 1]] ?? (/^\d{1,3}$/.test(tokens[at + 1] ?? "") ? Number(tokens[at + 1]) : undefined);
+  const ordinal = ORDINAL_WORDS.get(tokens[at - 1]) ?? ORDINAL_WORDS.get(tokens[at + 1]) ?? (/^\d{1,3}$/.test(tokens[at + 1] ?? "") ? Number(tokens[at + 1]) : undefined);
   return ordinal ? { ordinal } : {};
 }
 
