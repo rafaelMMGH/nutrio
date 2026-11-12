@@ -96,6 +96,20 @@ test("REQ-14 trailing or surrounding date words are unrecognized, never a differ
   for (const [message, today] of cases) assert.equal(parsePeriod(message, today), "unrecognized", message);
 });
 
+// User answers 2026-11-12: "desde" only rejects a date-shaped follower; otherwise a later valid phrase still wins.
+test("REQ-14 a non-date 'desde' lets a later valid phrase win", () => {
+  assert.deepEqual(parsePeriod("desde luego, ¿cuánta agua tomé hoy?", TODAY), period("today", TODAY));
+  assert.deepEqual(parsePeriod("desde mi casa, ¿cuánta agua tomé ayer?", TODAY), period("yesterday", "2026-10-27"));
+  assert.deepEqual(parsePeriod("ayer, desde mi casa", TODAY), period("yesterday", "2026-10-27"));
+  assert.equal(parsePeriod("desde luego", TODAY), "unrecognized");
+});
+
+test("REQ-14 a year after the month is unrecognized, with or without 'del'", () => {
+  for (const message of ["desde el 5 de noviembre del 2024", "desde el 5 de noviembre del año pasado", "pasado mañana", "el año pasado"]) {
+    assert.equal(parsePeriod(message, TODAY), "unrecognized", message);
+  }
+});
+
 test("REQ-14 the ruled cases leave their plain forms alone", () => {
   assert.deepEqual(parsePeriod("el lunes", TODAY), period("weekday", "2026-10-26"));
   assert.deepEqual(parsePeriod("la semana pasada", TODAY), period("lastWeek", "2026-10-19", "2026-10-25"));
