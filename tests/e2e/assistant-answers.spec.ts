@@ -116,7 +116,7 @@ test.describe("REQ-2, REQ-3, REQ-18: an answer shows exactly its structure", () 
   test("meal times show one item per meal with highlighted times (real API)", async ({ chat }) => {
     await chat.goto("/");
     const ui = await openAssistant(chat);
-    await typeQuestion(chat, "¿A qué hora es mi comida?");
+    await typeQuestion(chat, "¿Cuál es mi horario?");
     const turn = ui.assistantTurns.first();
     await expect(turn.getByRole("heading", { level: 4 })).toHaveText(["Comidas"]);
     await expect(turn.getByRole("listitem")).toHaveText(["Desayuno · Entre 7 a 8 am", "Colación · Entre 10 a 11 am", "Comida · Entre 2 a 3 pm", "Cena · Entre 8 a 9 pm"]);

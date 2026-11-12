@@ -2,6 +2,7 @@ import type { AppDb, AppUser } from "@/lib/types";
 import { type Block, type Button, type ChatAnswer, type Intent, type ReplyKind, type Rich, type Section, normalizeText, STARTERS, words } from "@/lib/assistant";
 import { consolidateCart } from "@/lib/domain/cart";
 import { isGeneric } from "@/lib/domain/chat-dish";
+import { type Built, chooseSlot, planSlots, slotTimeLead } from "@/lib/domain/chat-meals";
 import { resolve } from "@/lib/domain/chat-intent";
 import { greetingOf, TOPICS, type TopicId } from "@/lib/domain/chat-topics";
 import { activePlan } from "@/lib/domain/plans";
@@ -34,9 +35,6 @@ const textLead = (text: string): Rich => [{ text }];
 const NO_PLAN_LEAD = "No tienes un plan activo.";
 const MAX_ITEMS = 8;
 
-/** What a builder returns; `ragAnswer` adds the kind and the follow-ups. */
-type Built = { lead: Rich; sections?: Section[]; sources?: string[] };
-
 /** A section of plain items, capped at 8 with a last item "y <n> más" (REQ-1). With no items there is no section: the list is empty. */
 function section(title: string, items: Rich[]): Section[] {
   if (!items.length) return [];
@@ -51,13 +49,18 @@ const lineItems = (text: string): Rich[] => text.split("\n").map((line) => line.
 const withValue = (name: string, value: string): Rich => [{ text: `${name} · ` }, { text: value, highlight: true }];
 const quantity = (item: { quantity: number; unit: string }) => `${formatQty(item.quantity)} ${item.unit}`.trim();
 
-function mealTimes(db: AppDb, userId: string): Built {
-  const plan = activePlan(db, userId);
-  if (!plan?.current_version) return { lead: textLead(NO_PLAN_LEAD) };
-  const meals = plan.current_version.structured_data.meals;
-  const lead = meals.some((meal) => meal.time_window) ? "Estos son los horarios de tus comidas." : "Tu plan no tiene horarios para tus comidas.";
-  const items = meals.map((meal): Rich => (meal.time_window ? withValue(meal.name, meal.time_window) : [{ text: meal.name }]));
-  return { lead: textLead(lead), sections: section("Comidas", items), sources: [`Plan activo: ${plan.name}`] };
+/** Slot times (REQ-8): the slot the intent names, or every slot when it names none. */
+function mealTimes(db: AppDb, userId: string, intent: Intent): Built {
+  const plan = planSlots(db, userId);
+  if (!plan) return { lead: textLead(NO_PLAN_LEAD) };
+  const sources = [`Plan activo: ${plan.planName}`];
+  if (intent.slot) {
+    const chosen = chooseSlot(plan, intent.slot, "times");
+    return "built" in chosen ? chosen.built : { lead: slotTimeLead(chosen.slot), sources };
+  }
+  const lead = plan.slots.some((slot) => slot.time) ? "Estos son los horarios de tus comidas." : "Tu plan no tiene horarios para tus comidas.";
+  const items = plan.slots.map((slot): Rich => (slot.time ? withValue(slot.ref, slot.time) : [{ text: slot.ref }]));
+  return { lead: textLead(lead), sections: section("Comidas", items), sources };
 }
 
 function planSummary(db: AppDb, userId: string, q: string): Built {
@@ -103,8 +106,8 @@ export function recipeList(db: AppDb, userId: string, question: string): Built {
   };
 }
 
-const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: string) => Built>> = {
-  mealTimes: (db, userId) => mealTimes(db, userId),
+const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: string, intent: Intent) => Built>> = {
+  mealTimes: (db, userId, _question, intent) => mealTimes(db, userId, intent),
   cart: (db, userId) => cartSummary(db, userId),
   recipes: recipeList,
   plan: (db, userId, question) => planSummary(db, userId, normalizeText(question))
@@ -136,10 +139,12 @@ export function ragAnswer(db: AppDb, user: AppUser, message: string, _today: str
   // A topic without a button (identity, slots, ...) is left out silently.
   const overflow = further.flatMap((intent) => TOPICS[intent.topic as TopicId].button ?? []);
   const asked = normalizeText(message);
-  const builts = answered.map((topic) => BUILDERS[topic]?.(db, user.id, message) ?? pending(topic));
+  const builts = answered.map((topic, index) => BUILDERS[topic]?.(db, user.id, message, intents[index]) ?? pending(topic));
   const blocks = builts.map((built, index): Block => ({ title: answered.length > 1 ? TOPICS[answered[index]].title : null, lead: built.lead, sections: built.sections ?? [], buttons: [] }));
   // Repeat rule (chat-polish REQ-5): a follow-up that repeats the question just asked is not offered. Follow-ups only.
   // A button is offered once: an overflow topic can also be one of the follow-ups (REQ-24).
   const followUps = [...new Set([...TOPICS[answered[answered.length - 1]].followUps.filter((text) => normalizeText(text) !== asked), ...overflow])];
-  return reply("answer", blocks, followUps.map(questionButton), [...new Set(builts.flatMap((built) => built.sources ?? []))], trace ? intents : undefined);
+  // A builder that asks something (REQ-7, REQ-11, REQ-27) brings its own buttons in place of the follow-ups.
+  const choice = builts.find((built) => built.buttons);
+  return reply(choice?.kind ?? "answer", blocks, choice?.buttons ?? followUps.map(questionButton), [...new Set(builts.flatMap((built) => built.sources ?? []))], trace ? intents : undefined);
 }

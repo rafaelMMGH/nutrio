@@ -240,7 +240,7 @@ test.describe("builders", () => {
     expect(plan.answer).toBe(`Tu objetivo: ${OBJECTIVE}`);
 
     const times = await answer(chatContext, "¿A qué hora es mi comida?");
-    expect(plainOf(times.blocks[0].lead)).toBe("Tu plan no tiene horarios para tus comidas.");
+    expect(plainOf(times.blocks[0].lead)).toBe("Tu plan no tiene comida.");
     expect(times.blocks[0].sections).toEqual([]);
     expect(times.answer).not.toContain("Comidas");
   });
@@ -273,8 +273,15 @@ test.describe("builders", () => {
     expect(await sourcesOf("¿A qué hora es la cena?")).toEqual([]);
   });
 
-  test("REQ-18 with an active plan and times, there is one item per meal and each time is highlighted", async ({ chatContext }) => {
+  test("REQ-8 a slot's time answers only that slot, the time highlighted", async ({ chatContext }) => {
     const body = await answer(chatContext, "¿A qué hora es la cena?");
+    expect(body.answer).toBe("Tu horario de cena: Entre 8 a 9 pm.");
+    expect(body.blocks[0].sections).toEqual([]);
+    expect(body.blocks[0].lead.filter((span) => span.highlight).map((span) => span.text)).toEqual(["Entre 8 a 9 pm"]);
+  });
+
+  test("REQ-18 with an active plan and times, there is one item per meal and each time is highlighted", async ({ chatContext }) => {
+    const body = await answer(chatContext, "¿Cuál es mi horario?");
     expect(plainOf(body.blocks[0].lead)).toBe("Estos son los horarios de tus comidas.");
     expect(body.blocks[0].sections.map((section) => section.title)).toEqual(["Comidas"]);
     expect(items(body, "Comidas")).toEqual(["Desayuno · Entre 7 a 8 am", "Colación · Entre 10 a 11 am", "Comida · Entre 2 a 3 pm", "Cena · Entre 8 a 9 pm"]);
@@ -293,9 +300,15 @@ test.describe("builders", () => {
     expect(body.blocks[0].sections[0].items.map((item) => item.some((span) => span.highlight))).toEqual([true, false, true, false]);
   });
 
-  test("REQ-18 without meal times the lead says so and the meals are listed without highlights", async ({ chatContext }) => {
+  test("REQ-8 a slot without a time says so", async ({ chatContext }) => {
     seedPlan({ times: "none" });
     const body = await answer(chatContext, "¿Cuándo desayuno?");
+    expect(body.answer).toBe("Tu plan no tiene horario para tu desayuno.");
+  });
+
+  test("REQ-18 without meal times the lead says so and the meals are listed without highlights", async ({ chatContext }) => {
+    seedPlan({ times: "none" });
+    const body = await answer(chatContext, "¿Cuál es mi horario?");
     expect(plainOf(body.blocks[0].lead)).toBe("Tu plan no tiene horarios para tus comidas.");
     expect(items(body, "Comidas")).toEqual(MEALS);
     expect(body.blocks[0].sections[0].items.flat().some((span) => span.highlight)).toBe(false);
