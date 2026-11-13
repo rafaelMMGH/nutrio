@@ -1,3 +1,6 @@
+// Adapted from prompt-kit (https://github.com/ibelick/prompt-kit), MIT License
+// Copyright (c) 2025 Julien Thibeaut
+// Changes: the response-stream typewriter reduced to a hook over grapheme counts, once-per-identity completion.
 "use client";
 
 import { useEffect, useRef, useState } from "react";
