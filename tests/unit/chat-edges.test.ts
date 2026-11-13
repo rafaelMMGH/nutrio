@@ -250,6 +250,13 @@ test("REQ-24 a clarification stands alone: a later topic is not answered and its
   assert.equal(reply.blocks.length, 1);
   assert.equal(reply.answer, "Tienes 2 colaciones. ¿Cuál?");
   assert.deepEqual(messages(reply), ["¿Cuál es mi primera colación?", "¿Cuál es mi segunda colación?"]);
+  // The overflow topic of a clarification is not offered either.
+  assert.deepEqual(messages(askIn("colación, agua y peso", TWO_COLACIONES)), messages(reply));
+});
+
+test("REQ-24 an offered slot button names the concrete slot; a slot that would ask again is not offered", () => {
+  assert.deepEqual(messages(askIn("¿Qué puedo desayunar y la segunda colación?", TWO_COLACIONES)).slice(-1), ["¿Cuál es mi segunda colación?"]);
+  assert.deepEqual(messages(askIn("¿Qué puedo desayunar, comer y colación?", TWO_COLACIONES)).slice(-1), ["¿Cuál es mi comida?"]);
 });
 
 test("REQ-24 a later topic that needs a clarification is omitted: the first answer keeps its follow-ups", () => {
