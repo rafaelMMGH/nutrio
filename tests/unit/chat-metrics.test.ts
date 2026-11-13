@@ -209,6 +209,20 @@ test("REQ-19 'sin cambio' for a zero change, bold, only with a record this week"
   assert.doesNotMatch(weight("Mi peso", kilos(["2026-10-20", 66.6], ["2026-10-25", 66.6]), 63), /sin cambio/);
 });
 
+test("REQ-19 a change that rounds to 0.0 reads 'sin cambio', not 'bajaste 0 kg'", () => {
+  assert.match(weight("Mi peso", kilos(["2026-10-20", 66.04], ["2026-10-27", 66]), 63), /Esta semana: sin cambio\.$/);
+});
+
+test("REQ-19 a goal above the weight shows the distance as a positive number", () => {
+  assert.match(weight("Mi peso", kilos(["2026-10-01", 60], ["2026-10-27", 62]), 66), /Te faltan 4 kg para tu meta de 66 kg\./);
+});
+
+test("REQ-19 another user's weight records never count", () => {
+  const { db, user } = memDb({ logs: kilos(["2026-10-27", 66]) });
+  db.dailyLogs.push({ ...db.dailyLogs[0], id: "other", user_id: "someone-else", date: "2026-10-28", weight_kg: 50 });
+  assert.match(ragAnswer(db, user, "Mi peso", TODAY).answer, /66 kg \(27 oct\)/);
+});
+
 test("REQ-19 'meta alcanzada' once the progress from the first weight reaches 100%, losing or gaining", () => {
   assert.match(weight("Mi peso", kilos(["2026-10-01", 70], ["2026-10-27", 64.5]), 65), /\(27 oct\)\. ¡Ya alcanzaste tu meta de 65 kg!/);
   assert.match(weight("Mi peso", kilos(["2026-10-01", 70], ["2026-10-27", 65]), 65), /¡Ya alcanzaste tu meta de 65 kg!/);

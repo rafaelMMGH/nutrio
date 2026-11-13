@@ -146,8 +146,8 @@ export function weightAnswer(db: AppDb, userId: string, question: string, intent
   } else if (stats.ratio >= 1) sentences.push([plain(`¡Ya alcanzaste tu meta de ${kg(goal)}!`)]);
   else sentences.push([plain("Te faltan "), bold(kg(Math.abs(stats.latest - goal))), plain(` para tu meta de ${kg(goal)}.`)]);
 
-  // The week line needs a record this week and one before Monday: `change` alone is also set for a stale latest record.
-  if (stats.latestDate >= mondayOf(today) && stats.beforeWeek !== null && stats.change !== null) {
+  // The week line needs a record this week (`change` alone is also set when the latest record is the one before Monday) and one before it.
+  if (stats.latestDate >= mondayOf(today) && stats.change !== null) {
     sentences.push(unchanged(stats.change) ? [plain("Esta semana: "), bold("sin cambio"), plain(".")] : [plain(`Esta semana ${direction(stats.change)} `), bold(kg(Math.abs(stats.change))), plain(".")]);
   }
   const age = daysBetween(stats.latestDate, today).length - 1;
