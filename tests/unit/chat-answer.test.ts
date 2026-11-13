@@ -332,3 +332,16 @@ test("the trace carries the period computed from the given today", () => {
   assert.deepEqual(periodOf("2026-10-28"), { kind: "yesterday", from: "2026-10-27", to: "2026-10-27" });
   assert.deepEqual(periodOf("2026-03-13"), { kind: "yesterday", from: "2026-03-12", to: "2026-03-12" });
 });
+
+test("REQ-1 REQ-6 a recipe question that names a slot is a slot cue: it opens the slot's options, or the no-plan line, not the recipe list", () => {
+  const { db, user } = memDb();
+  const withPlan = ragAnswer(db, user, "¿Qué recetas hay para el desayuno?", TODAY, { trace: true });
+  assert.deepEqual(withPlan.resolved?.map((intent) => intent.topic), ["slotOptions"]);
+  const noPlan = memDb();
+  noPlan.db.plans = [];
+  const reply = ragAnswer(noPlan.db, noPlan.user, "¿Qué recetas hay para el desayuno?", TODAY, { trace: true });
+  assert.deepEqual(reply.resolved?.map((intent) => intent.topic), ["slotOptions"]);
+  assert.equal(reply.answer, "Aún no tienes un plan activo.");
+  const plain = ragAnswer(db, user, "¿Qué recetas hay para mí?", TODAY, { trace: true });
+  assert.deepEqual(plain.resolved?.map((intent) => intent.topic), ["recipes"]);
+});

@@ -158,16 +158,17 @@ test.describe("builders", () => {
   });
 
   test("REQ-1 stop words and topic words never filter the recipe list", async ({ chatContext }) => {
-    // "con" is in "Tacos con carne" and "desayuno" in "Desayuno ranchero": they would narrow the list if they counted as filter words.
+    // "con" is in "Tacos con carne" and "para" in "Desayuno para llevar": they would narrow the list if they counted as filter words.
+    // (A question naming a slot, "para el desayuno", is a slot cue and opens the slot's options instead: tests/unit/chat-answer.test.ts.)
     seedRecipes([
       { name: "Tacos con carne", ingredients: [{ name: "Tortilla" }] },
-      { name: "Desayuno ranchero", ingredients: [{ name: "Huevo" }] },
+      { name: "Desayuno para llevar", ingredients: [{ name: "Huevo" }] },
       { name: "Ensalada", ingredients: [{ name: "Lechuga" }] }
     ]);
-    for (const question of ["¿Qué recetas hay con queso?", "¿Qué recetas hay para el desayuno?"]) {
+    for (const question of ["¿Qué recetas hay con queso?", "¿Qué recetas hay para mí?"]) {
       const body = await answer(chatContext, question);
       expect(plainOf(body.blocks[0].lead), question).toBe("Estas son tus recetas.");
-      expect(items(body, "Recetas"), question).toEqual(["Tacos con carne", "Desayuno ranchero", "Ensalada"]);
+      expect(items(body, "Recetas"), question).toEqual(["Tacos con carne", "Desayuno para llevar", "Ensalada"]);
     }
   });
 
