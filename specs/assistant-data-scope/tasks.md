@@ -971,9 +971,9 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
 
 UI-only: e2e tests are written here and proven in Batch E (T076 run, T077 breakage demo).
 
-**Batch 6a1: UI tests, written**, about 250 lines (revision 7 split of 6a; e2e only, not run, so a tests-only batch is green on tsc + unit). **Review round 1 FAIL: fix round 1 in progress** (tests only; see Batch note 6a1).
+**Batch 6a1: UI tests, written**, about 250 lines (revision 7 split of 6a; e2e only, not run, so a tests-only batch is green on tsc + unit). **Done: review round 2 PASS** (tip 5cbc4a3; see Batch note 6a1).
 
-- [ ] T055 [US6] e2e, written: REQ-32, REQ-34, REQ-35 visuals (tests/e2e/assistant-look.spec.ts, tests/e2e/assistant-a11y.spec.ts)
+- [x] T055 [US6] e2e, written: REQ-32, REQ-34, REQ-35 visuals (tests/e2e/assistant-look.spec.ts, tests/e2e/assistant-a11y.spec.ts)
   - Sides and avatar (32 px `Bot`, aria-hidden, also on errors).
   - Contrast in both themes: text 4.5:1, boundary 3:1, for bubbles, avatar and the `ArrowUpRight` icon (3:1 against its button).
   - 360 px: a 500-character message and an 80-character token have no overflow.
@@ -981,10 +981,11 @@ UI-only: e2e tests are written here and proven in Batch E (T076 run, T077 breaka
   - Visible focus ring on option buttons and nav links, both themes. Bubbles are not keyboard-focusable: no tabindex, skipped by Tab.
   - Only the last answer has question buttons; `aria-disabled` while pending (focusable, sends nothing); links work on old answers.
   - The arrow icon is aria-hidden; the accessible name equals the label.
-**Review checkpoint 6a1:** tsc + unit. Round 1 FAIL (HIGH-1, HIGH-2, both in test code); fix round 1 (tests only) running; round 1 of max 3.
+  - **Done:** dab7718 (tests written) + 5cbc4a3 (fix round 1); e2e written, not run (first run T076); review round 2 PASS.
+**Review checkpoint 6a1: PASS (round 2 of max 3).** Round 1 FAIL (HIGH-1, HIGH-2, both in test code); fix round 1 (tests only) in 5cbc4a3; round 2 PASS, no HIGH, nothing blocking.
 
-**Batch note 6a1 (in progress; T055 not ticked; commit dab7718, +303/-4 vs ~250 estimated; tsc clean, unit 798/798; e2e written, not run; no snapshots created; no dependency change):**
-- **Review round 1: FAIL** (two HIGH, both in test code, small fix). Fix round 1 (tests only) is running; findings:
+**Batch note 6a1 (done; T055 ticked; commits dab7718 +303/-4 vs ~250 estimated, fix 5cbc4a3 +49/-17 over 3 files: tests/e2e/assistant-look.spec.ts, assistant-a11y.spec.ts, assistant-helpers.ts; tsc clean, unit 798/798; e2e written, not run; no snapshots created; no src/CSS/specs/dependency change):**
+- **Review round 1: FAIL** (two HIGH, both in test code, small fix). Findings (all fixed in 5cbc4a3 unless noted):
   - **HIGH-1:** the 360 px wrap test sends a 576-character user message, above `MAX_MESSAGE` (500): Send is disabled, so the test would time out against any correct implementation. Fix: a message ≤500 characters (still with the 80-character token); also add the REQ-32 assertion "user bubble ≤80% of the log width" to that test.
   - **HIGH-2:** the tests required `[data-variant="option"]` count 3 while the fixture also carries the answer-level question button ("Mi cena de hoy"). Fix: that button gets its own variant `data-variant="chip"`; the old-answer, pending and aria-disabled checks become role-based (`getByRole("button", { name })`), not variant counts.
   - **MEDIUM-1:** two existing tests in tests/e2e/assistant-look.spec.ts (~139-147 border edge, ~230-250 user ≤80%) measure `.assistant-turn.user` / `.assistant-turn.assistant`; retarget them to `.assistant-bubble` (the turn becomes the full-width row, DOM contract under T056).
@@ -993,8 +994,18 @@ UI-only: e2e tests are written here and proven in Batch E (T076 run, T077 breaka
   - **LOW:** synchronous nothing-sent evidence (request counter checked right after the forced click, not a wait); the circular-radius check accepts `50%` or a px radius ≥16; the fixture kind is `"options"`; `LINK_HREF` is a real destination (`/plans`); comments record the boundary interpretation (better of fill vs opaque border) and the inner-width interpretation (clientWidth minus padding).
 - **Reviewer note (record):** the avatar boundary-contrast assertion comes from this task's text ("boundary 3:1 for bubbles, avatar and ArrowUpRight"), not from REQ-32, whose text does not mention the avatar boundary. Keep it; flag it for the spec-change list if the user disagrees.
 - **No T055 test depends on where block-level buttons sit relative to `.assistant-turn-live`** (live-region placement is T060's assertion; see L6 under T056/T060).
+- **Fix round 1 (5cbc4a3):** user message exactly 500 chars (419 + space + 80-char token) with the ≤80% assertion on `.assistant-turn.user .assistant-bubble`; chip `data-variant="chip"` (`CHIP_LABEL` "Mi cena de hoy", `ui.questionChips`), `ui.options` = 3 `option` buttons; old-answer and pending checks role-based (0 buttons on the old answer; 3 options + chip = 4 on the latest; `aria-disabled` by name on the chip; `userTurns` count 2, then `held.requests` length 1); Tab-order asserts variants option, option, option, link, chip; border/width tests retargeted to `.assistant-bubble`; `focusWalk(page, theme, visited?)` records `<data-variant or tag>:<text>` per stop and the REQ-35 ring test asserts the three options, `link:Ver receta completa` and `chip:Mi cena de hoy` were visited; radius accepts `50%` or ≥16 px; fixture `kind: "options"`, `LINK_HREF = "/plans"`; interpretation comments recorded.
+- **Review round 2: PASS** (no HIGH, nothing blocking). Findings with owners:
+  - **MEDIUM-A → T059 (6b2), trivial:** assistant-a11y.spec.ts:792-795 `first.getByRole("button")` toHaveCount(0) passes instantly; once typing and delayed buttons exist (REQ-33) a buggy implementation would not have rendered them yet. Reorder: assert `first.getByRole("link", { name: LINK_LABEL })` toHaveCount(1) before the zero-button assertion.
+  - **MEDIUM-B → T059 (6b2):** assistant-a11y.spec.ts:815-817 `await buttons.count()` then `expect(count).toBe(4)` has no auto-wait; use `await expect(buttons).toHaveCount(OPTION_LABELS.length + 1)` first.
+  - **MEDIUM-C → T056 contract (6a2):** assistant-a11y.spec.ts:334 uses `.assistant-turn-head svg`, but the contract has the avatar replace `.assistant-turn-head`. The 6a2 writer retargets that line to `.assistant-avatar svg` (the ONE test edit allowed in 6a2) or keeps the element.
+  - **MEDIUM-D → T056 contract (6a2):** avatar boundary ≥3:1 against the log (fill or an opaque border) and its icon ≥3:1 against its fill, both themes (assistant-look.spec.ts:343).
+  - **LOW-3 → T056 contract (6a2):** the chip sits inside `.assistant-turn` (the article) and is reachable by Tab after the link.
+  - **LOW-4 → T059 (6b2):** the chip has no ≥44 px target assertion (`expectTargets` covers only options and links) while REQ-35 lists the new buttons in the touch-target list; add it.
+  - **LOW-1 → T059 or a later cleanup:** the comment at assistant-look.spec.ts:341 says the avatar edge is checked "against the bubble row it sits in", but `boundary()` measures it against the log; fix the comment.
+  - **LOW-2 → T059 or a later cleanup:** no comment records the "≤80% of the log content box" interpretation at assistant-look.spec.ts:243 and :386 (spec says only "≤80% of the log width"); add it.
 
-**Batch 6a2: bubbles, avatar, button variants**, about 260 lines
+**Batch 6a2: bubbles, avatar, button variants**, about 260 lines. **In progress** (T056).
 
 - [ ] T056 [US6] Single button component with `option`, `chip` (answer-level question buttons; added by the 6a1 review) and `link` variants (`ArrowUpRight`); bubbles and avatar with theme tokens only (src/components/shared/PromptSuggestion.tsx, src/components/shared/AssistantTurn.tsx, src/components/shared/assistant-chat.css)
   - 1b2b review (L3): rename `askInScope` (e.g. `ask`) in src/components/app/assistant.tsx:110 and src/components/app/AppShell.tsx:47, 68; do it here or in T058, whichever UI batch touches those files first.
@@ -1013,6 +1024,17 @@ UI-only: e2e tests are written here and proven in Batch E (T076 run, T077 breaka
     - While a request is pending, question buttons are `aria-disabled="true"` with NO native `disabled`, stay focusable, and the handler ignores activation (a forced click sends nothing).
     - Tab order is DOM order: options, then the link, then the chip. Bubbles have no tabindex.
     - Contrast: boundary = the better of fill vs an OPAQUE border against the log ≥3:1 (a translucent border does not count); bubble text ≥4.5:1; avatar icon and the arrow ≥3:1. Both themes.
+    - **Added by the 6a1 round-2 review (must-follow):**
+      - `.assistant-bubble` itself carries `color` and `background` (the tests read them from the bubble, not the turn).
+      - Avatar (MEDIUM-D): boundary ≥3:1 against the log (its fill, or an opaque border), and its `Bot` icon ≥3:1 against the avatar fill; both themes.
+      - Chip placement (LOW-3): the chip renders inside the same `.assistant-turn` (the article), after the link in DOM order, so Tab reaches it after the link.
+      - Chip size: the chip is a ≥44 px touch target (REQ-35; the assertion is added in T059, build it to the size now).
+      - The assistant turn keeps its `tabIndex={-1}`; no tabindex on `.assistant-bubble` or `.assistant-avatar`.
+      - Do not rename or remove `.assistant-turn-label`, `.assistant-turn-live`, `.assistant-turn-lead`, `.assistant-turn-sources` (used by `ui.labels`, composer.spec.ts:427-432, answers.spec.ts).
+      - Exactly 5 Tab stops inside the turn for the `optionsAnswer` fixture (3 options, the link, the chip).
+      - Pending state: `aria-disabled` is removed when the answer arrives.
+      - `.assistant-turn-head` (MEDIUM-C): if the avatar replaces it, retarget assistant-a11y.spec.ts:334 from `.assistant-turn-head svg` to `.assistant-avatar svg` (the only test edit allowed in 6a2); otherwise keep the element.
+      - Record in Batch note 6a2 whether block buttons/links left `.assistant-turn-live` here (T056) or are left for T060.
   - **Live region (L6 carry-forward):** block-level buttons and links currently render inside `.assistant-turn-live` (AssistantTurn.tsx ~62-80 via BlockContent → ButtonList), contradicting REQ-33. The 6a2 writer moves them out of the live region here in T056 if cheap; otherwise T060 does it (T060 already owns the assertion). No T055 test depends on either placement. Record in Batch note 6a2 which one happened.
 
 **Review checkpoint 6a2:** tsc + unit.
@@ -1029,6 +1051,7 @@ UI-only: e2e tests are written here and proven in Batch E (T076 run, T077 breaka
   - The live region changes once and includes "3 opciones" and the labels.
   - No replay after close/reopen or navigation; the scroll uses the final height.
   - Use the T056 DOM contract selectors (`.assistant-bubble`, `[data-variant="option"|"chip"|"link"]`, role-based button queries); do not count options by a selector that also matches the chip.
+  - 6a1 round-2 review carry-forwards (owned here; detail in Batch note 6a1): MEDIUM-A reorder assistant-a11y.spec.ts:792-795 (link count 1 before the zero-button assertion on the old answer); MEDIUM-B assistant-a11y.spec.ts:815-817 use `await expect(buttons).toHaveCount(OPTION_LABELS.length + 1)` instead of `count()` + `toBe(4)`; LOW-4 add the chip to the ≥44 px target assertion (`expectTargets`); LOW-1/LOW-2 comment fixes in assistant-look.spec.ts (:341 avatar edge is measured against the log; :243 and :386 record the "≤80% of the log content box" interpretation), unless a cleanup did them first.
 - [ ] T060 [US6] Type the first lead only (precomputed full-height layout); fades ≤200 ms; reduced motion; typed-once flag; hidden option count in the live region (src/components/shared/AssistantTurn.tsx, src/components/shared/assistant-chat.css)
   - 1b1a review (MEDIUM 2), owned here: block-level buttons render inside `.assistant-turn-live` (AssistantTurn.tsx:438, :476); move them outside the live region, leaving only the hidden option count and labels (plan UI rule, ux checklist v1.2, chat-polish REQ-17 as amended). Between T032 (2b1) and here, option buttons sit inside the region; no e2e runs before Batch E, so this lands before any tested UI sees them. e2e (with T059, tests/e2e/assistant-a11y.spec.ts): no `button` inside the live region, and the region holds "3 opciones" plus the labels.
   - 2c2 review (L6): since T036 the detail's "Ver receta completa" link is also a block-level button inside `.assistant-turn-live` (AssistantTurn.tsx ~62-80); the move must cover link buttons too, and the e2e must assert no `a` or `button` inside the region.
