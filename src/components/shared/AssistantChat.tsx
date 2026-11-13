@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { usePathname } from "next/navigation";
 import { Bot, Loader2, MessageSquarePlus, Mic, Square, X } from "lucide-react";
 import { AssistantTurn, ButtonList, STARTER_BUTTONS, type Turn } from "./AssistantTurn";
 import { useMediaQuery } from "@/lib/client/useMediaQuery";
@@ -92,6 +93,36 @@ export function AssistantChat({ title = "Asistente", subtitle, turns, busy, open
     returnFocus.current = true;
     onOpenChange(false);
   }
+
+  // A navigation link (REQ-34, REQ-35). The thread lives in the shell, so it survives the navigation. A link to the page
+  // already open only closes the sheet and focuses the FAB; one that navigates closes the sheet at ≤640 px and, once the
+  // path has changed, hands focus to the destination's main heading, as a normal navigation would.
+  const pathname = usePathname();
+  const navigatingFrom = useRef<string | null>(null);
+  function onLogClick(event: MouseEvent<HTMLElement>) {
+    const link = (event.target as Element).closest<HTMLAnchorElement>('a[data-variant="link"]');
+    // A modified click opens a new tab or window: this page and the sheet stay as they are.
+    if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const destination = new URL(link.href);
+    if (destination.pathname + destination.search === location.pathname + location.search) {
+      if (sheet) close();
+      return;
+    }
+    navigatingFrom.current = pathname;
+    if (sheet) {
+      dictation.stop();
+      onOpenChange(false);
+    }
+  }
+  useEffect(() => {
+    if (navigatingFrom.current === null || navigatingFrom.current === pathname) return;
+    navigatingFrom.current = null;
+    // While the destination's loading state shows there may be no heading yet; the main region is the fallback.
+    const target = document.querySelector<HTMLElement>("main h1") ?? document.querySelector<HTMLElement>("main");
+    if (!target) return;
+    if (!target.hasAttribute("tabindex")) target.tabIndex = -1;
+    target.focus();
+  }, [pathname]);
 
   function wrapTab(event: KeyboardEvent) {
     const panel = panelRef.current;
@@ -207,7 +238,7 @@ export function AssistantChat({ title = "Asistente", subtitle, turns, busy, open
           <button type="button" className="assistant-chat-close" onClick={close} aria-label="Cerrar asistente"><X size={18} /></button>
         </header>
         <div className="assistant-chat-body">
-          <div className="assistant-chat-log" ref={logRef} tabIndex={-1}>
+          <div className="assistant-chat-log" ref={logRef} tabIndex={-1} onClick={onLogClick}>
             {turns.length === 0 && (
               <div className="assistant-chat-empty">
                 <p>Pregúntame lo que quieras saber. Respondo con la información de tus planes.</p>
