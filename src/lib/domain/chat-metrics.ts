@@ -2,8 +2,8 @@ import type { AppDb } from "@/lib/types";
 import type { Button, Intent, Rich, Span } from "@/lib/assistant";
 import { CLAMP_LINE, clampPeriod, dateLabel, notUnderstoodLine, type Period, periodLabel } from "@/lib/domain/chat-dates";
 import { type Built, pickVariant } from "@/lib/domain/chat-meals";
-import { activeSchedule } from "@/lib/domain/plans";
-import { daysBetween, exerciseOver, type LogOf, mealsOver, mondayOf, WATER_GLASS_LITERS, waterGoalGlasses, waterOver, weightStats } from "@/lib/progress";
+import { activePlan, activeSchedule } from "@/lib/domain/plans";
+import { daysBetween, exerciseOver, type LogOf, mealsOver, mondayOf, WATER_GLASS_LITERS, WATER_GOAL_LITERS, waterGoalGlasses, waterOver, weekExercise, weekMeals, weekWater, weightStats } from "@/lib/progress";
 
 // Metric answers (spec assistant-data-scope REQ-15 to REQ-18): numbers come from `progress.ts`, the same math as the dashboard tiles (REQ-16).
 
@@ -64,6 +64,9 @@ export function waterAnswer(db: AppDb, userId: string, question: string, intent:
   return { lead: joinSentences([...lead, summary]) };
 }
 
+/** Exercise days per week the user aims for. */
+const exerciseGoalDays = (db: AppDb, userId: string) => db.users.find((user) => user.id === userId)?.activity_goal_days ?? 4;
+
 const WEEK_EXERCISE: ((label: string, done: string, left: Rich) => Rich)[] = [
   (label, done, left) => [plain(`${label} llevas `), bold(done), plain(" de ejercicio. "), ...left],
   (label, done, left) => [plain(`${label} has hecho ejercicio `), bold(done), plain(". "), ...left]
@@ -75,7 +78,7 @@ const WEEK_EXERCISE: ((label: string, done: string, left: Rich) => Rich)[] = [
  */
 export function exerciseAnswer(db: AppDb, userId: string, question: string, intent: Intent, today: string): Built {
   const logOf = logLookup(db, userId);
-  const goal = db.users.find((user) => user.id === userId)?.activity_goal_days ?? 4;
+  const goal = exerciseGoalDays(db, userId);
   const { period, lead } = namedPeriod(intent, today, "esta semana");
   const respond = (...sentences: Rich[]): Built => ({ lead: joinSentences([...lead, ...sentences]) });
 
@@ -107,7 +110,7 @@ const unchanged = (change: number) => number(change) === "0";
 const direction = (change: number) => (change < 0 ? "bajaste" : "subiste");
 /** "bajaste 0.4 kg", "subiste 0.4 kg" or "sin cambio" (a change that rounds to 0 is no change). */
 const changeText = (change: number) => (unchanged(change) ? "sin cambio" : `${direction(change)} ${kg(Math.abs(change))}`);
-const link = (label: string): Button => ({ type: "link", label, href: "/" });
+const link = (label: string, href = "/"): Button => ({ type: "link", label, href });
 
 /**
  * Weight (REQ-19, REQ-27): with no period, the latest record up to today, the distance to the goal, this week's change
@@ -186,4 +189,67 @@ export function mealsDoneAnswer(db: AppDb, userId: string, question: string, int
   if (!period) return { lead: joinSentences([...lead, todaySentence(), weekSentence({ kind: "thisWeek", from: mondayOf(today), to: today })]) };
   const days = daysBetween(period.from, period.to);
   return { lead: joinSentences([...lead, period.kind === "thisWeek" ? weekSentence(period) : rangeSentence(period, days, slotIds.length * days.length)]) };
+}
+
+const NO_PLAN_LINE = "Aún no tienes un plan activo.";
+const PLAN_LINK = link("Subir mi plan", "/plans");
+
+/**
+ * Goals (REQ-21): the plan objective and the weight, exercise and water goals, or only the one the intent names. The water
+ * goal is the plan's liters as glasses (clamped), shown with the plan's own liters, as the spec examples do. With no
+ * active plan the objective is left out and the water goal is the 2 L default plus the no-plan line (bare answer only).
+ */
+export function goalsAnswer(db: AppDb, userId: string, intent: Intent): Built {
+  const weightGoal = db.users.find((user) => user.id === userId)?.weight_goal_kg ?? null;
+  const days = plural(exerciseGoalDays(db, userId), "día", "días");
+  const planLiters = activeSchedule(db, userId)?.water_goal_liters ?? WATER_GOAL_LITERS;
+  const glasses = plural(waterGoalGlasses(planLiters), "vaso", "vasos");
+  const waterTail = ` (${liters(planLiters)}) al día`;
+
+  if (intent.metric === "weight") {
+    return weightGoal === null
+      ? { lead: [plain("No has fijado meta de peso.")], blockButtons: [link("Fijar mi meta")] }
+      : { lead: [plain("Tu meta de peso es "), bold(kg(weightGoal)), plain(".")] };
+  }
+  if (intent.metric === "exercise") return { lead: [plain("Tu meta de ejercicio es "), bold(days), plain(" por semana.")] };
+  if (intent.metric === "water") return { lead: [plain("Tu meta de agua es "), bold(glasses), plain(`${waterTail}.`)] };
+
+  const objective = activePlan(db, userId)?.current_version?.structured_data.objective;
+  const items: Rich[] = [
+    ...(objective ? [[plain(`Objetivo del plan: ${objective}`)]] : []),
+    weightGoal === null ? [plain("Peso: sin meta")] : [plain("Peso: "), bold(kg(weightGoal))],
+    [plain("Ejercicio: "), bold(days), plain(" por semana")],
+    [plain("Agua: "), bold(glasses), plain(waterTail)]
+  ];
+  const hasPlan = activeSchedule(db, userId) !== null;
+  if (!hasPlan) items.push([plain(NO_PLAN_LINE)]);
+  return { lead: [plain("Estas son tus metas:")], sections: [{ title: "Metas", items }], blockButtons: hasPlan ? [] : [PLAN_LINK] };
+}
+
+/**
+ * Weekly progress (REQ-22, REQ-16): this week's exercise, water, meals and weight change from the dashboard's own
+ * helpers, ending today. Meals need an active plan with slots; the weight item needs a record this week and one before
+ * Monday, as in the weight answer.
+ */
+export function weeklyAnswer(db: AppDb, userId: string, today: string): Built {
+  const logOf = logLookup(db, userId);
+  const monday = mondayOf(today);
+  const schedule = activeSchedule(db, userId);
+  const slotIds = schedule?.meals.map((meal) => meal.id) ?? [];
+  const label = periodLabel({ kind: "thisWeek", from: monday, to: today }, today);
+  const goal = plural(exerciseGoalDays(db, userId), "día", "días");
+
+  const items: Rich[] = [
+    [plain("Ejercicio: "), bold(`${weekExercise(logOf, monday, today)} de ${goal}`)],
+    [plain("Agua: "), bold(liters(weekWater(logOf, monday, today, waterGoalGlasses(schedule?.water_goal_liters))))]
+  ];
+  if (slotIds.length) items.push([plain("Comidas: "), bold(`${weekMeals(logOf, slotIds, monday, today)} de ${slotIds.length * 7}`)]);
+  const records = db.dailyLogs.filter((log) => log.user_id === userId && typeof log.weight_kg === "number").map((log): [string, number] => [log.date, log.weight_kg as number]);
+  const { change, latestDate } = weightStats(records, today, monday, null);
+  if (latestDate !== null && latestDate >= monday && change !== null) {
+    items.push(unchanged(change) ? [plain("Peso: sin cambio")] : [plain(`Peso: ${direction(change)} `), bold(kg(Math.abs(change)))]);
+  }
+  if (!schedule) items.push([plain(NO_PLAN_LINE)]);
+  // "Esta semana (lun 26 – hoy)" lowercased into the lead: the parenthesis is the range.
+  return { lead: [plain(`Tu avance de esta semana ${label.slice(label.indexOf("("))}:`)], sections: [{ title: "Avance", items }], blockButtons: schedule ? [] : [PLAN_LINK] };
 }

@@ -3,7 +3,7 @@ import { type Block, type Button, type ChatAnswer, type Intent, type ReplyKind, 
 import { consolidateCart } from "@/lib/domain/cart";
 import { isGeneric } from "@/lib/domain/chat-dish";
 import { type Built, chooseSlot, planSlots, recipeDetail, slotOptions, slotTimeLead } from "@/lib/domain/chat-meals";
-import { exerciseAnswer, mealsDoneAnswer, waterAnswer, weightAnswer } from "@/lib/domain/chat-metrics";
+import { exerciseAnswer, goalsAnswer, mealsDoneAnswer, waterAnswer, weeklyAnswer, weightAnswer } from "@/lib/domain/chat-metrics";
 import { resolve } from "@/lib/domain/chat-intent";
 import { greetingOf, TOPICS, type TopicId } from "@/lib/domain/chat-topics";
 import { activePlan } from "@/lib/domain/plans";
@@ -120,6 +120,8 @@ const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: st
   weight: (db, userId, question, intent, today) => weightAnswer(db, userId, question, intent, today),
   // No active plan keeps the interim answer until T052.
   mealsDone: (db, userId, question, intent, today) => mealsDoneAnswer(db, userId, question, intent, today) ?? pending("mealsDone"),
+  goals: (db, userId, _question, intent) => goalsAnswer(db, userId, intent),
+  weekly: (db, userId, _question, _intent, today) => weeklyAnswer(db, userId, today),
   cart: (db, userId) => cartSummary(db, userId),
   recipes: recipeList,
   plan: (db, userId, question) => planSummary(db, userId, normalizeText(question))
