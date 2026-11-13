@@ -585,3 +585,13 @@ test("REQ-22 REQ-27 an active plan with zero slots is no plan for the weekly ans
   assert.deepEqual(itemsOf(reply), ["Ejercicio: 2 de 4 días", "Agua: 5 litros", "Peso: bajaste 0.4 kg", "Aún no tienes un plan activo."]);
   assert.deepEqual(reply.blocks[0].buttons, [{ type: "link", label: "Subir mi plan", href: "/plans" }]);
 });
+
+test("REQ-17 REQ-27 an active plan with zero slots is no plan for water: the goal is the 2 L default (8 vasos), not the plan's 3 L", () => {
+  const { db, user } = memDb({ meals: [] });
+  db.planVersions[0].structured_data.nutrition_summary = { water_liters: { min: 3 } };
+  assert.match(ragAnswer(db, user, "¿Cuánta agua llevo?", TODAY).answer, /de tu meta de 8 vasos\./);
+  // Control: with slots the same plan's 3 L goal (12 vasos) applies.
+  const withMeals = memDb();
+  withMeals.db.planVersions[0].structured_data.nutrition_summary = { water_liters: { min: 3 } };
+  assert.match(ragAnswer(withMeals.db, withMeals.user, "¿Cuánta agua llevo?", TODAY).answer, /de tu meta de 12 vasos\./);
+});
