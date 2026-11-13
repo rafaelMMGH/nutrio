@@ -3,7 +3,7 @@ import { GREETINGS, NO_MATCH_LEADS, THANKS, slotTime } from "../shared/assistant
 import { ask, createChatUser, deleteChatUser, expect, resendSweep, seedPlan, test } from "./assistant-helpers";
 
 // Chat-like edge cases through POST /api/rag/chat (spec assistant-data-scope US4): REQ-23 greeting and thanks, the
-// REQ-28 variants and the plain no-match reply. The dish answers come with the next batch. Written, not run, until Batch E.
+// REQ-28 variants, the plain no-match reply and the dish answers (REQ-26, REQ-29). Written, not run, until Batch E.
 
 const STARTERS = ["Mi cena de hoy", "Mi avance de la semana", "Mi peso", "Mi carrito"];
 
@@ -37,4 +37,29 @@ test("REQ-28 the same question twice shows the same variant, and the no-match le
   expect(NO_MATCH_LEADS).toContain(noMatch.body.answer);
   expect(messages(noMatch.body.buttons)).toEqual(STARTERS);
   expect((await ask(chatContext.request, "¿A qué hora es mi colación?")).body.answer).toMatch(slotTime("colación", "Entre 10 a 11 am"));
+});
+
+const quoted = (buttons: Button[]) => buttons.flatMap((button) => (button.type === "question" ? [[button.label, button.message]] : []));
+const sends = (...names: string[]) => names.map((name) => [name, `¿Qué lleva ${name}?`]);
+
+test("REQ-26 pollo is a did-you-mean with its two recipes, pizza is not found, and the buttons resolve", async ({ chatContext }) => {
+  seedPlan({ times: "all", fixture: true });
+  const pollo = await ask(chatContext.request, "¿Qué lleva el pollo?");
+  expect(pollo.body.kind).toBe("did_you_mean");
+  expect(pollo.body.answer).toBe("No encontré exactamente 'pollo'. ¿Quisiste decir…?");
+  expect(quoted(pollo.body.buttons)).toEqual(sends("Pollo asado", "Ensalada de pollo"));
+  const pizza = await ask(chatContext.request, "¿Qué lleva la pizza?");
+  expect(pizza.body.kind).toBe("answer");
+  expect(pizza.body.answer).toBe("No encontré 'pizza' en tu plan ni en tus recetas.");
+  expect(messages(pizza.body.buttons)).toEqual(["Mi carrito", "Mi cena de hoy"]);
+  await resendSweep(chatContext.request, [pollo.body, pizza.body]);
+});
+
+test("REQ-29 a question with recipe words and no cue is a did-you-mean in rank order, never a detail", async ({ chatContext }) => {
+  seedPlan({ times: "all", fixture: true });
+  const { body } = await ask(chatContext.request, "pollo atún ensalada");
+  expect(body.kind).toBe("did_you_mean");
+  expect(body.answer).toBe("¿Quisiste decir…?");
+  expect(quoted(body.buttons)).toEqual(sends("Ensalada de pollo", "Pollo asado", "Sándwich de atún"));
+  await resendSweep(chatContext.request, [body]);
 });
