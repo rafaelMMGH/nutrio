@@ -271,3 +271,20 @@ test("REQ-14 no period without a recognized phrase, without today, or on topics 
   assert.deepEqual(noPeriod("¿Qué lleva la cena ayer?"), [["slotOptions", undefined]]);
   assert.deepEqual(noPeriod("Mi avance de la semana"), [["weekly", undefined]]);
 });
+
+const unrecognized = (message: string, today: string | null = TODAY) => resolve(message, undefined, today ?? undefined).intents.map((intent) => [intent.topic, intent.periodUnrecognized]);
+
+test("REQ-14 periodUnrecognized is set on metric intents and meals done for a cue with no phrase, and only then", () => {
+  assert.deepEqual(unrecognized("¿Cuánta agua tomé hace dos semanas?"), [["water", true]]);
+  assert.deepEqual(unrecognized("¿Cuántos días hice ejercicio hace dos semanas?"), [["exercise", true]]);
+  assert.deepEqual(unrecognized("¿Cuál es mi peso hace dos semanas?"), [["weight", true]]);
+  assert.deepEqual(unrecognized("¿Cuántas comidas llevo hace dos semanas?"), [["mealsDone", true]]);
+  assert.deepEqual(unrecognized("¿Cuánta agua tomé ayer?"), [["water", undefined]]);
+  assert.deepEqual(unrecognized("¿Cuánta agua llevo?"), [["water", undefined]]);
+  assert.deepEqual(unrecognized("¿Cuánta agua tomé hace dos semanas?", null), [["water", undefined]]);
+});
+
+test("REQ-14 periodUnrecognized is not set on topics that are not metrics", () => {
+  assert.deepEqual(unrecognized("¿Cuál es mi meta de peso hace dos semanas?"), [["goals", undefined]]);
+  assert.deepEqual(unrecognized("¿Qué lleva la cena hace dos semanas?"), [["slotOptions", undefined]]);
+});
