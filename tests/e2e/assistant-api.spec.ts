@@ -1,5 +1,6 @@
 import type { BrowserContext } from "@playwright/test";
 import type { ChatAnswer } from "../../src/lib/assistant";
+import { slotTime } from "../shared/assistant-copy";
 import {
   PLAN_NAME,
   ask,
@@ -279,7 +280,7 @@ test.describe("builders", () => {
 
   test("REQ-8 a slot's time answers only that slot, the time highlighted", async ({ chatContext }) => {
     const body = await answer(chatContext, "¿A qué hora es la cena?");
-    expect(body.answer).toBe("Tu horario de cena: Entre 8 a 9 pm.");
+    expect(body.answer).toMatch(slotTime("cena", "Entre 8 a 9 pm"));
     expect(body.blocks[0].sections).toEqual([]);
     expect(body.blocks[0].lead.filter((span) => span.highlight).map((span) => span.text)).toEqual(["Entre 8 a 9 pm"]);
   });

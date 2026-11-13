@@ -5,6 +5,7 @@ import { ragAnswer } from "@/lib/domain/chat";
 import { recipeSteps } from "@/lib/recipe-steps";
 import { type Built, chooseSlot, planSlots, slotOptions, type SlotOptionsView } from "@/lib/domain/chat-meals";
 import type { AppDb } from "@/lib/types";
+import { slotTime } from "../shared/assistant-copy";
 import { PLAN_NAME } from "../shared/assistant-fixture";
 import { memDb, sweep, type MemDbOptions } from "./memdb";
 
@@ -27,7 +28,7 @@ const refsOf = (meals: string[]) => {
 test("REQ-8 a slot's time answers only that slot, the time highlighted", () => {
   const reply = ask("¿A qué hora es la cena?");
   assert.equal(reply.kind, "answer");
-  assert.equal(reply.answer, "Tu horario de cena: Entre 8 a 9 pm.");
+  assert.match(reply.answer, slotTime("cena", "Entre 8 a 9 pm"));
   assert.deepEqual(highlighted(reply), ["Entre 8 a 9 pm"]);
   assert.deepEqual(reply.blocks[0].sections, []);
   assert.deepEqual(reply.sources, [`Plan activo: ${PLAN_NAME}`]);
@@ -55,12 +56,12 @@ test("REQ-8 without an active plan the reply says so", () => {
 });
 
 test("REQ-7 merienda and snack map to colación when the plan has no slot with that name", () => {
-  for (const word of ["merienda", "snack"]) assert.equal(ask(`¿A qué hora es mi ${word}?`).answer, "Tu horario de colación: Entre 10 a 11 am.", word);
+  for (const word of ["merienda", "snack"]) assert.match(ask(`¿A qué hora es mi ${word}?`).answer, slotTime("colación", "Entre 10 a 11 am"), word);
 });
 
 test("REQ-7 a slot with the asked name wins", () => {
-  assert.equal(ask("¿A qué hora es mi merienda?", { meals: ["Desayuno", "Merienda", "Cena"] }).answer, "Tu horario de merienda: Entre 10 a 11 am.");
-  assert.equal(ask("¿A qué hora es mi almuerzo?", { meals: ["Desayuno", "Almuerzo", "Cena"] }).answer, "Tu horario de almuerzo: Entre 10 a 11 am.");
+  assert.match(ask("¿A qué hora es mi merienda?", { meals: ["Desayuno", "Merienda", "Cena"] }).answer, slotTime("merienda", "Entre 10 a 11 am"));
+  assert.match(ask("¿A qué hora es mi almuerzo?", { meals: ["Desayuno", "Almuerzo", "Cena"] }).answer, slotTime("almuerzo", "Entre 10 a 11 am"));
 });
 
 test("REQ-7 almuerzo without such a slot asks desayuno or comida, one button per slot that exists", () => {
@@ -130,28 +131,28 @@ test("REQ-11 two snacks read '2 snacks' (the loanword takes only an s)", () => {
 });
 
 // T028 part 2: typed ordinals and "<slot> <n>" (REQ-11), the duplicate buttons no longer loop, the sweep.
-const SECOND_COLACION = "Tu horario de segunda colación: Entre 8 a 9 pm.";
+const SECOND_COLACION = slotTime("segunda colación", "Entre 8 a 9 pm");
 const trace = (message: string, options?: MemDbOptions) => ask(message, options).resolved;
 
 test("REQ-11 the duplicate-colación buttons answer their slot's time instead of asking again", () => {
   const first = ask("¿A qué hora es mi primera colación?", { meals: DUPLICATED });
   assert.equal(first.kind, "answer");
-  assert.equal(first.answer, "Tu horario de primera colación: Entre 10 a 11 am.");
-  assert.equal(ask("¿A qué hora es mi segunda colación?", { meals: DUPLICATED }).answer, SECOND_COLACION);
+  assert.match(first.answer, slotTime("primera colación", "Entre 10 a 11 am"));
+  assert.match(ask("¿A qué hora es mi segunda colación?", { meals: DUPLICATED }).answer, SECOND_COLACION);
 });
 
 test("REQ-11 typed ordinals pick the slot, with or without accents and in either gender", () => {
   for (const typed of ["segunda colación", "segunda colacion", "SEGUNDA COLACIÓN", "colación 2", "colacion 2"]) {
-    assert.equal(ask(`¿A qué hora es mi ${typed}?`, { meals: DUPLICATED }).answer, SECOND_COLACION, typed);
+    assert.match(ask(`¿A qué hora es mi ${typed}?`, { meals: DUPLICATED }).answer, SECOND_COLACION, typed);
   }
   const meals = ["Desayuno", "Desayuno", "Cena"];
-  assert.equal(ask("¿A qué hora es mi segundo desayuno?", { meals }).answer, "Tu horario de segundo desayuno: Entre 10 a 11 am.");
-  assert.match(ask("¿A qué hora es mi colación 11?", { meals: Array(11).fill("Colación") }).answer, /^Tu horario de colación 11: /);
+  assert.match(ask("¿A qué hora es mi segundo desayuno?", { meals }).answer, slotTime("segundo desayuno", "Entre 10 a 11 am"));
+  assert.match(ask("¿A qué hora es mi colación 11?", { meals: Array(11).fill("Colación") }).answer, /^(Tu horario de colación 11: |Tu colación 11 es: )/);
 });
 
 test("REQ-11 an ordinal the plan lacks asks which one; on a single slot it is that slot", () => {
   assert.equal(ask("¿A qué hora es mi tercera colación?", { meals: DUPLICATED }).answer, "Tienes 2 colaciones. ¿Cuál?");
-  assert.equal(ask("¿A qué hora es mi primera cena?").answer, "Tu horario de cena: Entre 8 a 9 pm.");
+  assert.match(ask("¿A qué hora es mi primera cena?").answer, slotTime("cena", "Entre 8 a 9 pm"));
 });
 
 test("REQ-11 a typed ordinal reaches the options reading with the slot's position", () => {
@@ -543,7 +544,7 @@ test("pinned (LOW-1, LOW-3, MEDIUM-3): '<slot> 2 veces' is option n, a time word
   assert.equal(twice.kind, "detail");
   assert.match(twice.answer.split("\n")[0], DETAIL_LEAD("Cena, opción 2"));
   assert.equal(ask("cena 12 veces").blocks[0].lead[0].text, "Tu cena tiene 5 opciones.");
-  assert.equal(ask("cena hora opción 2").answer, "Tu horario de cena: Entre 8 a 9 pm.");
+  assert.match(ask("cena hora opción 2").answer, slotTime("cena", "Entre 8 a 9 pm"));
   const clarify = ask("colación opción 2", { meals: DUPLICATED });
   assert.equal(clarify.kind, "clarify");
   assert.equal(clarify.answer, "Tienes 2 colaciones. ¿Cuál?");

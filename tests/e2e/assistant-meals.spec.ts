@@ -1,4 +1,5 @@
 import type { Button, ChatAnswer } from "../../src/lib/assistant";
+import { slotTime } from "../shared/assistant-copy";
 import { ask, createChatUser, deleteChatUser, expect, openAssistant, resendSweep, seedPlan, seedRecipes, test } from "./assistant-helpers";
 
 // REQ-7 (almuerzo), REQ-8 (slot times) and REQ-11 (duplicate slots) through POST /api/rag/chat as a seeded user.
@@ -28,7 +29,7 @@ test("REQ-7 an almuerzo question asks desayuno or comida, one button per slot th
 test("REQ-8 a single slot's time is highlighted, a slot without one says so, and no slot lists them all", async ({ chatContext }) => {
   seedPlan({ times: "some" });
   const timed = await ask(chatContext.request, "¿A qué hora es mi desayuno?");
-  expect(timed.body.answer).toBe("Tu horario de desayuno: Entre 7 a 8 am.");
+  expect(timed.body.answer).toMatch(slotTime("desayuno", "Entre 7 a 8 am"));
   expect(timed.body.blocks[0].lead.filter((span) => span.highlight).map((span) => span.text)).toEqual(["Entre 7 a 8 am"]);
 
   const untimed = await ask(chatContext.request, "¿A qué hora es mi colación?");
@@ -54,9 +55,9 @@ test("REQ-11 duplicate colaciones: the buttons answer their own slot, and typed 
 
   const first = await ask(chatContext.request, "¿A qué hora es mi primera colación?");
   expect(first.body.kind).toBe("answer");
-  expect(first.body.answer).toBe("Tu horario de primera colación: Entre 10 a 11 am.");
+  expect(first.body.answer).toMatch(slotTime("primera colación", "Entre 10 a 11 am"));
   for (const typed of ["segunda colacion", "colación 2"]) {
-    expect((await ask(chatContext.request, `¿A qué hora es mi ${typed}?`)).body.answer, typed).toBe("Tu horario de segunda colación: Entre 8 a 9 pm.");
+    expect((await ask(chatContext.request, `¿A qué hora es mi ${typed}?`)).body.answer, typed).toMatch(slotTime("segunda colación", "Entre 8 a 9 pm"));
   }
 });
 

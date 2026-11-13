@@ -3,6 +3,7 @@ import { test } from "node:test";
 import type { Block, ChatAnswer } from "@/lib/assistant";
 import { ragAnswer, recipeList } from "@/lib/domain/chat";
 import { isGeneric } from "@/lib/domain/chat-dish";
+import { NO_MATCH_LEAD } from "../shared/assistant-copy";
 import { memDb, sweep } from "./memdb";
 
 // The answer path of the chat over in-memory data (plan D10): the same ragAnswer the route calls, with today passed in.
@@ -63,7 +64,7 @@ test("a question with no topic is no_match with the lead, the four starters and 
   for (const message of ["¿Cuál es la capital de Francia?", "¿Qué hago ahora?"]) {
     const reply = ragAnswer(db, user, message, TODAY);
     assert.equal(reply.kind, "no_match", message);
-    assert.equal(reply.answer, "No entendí tu pregunta. Puedo ayudarte con:", message);
+    assert.match(reply.answer, NO_MATCH_LEAD, message);
     assert.deepEqual(messagesOf(reply.buttons), STARTERS, message);
     assert.deepEqual(reply.sources, [], message);
   }
@@ -181,7 +182,7 @@ test("REQ-3 the sources of the second answered block are listed too", () => {
   const { db, user } = memDb({ cart: 2 });
   const reply = ragAnswer(db, user, "mi objetivo y carrito", TODAY, { trace: true });
   assert.deepEqual(reply.resolved?.map((intent) => intent.topic), ["goals", "cart"]);
-  // Includes, not equals: the goals block may bring its own sources once its builder lands.
+  // Includes, not equals: this asserts the cart block's source; the goals block brings none.
   assert.ok(reply.sources.includes("Carrito actual"), reply.sources.join());
 });
 

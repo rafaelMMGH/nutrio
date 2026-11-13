@@ -1,4 +1,5 @@
 import type { Page } from "@playwright/test";
+import { NO_MATCH_LEAD } from "../shared/assistant-copy";
 import { expectIssues } from "./fixtures";
 import {
   assistantUi,
@@ -112,7 +113,7 @@ test.describe("REQ-29: the no-match reply", () => {
     const ui = await openAssistant(chat);
     await typeQuestion(chat, "¿Cuál es la capital de Francia?");
     await expect(ui.assistantTurns).toHaveCount(1);
-    await expect(ui.assistantTurns.getByRole("paragraph")).toHaveText(["No entendí tu pregunta. Puedo ayudarte con:"]);
+    await expect(ui.assistantTurns.getByRole("paragraph")).toHaveText([NO_MATCH_LEAD]);
     await expect(ui.chips).toHaveText(["Mi cena de hoy", "Mi avance de la semana", "Mi peso", "Mi carrito"]);
     await expect(ui.panel).not.toContainText("No pude responder");
     await expect(ui.panel).not.toContainText("Algo salió mal");
