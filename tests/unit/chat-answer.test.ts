@@ -74,7 +74,7 @@ test("the old fallback texts never appear", () => {
   const { db, user } = memDb();
   for (const message of QUESTIONS) {
     const { answer } = ragAnswer(db, user, message, TODAY);
-    assert.doesNotMatch(answer, /No encontré eso en tu información|Puedo ayudarte con tu plan de comidas/, message);
+    assert.doesNotMatch(answer, /No encontré eso en tu información|Puedo ayudarte con tu plan de comidas|No encontré esa información en (tu plan activo|el sistema)/, message);
   }
 });
 
