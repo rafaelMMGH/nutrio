@@ -49,10 +49,12 @@ test("REQ-8 with no slot named every slot is listed with its time highlighted", 
   );
 });
 
-test("REQ-8 without an active plan the reply says so", () => {
+test("REQ-8 REQ-27 without an active plan the reply is the spec's, with no sources", () => {
   const { db, user } = memDb();
   db.plans = [];
-  assert.equal(ragAnswer(db, user, "¿A qué hora es la cena?", TODAY).answer, "No tienes un plan activo.");
+  const reply = ragAnswer(db, user, "¿A qué hora es la cena?", TODAY);
+  assert.equal(reply.answer, "Aún no tienes un plan activo.");
+  assert.deepEqual(reply.sources, []);
 });
 
 test("REQ-7 merienda and snack map to colación when the plan has no slot with that name", () => {
@@ -187,10 +189,17 @@ test("REQ-11 the masculine ordinals also end at ten: the eleventh desayuno is 'D
   assert.equal(refsOf(Array(11).fill("Desayuno"))[10], "Desayuno 11");
 });
 
-test("REQ-27 a plan with no slots offers the starters instead of slot buttons", () => {
+test("REQ-27 an active plan with no slots is treated as no plan (user ruling 2026-11-13)", () => {
   const reply = ask("¿A qué hora es mi cena?", { meals: [] });
-  assert.equal(reply.answer, "Tu plan no tiene cena.");
-  assert.deepEqual(questions(reply).map((button) => button.message), STARTERS);
+  assert.equal(reply.answer, "Aún no tienes un plan activo.");
+  const { db, user } = memDb({ meals: [] });
+  assert.equal(planSlots(db, user.id), null);
+});
+
+test("REQ-27 the choice of a slot in a slot list that is empty offers the starters", () => {
+  const chosen = chooseSlot({ planName: PLAN_NAME, slots: [] }, "cena", "options");
+  assert.ok("built" in chosen);
+  assert.deepEqual(chosen.built.buttons?.map((button) => button.type === "question" && button.message), STARTERS);
 });
 
 // REQ-9, REQ-10, REQ-11 (T031 part 1): the options builder. With the default plan Cena has 5 options (4 generic and

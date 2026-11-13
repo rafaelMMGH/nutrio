@@ -543,6 +543,15 @@ test("REQ-22 another user's logs, plan and goals never count in my weekly progre
   assert.deepEqual(itemsOf(ragAnswer(db, user, "Mi avance de la semana", TODAY)), ["Ejercicio: 2 de 4 días", "Agua: 5 litros", "Comidas: 3 de 28", "Peso: bajaste 0.4 kg"]);
 });
 
+test("REQ-21 a blank plan objective is left out, and a padded one is trimmed", () => {
+  const items = (objective: string) => {
+    const { db, user } = memDb({ objective });
+    return itemsOf(ragAnswer(db, user, "¿Cuál es mi meta?", TODAY));
+  };
+  assert.deepEqual(items("   "), ["Peso: sin meta", "Ejercicio: 4 días por semana", "Agua: 8 vasos (2 litros) al día"]);
+  assert.equal(items("  Mejorar mi energía  ")[0], "Objetivo del plan: Mejorar mi energía");
+});
+
 test("REQ-21 REQ-22 an active plan without a current version is no plan: no objective, the default water goal, the no-plan line", () => {
   const without = (message: string) => {
     const { db, user } = memDb({ goals: { weight: 63 }, logs: weeklyLogs });

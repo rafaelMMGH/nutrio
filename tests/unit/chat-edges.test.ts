@@ -384,3 +384,108 @@ test("REQ-24 the trace lists every intent the resolver found, also the ones the 
   assert.equal(both.blocks.length, 1);
   assert.deepEqual(both.resolved?.map((intent) => [intent.topic, intent.slot]), [["slotOptions", "desayuno"], ["slotOptions", "cena"]]);
 });
+
+// REQ-25: ambiguous progress asks which metric (T052).
+test('REQ-25 "¿Cuánto llevo?" asks which metric, with Agua, Ejercicio and Comidas as buttons that resolve', () => {
+  for (const message of ["¿Cuánto llevo?", "¿Cómo voy?"]) {
+    const reply = ask(message);
+    assert.equal(reply.kind, "clarify", message);
+    assert.equal(reply.answer, "¿Te refieres a agua, ejercicio o comidas?", message);
+    assert.deepEqual(reply.buttons, [
+      { type: "question", label: "Agua", message: "¿Cuánta agua llevo?" },
+      { type: "question", label: "Ejercicio", message: "¿Cuánto ejercicio llevo?" },
+      { type: "question", label: "Comidas", message: "¿Cuántas comidas llevo?" }
+    ], message);
+    assert.deepEqual(reply.sources, [], message);
+    assert.deepEqual(reply.resolved, [{ topic: "ambiguous" }], message);
+  }
+  const { db, user } = memDb();
+  assert.deepEqual(sweep(db, user, [ragAnswer(db, user, "¿Cuánto llevo?", TODAY)], TODAY), ["¿Cuánta agua llevo?", "¿Cuánto ejercicio llevo?", "¿Cuántas comidas llevo?"]);
+});
+
+test("REQ-5 REQ-24 every clarify and overflow button resolves to a definite answer", () => {
+  const { db, user } = memDb({ meals: TWO_COLACIONES.meals });
+  const answers = ["¿Cuánto llevo?", "colación", "¿A qué hora es mi almuerzo?", "¿Qué lleva?", "agua, ejercicio, peso y carrito"].map((message) => ragAnswer(db, user, message, TODAY));
+  assert.deepEqual(answers.map((reply) => reply.kind), ["clarify", "clarify", "clarify", "clarify", "answer"]);
+  const swept = sweep(db, user, answers, TODAY);
+  for (const message of ["¿Cuánta agua llevo?", "¿Cuál es mi primera colación?", "¿A qué hora es mi segunda colación?", "¿Qué lleva Pollo asado?", "Mi peso", "Mi carrito"]) assert.ok(swept.includes(message), message);
+});
+
+// REQ-27: no active plan, for plan, slot and meals-done questions (T052). A plan with no slots is no plan (user ruling 2026-11-13).
+const NO_PLAN = "Aún no tienes un plan activo.";
+const NO_PLAN_LINK = { type: "link", label: "Subir mi plan", href: "/plans" };
+const NO_PLAN_QUESTIONS = ["¿A qué hora es la cena?", "¿Cuál es mi horario?", "¿Qué puedo cenar?", "cena, opción 2", "¿Cuál es mi plan?", "¿Qué suplementos tomo?", "¿Cuántas comidas llevo?", "¿Cuántas comidas llevo hoy?"];
+const WITHOUT_PLAN: [string, MemDbOptions | undefined, (db: AppDb) => void][] = [
+  ["no active plan", undefined, (db) => { db.plans = []; }],
+  ["an active plan with no slots", { meals: [], fixture: false }, () => {}]
+];
+
+for (const [name, options, tweak] of WITHOUT_PLAN) {
+  test(`REQ-27 ${name}: slot, times, plan and meals-done questions say so, with 'Subir mi plan' and no sections or sources`, () => {
+    for (const message of NO_PLAN_QUESTIONS) {
+      const reply = askIn(message, options, tweak);
+      assert.equal(reply.kind, "answer", message);
+      assert.equal(reply.answer, NO_PLAN, message);
+      assert.deepEqual(reply.blocks[0].sections, [], message);
+      assert.deepEqual(reply.blocks[0].buttons, [NO_PLAN_LINK], message);
+      assert.deepEqual(reply.sources, [], message);
+    }
+  });
+}
+
+test("REQ-27 a no-plan answer about a slot offers the other question about that slot; one about all the times keeps the topic's follow-ups", () => {
+  const noPlan = (db: AppDb) => { db.plans = []; };
+  assert.deepEqual(messages(askIn("¿Qué puedo cenar?", undefined, noPlan)), ["¿A qué hora es mi cena?"]);
+  assert.deepEqual(messages(askIn("¿Qué puedo tomar de colación?", undefined, noPlan)), ["¿A qué hora es mi colación?"]);
+  assert.deepEqual(messages(askIn("¿A qué hora es mi cena?", undefined, noPlan)), ["¿Cuál es mi cena?"]);
+  assert.deepEqual(messages(askIn("¿Cuál es mi horario?", undefined, noPlan)), ["Mi cena de hoy", "Mi carrito"]);
+  assert.deepEqual(messages(askIn("¿Cuántas comidas llevo?", undefined, noPlan)), ["¿Cuánta agua llevo?", "Mi cena de hoy"]);
+});
+
+test("REQ-24 REQ-27 no-plan slot blocks beside another block are titled, and 'Subir mi plan' shows once", () => {
+  const noPlan = (db: AppDb) => { db.plans = []; };
+  assert.deepEqual(titles(askIn("¿qué puedo desayunar y mi peso?", undefined, noPlan)), ["Desayuno", "Peso"]);
+  assert.deepEqual(titles(askIn("mi peso y qué puedo tomar de colación", undefined, noPlan)), ["Peso", "Colación"]);
+  const both = askIn("¿qué puedo desayunar y qué puedo cenar?", undefined, noPlan);
+  assert.deepEqual(titles(both), ["Desayuno", "Cena"]);
+  assert.deepEqual(both.blocks.flatMap((block) => block.buttons), [NO_PLAN_LINK]);
+  const meals = askIn("¿Cuántas comidas llevo y mi peso?", undefined, noPlan);
+  assert.deepEqual(titles(meals), ["Comidas", "Peso"]);
+  assert.equal(meals.blocks[0].lead.map((span) => span.text).join(""), NO_PLAN);
+});
+
+test("REQ-27 a slot with no options says so and offers its time; the Given of a plan without cena offers one button per slot", () => {
+  const noOptions = askIn("¿Qué puedo cenar?", undefined, (db) => {
+    db.mealOptions = db.mealOptions.filter((option) => !option.meal_type_id.endsWith("-meal-3"));
+  });
+  assert.equal(noOptions.answer, "Tu plan no tiene opciones para tu cena.");
+  assert.deepEqual(messages(noOptions), ["¿A qué hora es mi cena?"]);
+  const absent = askIn("¿Qué puedo cenar?", { meals: ["Desayuno", "Comida"] });
+  assert.equal(absent.answer, "Tu plan no tiene cena.");
+  assert.deepEqual(messages(absent), ["¿Cuál es mi desayuno?", "¿Cuál es mi comida?"]);
+});
+
+test("REQ-27 an empty recipe book says so: no sections and no sources", () => {
+  const reply = askIn("¿Qué recetas tengo?", undefined, (db) => { db.recipes = []; });
+  assert.equal(reply.answer, "Aún no tienes recetas.");
+  assert.deepEqual(reply.blocks[0].sections, []);
+  assert.deepEqual(reply.sources, []);
+});
+
+test("REQ-8 a slot's time offers that slot's options, with or without a time and with duplicated slots; all the times keep the topic's follow-ups", () => {
+  assert.deepEqual(messages(ask("¿A qué hora es la cena?")), ["¿Cuál es mi cena?"]);
+  assert.deepEqual(messages(askIn("¿Cuándo desayuno?", { times: "none" })), ["¿Cuál es mi desayuno?"]);
+  assert.deepEqual(messages(askIn("¿A qué hora es mi segunda colación?", TWO_COLACIONES)), ["¿Cuál es mi segunda colación?"]);
+  assert.deepEqual(messages(ask("¿Cuál es mi horario?")), ["Mi cena de hoy", "Mi carrito"]);
+});
+
+test("REQ-5 the options and times follow-ups of the slot answers resolve", () => {
+  const { db, user } = memDb();
+  const answers = ["¿A qué hora es la cena?", "¿Qué puedo cenar?"].map((message) => ragAnswer(db, user, message, TODAY));
+  const noOptions = askIn("¿Qué puedo cenar?", undefined, (copy) => {
+    copy.mealOptions = copy.mealOptions.filter((option) => !option.meal_type_id.endsWith("-meal-3"));
+  });
+  assert.ok(sweep(db, user, [answers[0]], TODAY).includes("¿Cuál es mi cena?"));
+  assert.ok(messages(noOptions).includes("¿A qué hora es mi cena?"));
+  assert.ok(sweep(db, user, [noOptions], TODAY).includes("¿A qué hora es mi cena?"));
+});
