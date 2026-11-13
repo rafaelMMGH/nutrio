@@ -1,11 +1,11 @@
-# Handoff: assistant-data-scope (updated 2026-11-13 after Batch 5 passed review; logic US1-US5 complete; Batch 6a1 in progress)
+# Handoff: assistant-data-scope (updated 2026-11-13: logic US1-US5 complete; Batch 6a1 review round 1 FAIL, fix round 1 running)
 
 A fresh orchestrator session can continue from here without the earlier conversation. Read this file first, then `plan.md` (Batches), then `tasks.md` (Global rules at the top, then the **Batch notes**, which hold every decision and open item per batch). User-facing language is Spanish (Mexico); specs and this file are English.
 
 ## 1. State now
 
-- Branch `feature/assistant-data-scope` (local, never pushed). Batch 5 code tip **5d7370e**; the orchestrator adds one docs commit on top (this file, tasks.md). **Batch 6a1 (T055, UI e2e written) is running now**, so its commits may sit above that docs commit. Below 5d7370e: 3ae48b7, 1a83f81, 11be2f4 (docs, after 4b3), a53c105, f0f56df, 6674873 (4b3 tip).
-- Gates at 5d7370e: `npx tsc --noEmit` clean, `npm run test:unit` **798/798**, no dependency change (vs main, package.json differs only by the `test:unit` script line), no `specs/` in code commits.
+- Branch `feature/assistant-data-scope` (local, never pushed). Batch 5 code tip **5d7370e**, then docs commit 52f18b4, then **Batch 6a1 commit dab7718** (T055, e2e written, not run; +303/-4 vs ~250). **6a1 review round 1: FAIL** (HIGH-1 the 360 px test sends 576 chars over `MAX_MESSAGE` 500; HIGH-2 options counted 3 while the fixture's chip also matched; MEDIUM-1 two old tests measure `.assistant-turn` instead of `.assistant-bubble`; MEDIUM-2 focus-ring test must prove each visit; LOWs). **Fix round 1 (tests only) is running now** (round 1 of max 3), so its commits may sit above the orchestrator's docs commit. The DOM contract for 6a2 (MEDIUM-3) is recorded under T056 in tasks.md. Detail: Batch note 6a1.
+- Gates at dab7718: `npx tsc --noEmit` clean, `npm run test:unit` **798/798** (6a1 is e2e-only), no snapshots created, no dependency change (vs main, package.json differs only by the `test:unit` script line), no `specs/` in code commits.
 - Spec `spec.md` **v1.7, status `planned`** (Gate 2 approved 2026-10-29); plan **revision 10**. `assistant-chat-polish` is `partial` (its REQ-23, HTTP 500, is delivered here, in F1b).
 - **65 of 78 active tasks ticked** (80 ids: T071 removed, T025 dropped by spec v1.7). **The logic part of the feature is complete: US1–US5 code-complete and unit-green** (US5 checkpoint reached after Batch 5: T053, T054 ticked). Open: 13 tasks: US6 UI (T055, T056, T058–T062), Batch E (T076, T077, T057), Final (T063–T065).
 - **Batches done (all reviewer PASS or orchestrator-verified):** F1a, U0, F1b, 1a1, 1a2, 1b1a, 1b1b, 1b2a, 1b2b, 1c1, 3a1, 1c2, 3a2, 1d1, 1d2, 1e1, 1e2, 2a1, 2a2, 2b1, 2b2, 2c1, 2c2, 2c3 (cleanup), 3b1, 3b2, 3b3 (cleanup), 3c1, 3c2, 3d1, 3d2, 3e, 4a1, 4a2, 4b1, 4b2, 4b3, **5** (36 of 43).
@@ -19,8 +19,8 @@ A fresh orchestrator session can continue from here without the earlier conversa
 ## 2. Next steps, in this order
 
 1. **Sanity check before any agent runs:** `git status --short` (only the two untracked files above), `git log` (the docs commit on top of 5d7370e, or Batch 6a1 commits on top if it has landed), `npx tsc --noEmit` (clean) and `npm run test:unit` once (expect **798/798** at 5d7370e; 6a1 is e2e-only, so the count should not change unless it adds unit rows). If anything differs, stop and investigate before launching agents.
-2. **Batch 6a1, in progress** (T055: REQ-32, REQ-34, REQ-35 visuals, e2e written, not run; ~250 lines). Then the reviewer, then the planner docs pass.
-3. Continue the UI batches: **6a2** (T056 button component), **6b1/6b2** (T058 response-stream adaptation, no install; T059, T060 typing), **6c** (T061, T062).
+2. **Batch 6a1, in review** (T055: REQ-32, REQ-34, REQ-35 visuals, e2e written, not run). Round 1 FAIL; fix round 1 (tests only) running. Then reviewer round 2 (max 3 rounds), then the planner docs pass ticks T055.
+3. Continue the UI batches: **6a2** (T056 button component; the code-writer must follow the DOM contract under T056 exactly: `.assistant-bubble`, `.assistant-avatar`, `data-variant` option/chip/link, `aria-disabled` without native `disabled`, and moves block buttons out of `.assistant-turn-live` if cheap, else T060 does), **6b1/6b2** (T058 response-stream adaptation, no install; T059, T060 typing), **6c** (T061, T062).
 4. **Batch E:** T076 first full `npm run test:e2e` plus up to 3 fix rounds (check every Batch-note e2e assumption, listed in T076, incl. 4b2 and 4b3), T077 red-by-breaking demo for UI-only behavior (nothing committed), **T057 the ONE snapshot refresh, only after the user's explicit yes**.
 5. **Final:** T063–T065 (coverage audit incl. the unused `ReplyKind` "options", retiring or keeping the test `PLACEHOLDER` regexes, the optional Batch 5 LOWs, synthetic-volume check, **the user's manual ≤1 s check on real data before merge**), then section 6b's push/PR items.
 
@@ -29,7 +29,7 @@ Remember: **no e2e per batch** until Batch E.
 ## 3. Batch list (sizes are ADDED lines incl. tests; details in plan.md Batches)
 
 - **Done:** see section 1 (through 5; 36 of 43 batches). Logic (US1–US5) complete.
-- **In progress:** 6a1 (T055, ~250).
+- **In review:** 6a1 (T055, dab7718, +303/-4 vs ~250; round 1 FAIL, fix round 1 running).
 - **Next:** 6a2 (T056, ~260) · 6b1/6b2 (T058 / T059, T060, ~110 / ~370) · 6c (T061–T062, ~350) · **E** (T076, T077, T057) · Final (T063–T065, ~200).
 - Open items per batch live in the batch notes and on the owning task in `tasks.md`.
 
