@@ -22,6 +22,10 @@ function logLookup(db: AppDb, userId: string): LogOf {
   return (date) => logs.get(date) ?? { meals_done: [], water_glasses: 0 };
 }
 
+/** The user's weight records as [date, kg], in log order. */
+const weightRecords = (db: AppDb, userId: string) =>
+  db.dailyLogs.filter((log) => log.user_id === userId && typeof log.weight_kg === "number").map((log): [string, number] => [log.date, log.weight_kg as number]);
+
 /** Sentences for a period the message named: the clamp line when it was cut, or the fallback line naming the default shown (REQ-14). */
 function namedPeriod(intent: Intent, today: string, fallback: string): { period?: Period; lead: Rich[] } {
   if (!intent.period) return { lead: intent.periodUnrecognized ? [[plain(notUnderstoodLine(fallback))]] : [] };
@@ -118,9 +122,7 @@ const link = (label: string, href = "/"): Button => ({ type: "link", label, href
  */
 export function weightAnswer(db: AppDb, userId: string, question: string, intent: Intent, today: string): Built {
   const user = db.users.find((item) => item.id === userId);
-  const records = db.dailyLogs
-    .filter((log) => log.user_id === userId && typeof log.weight_kg === "number")
-    .map((log): [string, number] => [log.date, log.weight_kg as number]);
+  const records = weightRecords(db, userId);
   const { period, lead } = namedPeriod(intent, today, "tu último registro");
   const respond = (sentences: Rich[], blockButtons: Button[] = []): Built => ({ lead: joinSentences([...lead, ...sentences]), blockButtons });
 
@@ -241,8 +243,7 @@ export function weeklyAnswer(db: AppDb, userId: string, today: string): Built {
     [plain("Agua: "), bold(liters(weekWater(logOf, monday, today, waterGoalGlasses(schedule?.water_goal_liters))))]
   ];
   if (slotIds.length) items.push([plain("Comidas: "), bold(`${weekMeals(logOf, slotIds, monday, today)} de ${slotIds.length * 7}`)]);
-  const records = db.dailyLogs.filter((log) => log.user_id === userId && typeof log.weight_kg === "number").map((log): [string, number] => [log.date, log.weight_kg as number]);
-  const { change, latestDate } = weightStats(records, today, monday, null);
+  const { change, latestDate } = weightStats(weightRecords(db, userId), today, monday, null);
   if (latestDate !== null && latestDate >= monday && change !== null) {
     items.push(unchanged(change) ? [plain("Peso: sin cambio")] : [plain(`Peso: ${direction(change)} `), bold(kg(Math.abs(change)))]);
   }
