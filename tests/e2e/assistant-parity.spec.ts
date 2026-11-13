@@ -79,3 +79,15 @@ test("the chat's week exercise days equal the dashboard tile under the same toda
   expect(body.answer).toContain(`${expected.weekExerciseDays} de ${exerciseGoalDays} días`);
   expect(body.answer).toContain(`Te ${left === 1 ? "falta" : "faltan"} ${left} ${left === 1 ? "día" : "días"}.`);
 });
+
+test("the chat's weight change and latest weight equal the dashboard tile under the same today", async ({ chatContext }) => {
+  const today = mexicoCityToday();
+  const { logs, weightGoal, expected } = parityLogs(mondayOf(today));
+  seedLogs(logs.map((log) => ({ ...log, meals_done: log.meals_done?.map(seededId) })));
+  setGoals({ weight: weightGoal });
+
+  const { body } = await ask(chatContext.request, "Mi peso", { today });
+  const change = Math.abs(expected.weight.change);
+  expect(body.answer).toMatch(new RegExp(`^(Tu último peso es|Tu registro más reciente es) ${expected.weight.latest} kg `));
+  expect(body.answer).toContain(`Esta semana bajaste ${change} kg.`);
+});

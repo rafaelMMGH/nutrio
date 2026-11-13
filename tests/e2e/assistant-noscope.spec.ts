@@ -113,6 +113,7 @@ test("REQ-4 the search bar opens the panel and sends only { message }", async ({
   await expect(ui.panel).toBeVisible();
   await expect(ui.assistantTurns).toHaveCount(1);
   expect(bodies).toEqual([{ message: "¿Cuál es mi peso?" }]);
+  await expect(ui.live).toContainText("Aún no registras tu peso.");
 });
 
 test("REQ-4 the subtitle is a label only: the same question gives the same visible answer and buttons on two pages", async ({ chat }) => {
