@@ -98,6 +98,10 @@ test("REQ-5 the repeat rule drops a follow-up that repeats the message, however 
   assert.deepEqual(messagesOf(ragAnswer(db, user, "¡¿QUÉ recetas hay en MI plan?!", TODAY).buttons), wanted);
   assert.deepEqual(messagesOf(ragAnswer(db, user, "Mi carrito", TODAY).buttons), ["¿Qué recetas hay en mi plan?", "Mi cena de hoy"]);
   assert.deepEqual(messagesOf(ragAnswer(db, user, "¿Qué suplementos tomo?", TODAY).buttons), ["¿Cuál es mi meta?", "¿Qué recetas hay en mi plan?"]);
+  // Typed without "¿?", in capitals, or with a typo of the accents: the same message.
+  for (const typed of ["que suplementos tomo", "QUÉ SUPLEMENTOS TOMO", "¡¡qué suplementos tomo!!"]) {
+    assert.deepEqual(messagesOf(ragAnswer(db, user, typed, TODAY).buttons), ["¿Cuál es mi meta?", "¿Qué recetas hay en mi plan?"], typed);
+  }
 });
 
 test("REQ-5 every starter and follow-up with a builder resolves to its Button-column topic and gives the same answer", () => {

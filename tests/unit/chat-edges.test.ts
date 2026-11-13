@@ -126,6 +126,7 @@ function assertNotFound(message: string, phrase: string) {
 
 test("REQ-26 a dish no recipe resembles is not found: the lead quotes the phrase and the Recipes follow-ups show, no recipe is offered", () => {
   assertNotFound("¿Qué lleva la pizza?", "pizza");
+  assertNotFound("¿Qué lleva la Pizza?", "Pizza");
   assertNotFound("¿Qué lleva la opcion 1?", "opcion 1");
   assertNotFound("¿Qué lleva ab?", "ab");
 });
@@ -141,7 +142,6 @@ test("REQ-26 a phrase that only partly matches is a did-you-mean: the lead quote
     const reply = ask(message);
     assert.equal(reply.kind, "did_you_mean", message);
     assert.equal(reply.answer, NEARBY(phrase), message);
-    assert.ok(!phrase.startsWith("la ") && !phrase.includes("lleva"), message);
     assert.deepEqual(offered(reply), sends(...names), message);
     assert.deepEqual(reply.blocks[0].sections, [], message);
     assert.deepEqual(reply.resolved?.map((intent) => intent.outcome), ["didYouMean"], message);
@@ -355,4 +355,32 @@ test("REQ-25 with no non-generic recipe the buttons are the plan's slots, or the
   assert.equal(none.kind, "clarify");
   assert.equal(none.answer, "¿De qué platillo?");
   assert.deepEqual(messages(none), [...STARTERS]);
+});
+
+// 4b1 survivors (T050 part 2): the title of a slot block that has no options, the accent of an absent slot's title, the
+// trace listing intents the answer dropped.
+
+test("REQ-24 REQ-27 a slot with no options keeps its slot-ref title beside another block", () => {
+  // Slot position 3 is the cena of the default plan and the second colación of TWO_COLACIONES.
+  const noOptions = (db: AppDb) => {
+    db.mealOptions = db.mealOptions.filter((option) => !option.meal_type_id.endsWith("-meal-3"));
+  };
+  const reply = askIn("¿Qué puedo cenar y mi peso?", undefined, noOptions);
+  assert.deepEqual(titles(reply), ["Cena", "Peso"]);
+  assert.equal(reply.blocks[0].lead.map((span) => span.text).join(""), "Tu plan no tiene opciones para tu cena.");
+  assert.deepEqual(titles(askIn("mi peso y la segunda colación", TWO_COLACIONES, noOptions)), ["Peso", "Segunda colación"]);
+});
+
+test("REQ-24 REQ-27 the title of an absent slot is its word capitalised, with the accent of colación", () => {
+  assert.deepEqual(titles(askIn("¿Qué puedo tomar de colación y mi peso?", { meals: ["Desayuno", "Comida", "Cena"] })), ["Colación", "Peso"]);
+  assert.deepEqual(titles(askIn("mi peso y qué puedo cenar", { meals: ["Desayuno", "Comida"] })), ["Peso", "Cena"]);
+});
+
+test("REQ-24 the trace lists every intent the resolver found, also the ones the answer dropped", () => {
+  const dropped = askIn("colación y agua", TWO_COLACIONES);
+  assert.equal(dropped.blocks.length, 1);
+  assert.deepEqual(dropped.resolved?.map((intent) => intent.topic), ["slotOptions", "water"]);
+  const both = ask("¿Qué puedo desayunar y cenar?");
+  assert.equal(both.blocks.length, 1);
+  assert.deepEqual(both.resolved?.map((intent) => [intent.topic, intent.slot]), [["slotOptions", "desayuno"], ["slotOptions", "cena"]]);
 });

@@ -451,8 +451,9 @@ const weeklyLogs: SeedLog[] = [
   { date: "2026-10-27", exercised: true, water_glasses: 4, meals_done: [slotId(2)] },
   { date: "2026-10-28", water_glasses: 10 }
 ];
-const weeklyReply = (logs: SeedLog[] = weeklyLogs, { days = 4, plan = true, meals }: { days?: number; plan?: boolean; meals?: string[] } = {}) => {
+const weeklyReply = (logs: SeedLog[] = weeklyLogs, { days = 4, plan = true, meals, waterLiters }: { days?: number; plan?: boolean; meals?: string[]; waterLiters?: number } = {}) => {
   const { db, user } = memDb({ logs, goals: { days }, meals });
+  if (waterLiters !== undefined) db.planVersions[0].structured_data.nutrition_summary = { water_liters: { min: waterLiters } };
   if (!plan) db.plans = [];
   return ragAnswer(db, user, "Mi avance de la semana", TODAY);
 };
@@ -494,4 +495,61 @@ test("REQ-22 REQ-27 with no active plan the meals item is gone, water uses the d
   const reply = weeklyReply(weeklyLogs, { plan: false });
   assert.deepEqual(itemsOf(reply), ["Ejercicio: 2 de 4 días", "Agua: 5 litros", "Peso: bajaste 0.4 kg", "Aún no tienes un plan activo."]);
   assert.deepEqual(reply.blocks[0].buttons, [{ type: "link", label: "Subir mi plan", href: "/plans" }]);
+});
+
+// 3e cleanup rows (T050 part 2).
+
+test("REQ-22 the weekly water counts each day up to the plan's own goal: a 4 L plan keeps 12 glasses a day, a 0.5 L plan caps at 4", () => {
+  const logs: SeedLog[] = [{ date: "2026-10-26", water_glasses: 12 }, { date: "2026-10-27", water_glasses: 12 }];
+  assert.ok(itemsOf(weeklyReply(logs, { waterLiters: 4 })).includes("Agua: 6 litros"));
+  assert.ok(itemsOf(weeklyReply(logs, { waterLiters: 0.5 })).includes("Agua: 2 litros"));
+  assert.ok(itemsOf(weeklyReply(logs)).includes("Agua: 4 litros"));
+});
+
+test("REQ-22 a weekly weight change that rounds to 0.0 reads 'sin cambio', not 'bajaste 0 kg'", () => {
+  const reply = weeklyReply([{ date: "2026-10-20", weight_kg: 66.04 }, { date: "2026-10-27", weight_kg: 66 }]);
+  assert.equal(itemsOf(reply).at(-1), "Peso: sin cambio");
+  assert.deepEqual(boldItems(reply).at(-1), []);
+});
+
+test("REQ-21 the narrowed exercise goal has its days in bold, like the weight and water ones", () => {
+  assert.deepEqual(goalReply("¿Cuál es mi objetivo de ejercicio?", { days: 5 }).blocks[0].lead.filter((span) => span.highlight).map((span) => span.text), ["5 días"]);
+});
+
+/** A second user with the first position in every table: any lookup that forgets the user id would read these rows. */
+function withOtherUser(db: ReturnType<typeof memDb>["db"], user: ReturnType<typeof memDb>["user"]) {
+  const other = { ...user, id: "someone-else", weight_goal_kg: 50, activity_goal_days: 7 };
+  db.users.unshift(other);
+  const plan = { ...db.plans[0], id: "other-plan", user_id: other.id, objective: "Objetivo ajeno" };
+  const version = { ...db.planVersions[0], id: "other-plan-v1", plan_id: plan.id, structured_data: { ...db.planVersions[0].structured_data, objective: "Objetivo ajeno", nutrition_summary: { water_liters: { min: 4 } } } };
+  db.plans.unshift(plan);
+  db.planVersions.unshift(version);
+  db.mealTypes.unshift({ ...db.mealTypes[0], id: "other-meal", plan_version_id: version.id });
+  return other;
+}
+
+test("REQ-21 another user's goals, plan and water goal never show in mine", () => {
+  const { db, user } = memDb({ goals: { weight: 63, days: 5 } });
+  withOtherUser(db, user);
+  assert.deepEqual(itemsOf(ragAnswer(db, user, "¿Cuál es mi meta?", TODAY)), ["Objetivo del plan: Mejorar mi energía", "Peso: 63 kg", "Ejercicio: 5 días por semana", "Agua: 8 vasos (2 litros) al día"]);
+});
+
+test("REQ-22 another user's logs, plan and goals never count in my weekly progress", () => {
+  const { db, user } = memDb({ logs: weeklyLogs });
+  const other = withOtherUser(db, user);
+  for (const date of ["2026-10-20", "2026-10-26", "2026-10-27", "2026-10-28"]) {
+    db.dailyLogs.push({ ...db.dailyLogs[0], id: `other-${date}`, user_id: other.id, date, exercised: true, water_glasses: 12, weight_kg: 50, meals_done: ["other-meal"] });
+  }
+  assert.deepEqual(itemsOf(ragAnswer(db, user, "Mi avance de la semana", TODAY)), ["Ejercicio: 2 de 4 días", "Agua: 5 litros", "Comidas: 3 de 28", "Peso: bajaste 0.4 kg"]);
+});
+
+test("REQ-21 REQ-22 an active plan without a current version is no plan: no objective, the default water goal, the no-plan line", () => {
+  const without = (message: string) => {
+    const { db, user } = memDb({ goals: { weight: 63 }, logs: weeklyLogs });
+    db.planVersions = [];
+    return ragAnswer(db, user, message, TODAY);
+  };
+  assert.deepEqual(itemsOf(without("¿Cuál es mi meta?")), ["Peso: 63 kg", "Ejercicio: 4 días por semana", "Agua: 8 vasos (2 litros) al día", "Aún no tienes un plan activo."]);
+  assert.deepEqual(without("¿Cuál es mi meta?").blocks[0].buttons, [{ type: "link", label: "Subir mi plan", href: "/plans" }]);
+  assert.deepEqual(itemsOf(without("Mi avance de la semana")).slice(-1), ["Aún no tienes un plan activo."]);
 });
