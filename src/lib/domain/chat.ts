@@ -3,6 +3,7 @@ import { type Block, type Button, type ChatAnswer, type Intent, type ReplyKind, 
 import { consolidateCart } from "@/lib/domain/cart";
 import { isGeneric } from "@/lib/domain/chat-dish";
 import { type Built, chooseSlot, planSlots, recipeDetail, slotOptions, slotTimeLead } from "@/lib/domain/chat-meals";
+import { waterAnswer } from "@/lib/domain/chat-metrics";
 import { resolve } from "@/lib/domain/chat-intent";
 import { greetingOf, TOPICS, type TopicId } from "@/lib/domain/chat-topics";
 import { activePlan } from "@/lib/domain/plans";
@@ -106,7 +107,7 @@ export function recipeList(db: AppDb, userId: string, question: string): Built {
   };
 }
 
-const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: string, intent: Intent) => Built>> = {
+const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: string, intent: Intent, today: string) => Built>> = {
   mealTimes: (db, userId, _question, intent) => mealTimes(db, userId, intent),
   slotOptions: (db, userId, question, intent) => slotOptions(db, userId, intent, question),
   // A dish found by name opens its detail; did-you-mean and not-found keep the interim answer until T048.
@@ -114,6 +115,7 @@ const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: st
     const recipe = intent.outcome === "found" ? db.recipes.find((item) => item.id === intent.recipeIds?.[0] && item.user_id === userId && !item.deleted_at) : undefined;
     return recipe ? recipeDetail(db, userId, recipe) : pending("dish");
   },
+  water: (db, userId, question, intent, today) => waterAnswer(db, userId, question, intent, today),
   cart: (db, userId) => cartSummary(db, userId),
   recipes: recipeList,
   plan: (db, userId, question) => planSummary(db, userId, normalizeText(question))
@@ -146,7 +148,7 @@ export function ragAnswer(db: AppDb, user: AppUser, message: string, today: stri
   // A topic without a button (identity, slots, ...) is left out silently.
   const overflow = further.flatMap((intent) => TOPICS[intent.topic as TopicId].button ?? []);
   const asked = normalizeText(message);
-  const builts = answered.map((topic, index) => BUILDERS[topic]?.(db, user.id, message, intents[index]) ?? pending(topic));
+  const builts = answered.map((topic, index) => BUILDERS[topic]?.(db, user.id, message, intents[index], today) ?? pending(topic));
   const blocks = builts.map((built, index): Block => ({ title: answered.length > 1 ? TOPICS[answered[index]].title : null, lead: built.lead, sections: built.sections ?? [], buttons: built.blockButtons ?? [] }));
   // Repeat rule (chat-polish REQ-5): a follow-up that repeats the question just asked is not offered. Follow-ups only.
   // A button is offered once: an overflow topic can also be one of the follow-ups (REQ-24).

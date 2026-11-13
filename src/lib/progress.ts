@@ -34,10 +34,22 @@ export function waterGoalGlasses(liters: number | null | undefined) {
   return Math.min(12, Math.max(4, Math.round((liters ?? WATER_GOAL_LITERS) / WATER_GLASS_LITERS)));
 }
 
+/** Every day from `from` to `to`, both inclusive. */
+export function daysBetween(from: string, to: string) {
+  const days: string[] = [];
+  for (let day = from; day <= to; day = addDays(day, 1)) days.push(day);
+  return days;
+}
+
+/** Water over `days`: liters with each day counting at most the goal, and the days that reached the goal. */
+export function waterOver(logOf: LogOf, days: string[], goalGlasses: number) {
+  const glasses = days.reduce((sum, day) => sum + Math.min(logOf(day).water_glasses, goalGlasses), 0);
+  return { liters: glasses * WATER_GLASS_LITERS, daysMet: days.filter((day) => logOf(day).water_glasses >= goalGlasses).length };
+}
+
 /** Liters drunk in the week, each day counting at most the goal. */
 export function weekWater(logOf: LogOf, monday: string, endDay: string, goalGlasses: number) {
-  const glasses = weekDays(monday, endDay).reduce((sum, day) => sum + Math.min(logOf(day).water_glasses, goalGlasses), 0);
-  return glasses * WATER_GLASS_LITERS;
+  return waterOver(logOf, weekDays(monday, endDay), goalGlasses).liters;
 }
 
 /** Meals done on a day, counting only slots of the plan and never more than the slots. */

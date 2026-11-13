@@ -121,7 +121,7 @@ export function resolve(question: string, recipes?: readonly Recipe[], today?: s
   }
 
   const named = today ? parsePeriod(question, today) : undefined;
-  const dated = (intent: Intent): Intent => (typeof named === "object" ? { ...intent, period: named } : intent);
+  const dated = (intent: Intent): Intent => (typeof named === "object" ? { ...intent, period: named } : named === "unrecognized" ? { ...intent, periodUnrecognized: true } : intent);
   const items: { at: number; intent: Intent }[] = [];
   const add = (at: number | undefined, intent: Intent) => at !== undefined && items.push({ at, intent });
 

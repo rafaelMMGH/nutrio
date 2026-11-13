@@ -104,7 +104,7 @@ const LEADS: ((slot: string) => string)[] = [
 ];
 
 /** REQ-28: the same question always picks the same variant. */
-function pickVariant<T>(variants: T[], question: string): T {
+export function pickVariant<T>(variants: T[], question: string): T {
   let hash = 0;
   for (const char of normalizeText(question)) hash = (hash * 31 + char.charCodeAt(0)) % 997;
   return variants[hash % variants.length];

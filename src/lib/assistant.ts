@@ -70,6 +70,8 @@ export type Intent = {
   page?: number;
   /** Metric questions: the period the message names (REQ-14); absent means the metric's default. */
   period?: Period;
+  /** Metric questions: the message has a date cue that forms no recognized phrase, so the builder says so and shows its default (REQ-14). */
+  periodUnrecognized?: true;
 };
 
 export type ChatAnswer = {
