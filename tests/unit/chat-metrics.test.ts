@@ -443,13 +443,13 @@ test("REQ-21 REQ-27 with no active plan the bare answer drops the objective, use
   assert.deepEqual(goalReply("¿Cuál es mi meta de ejercicio?", { plan: false }).blocks[0].buttons, []);
 });
 
-// Weekly progress: Mon 26 and Tue 27 exercised, 8 + 4 + 6 glasses (the 6 today), 3 meals; 66.6 kg before Monday, 66.2 on Monday.
+// Weekly progress: Mon 26 and Tue 27 exercised, 8 + 4 + 10 glasses (10 today, counted at most the goal of 8), 3 meals; 66.6 kg before Monday, 66.2 on Monday.
 
 const weeklyLogs: SeedLog[] = [
   { date: "2026-10-20", weight_kg: 66.6 },
   { date: "2026-10-26", weight_kg: 66.2, exercised: true, water_glasses: 8, meals_done: [slotId(0), slotId(1)] },
   { date: "2026-10-27", exercised: true, water_glasses: 4, meals_done: [slotId(2)] },
-  { date: "2026-10-28", water_glasses: 6 }
+  { date: "2026-10-28", water_glasses: 10 }
 ];
 const weeklyReply = (logs: SeedLog[] = weeklyLogs, { days = 4, plan = true, meals }: { days?: number; plan?: boolean; meals?: string[] } = {}) => {
   const { db, user } = memDb({ logs, goals: { days }, meals });
@@ -462,8 +462,8 @@ test("REQ-22 weekly progress: exercise, water, meals and weight change in one bl
   assert.equal(reply.kind, "answer");
   assert.equal(plainOf(reply.blocks[0].lead), "Tu avance de esta semana (lun 26 – hoy):");
   assert.deepEqual(reply.blocks[0].sections.map((section) => section.title), ["Avance"]);
-  assert.deepEqual(itemsOf(reply), ["Ejercicio: 2 de 4 días", "Agua: 4.5 litros", "Comidas: 3 de 28", "Peso: bajaste 0.4 kg"]);
-  assert.deepEqual(boldItems(reply), [["2 de 4 días"], ["4.5 litros"], ["3 de 28"], ["0.4 kg"]]);
+  assert.deepEqual(itemsOf(reply), ["Ejercicio: 2 de 4 días", "Agua: 5 litros", "Comidas: 3 de 28", "Peso: bajaste 0.4 kg"]);
+  assert.deepEqual(boldItems(reply), [["2 de 4 días"], ["5 litros"], ["3 de 28"], ["0.4 kg"]]);
   assert.equal(reply.answer, `Tu avance de esta semana (lun 26 – hoy):\nAvance\n${itemsOf(reply).join("\n")}`);
   assert.deepEqual(reply.buttons, FOLLOW_UPS("Mi peso", "¿Cuál es mi meta?"));
   assert.deepEqual(reply.blocks[0].buttons, []);
@@ -487,11 +487,11 @@ test("REQ-22 REQ-19 the weight item is omitted without a record this week or wit
 
 test("REQ-13 REQ-22 a log dated after today never counts in the week", () => {
   const reply = weeklyReply([...weeklyLogs, { date: "2026-10-29", exercised: true, water_glasses: 8, meals_done: [slotId(0), slotId(1), slotId(2), slotId(3)], weight_kg: 60 }]);
-  assert.deepEqual(itemsOf(reply), ["Ejercicio: 2 de 4 días", "Agua: 4.5 litros", "Comidas: 3 de 28", "Peso: bajaste 0.4 kg"]);
+  assert.deepEqual(itemsOf(reply), ["Ejercicio: 2 de 4 días", "Agua: 5 litros", "Comidas: 3 de 28", "Peso: bajaste 0.4 kg"]);
 });
 
 test("REQ-22 REQ-27 with no active plan the meals item is gone, water uses the default goal and the no-plan line comes with 'Subir mi plan'", () => {
   const reply = weeklyReply(weeklyLogs, { plan: false });
-  assert.deepEqual(itemsOf(reply), ["Ejercicio: 2 de 4 días", "Agua: 4.5 litros", "Peso: bajaste 0.4 kg", "Aún no tienes un plan activo."]);
+  assert.deepEqual(itemsOf(reply), ["Ejercicio: 2 de 4 días", "Agua: 5 litros", "Peso: bajaste 0.4 kg", "Aún no tienes un plan activo."]);
   assert.deepEqual(reply.blocks[0].buttons, [{ type: "link", label: "Subir mi plan", href: "/plans" }]);
 });
