@@ -213,7 +213,7 @@ test("REQ-24 two slot topics that would both list options: the first lists them,
   const reply = ask("¿Qué puedo desayunar y cenar?");
   assert.equal(reply.blocks.length, 1);
   assert.equal(reply.blocks[0].title, null);
-  assert.equal(reply.answer, "Para tu desayuno puedes elegir:");
+  assert.equal(reply.answer, "Estas son tus opciones de desayuno:");
   assert.deepEqual(messages(reply), [...OPTIONS("Desayuno"), "¿Cuál es mi cena?"]);
   assert.deepEqual(reply.buttons.slice(0, 3).map((button) => button.type === "question" && button.layout), ["option", "option", "option"]);
   assert.deepEqual(messages(ask("¿Qué puedo desayunar, cenar y comer?")).slice(-2), ["¿Cuál es mi cena?", "¿Cuál es mi comida?"]);

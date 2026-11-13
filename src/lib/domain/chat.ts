@@ -2,7 +2,7 @@ import type { AppDb, AppUser } from "@/lib/types";
 import { type Block, type Button, type ChatAnswer, type Intent, type ReplyKind, type Rich, type Section, normalizeText, STARTERS, words } from "@/lib/assistant";
 import { consolidateCart } from "@/lib/domain/cart";
 import { isGeneric, rankDish } from "@/lib/domain/chat-dish";
-import { type Built, chooseSlot, pickVariant, planSlots, recipeDetail, slotOptions, slotTimeLead } from "@/lib/domain/chat-meals";
+import { type Built, chooseSlot, pickVariant, planSlots, recipeDetail, slotChoices, slotMessage, slotOptions, slotTimeLead } from "@/lib/domain/chat-meals";
 import { exerciseAnswer, goalsAnswer, mealsDoneAnswer, waterAnswer, weeklyAnswer, weightAnswer } from "@/lib/domain/chat-metrics";
 import { resolve } from "@/lib/domain/chat-intent";
 import { greetingOf, TOPICS, type TopicId } from "@/lib/domain/chat-topics";
@@ -111,12 +111,14 @@ const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: st
   mealTimes: (db, userId, question, intent) => mealTimes(db, userId, question, intent),
   slotOptions: (db, userId, question, intent) => slotOptions(db, userId, intent, question),
   // REQ-26: a dish found by name opens its detail; otherwise the candidates are offered, or the phrase is not found.
+  // The resolver (given the recipes) always names live recipes of this user, so found and didYouMean have them; an
+  // empty phrase is the clarify outcome (REQ-25).
   dish: (db, userId, _question, intent) => {
     const recipes = (intent.recipeIds ?? []).flatMap((id) => db.recipes.find((item) => item.id === id && item.user_id === userId && !item.deleted_at) ?? []);
-    if (intent.outcome === "found" && recipes[0]) return recipeDetail(db, userId, recipes[0]);
-    if (intent.outcome === "didYouMean" && recipes.length) return { lead: textLead(`No encontré exactamente '${intent.phrase}'. ${DID_YOU_MEAN}`), kind: "did_you_mean", buttons: dishButtons(recipes) };
+    if (intent.outcome === "found") return recipeDetail(db, userId, recipes[0]);
+    if (intent.outcome === "didYouMean") return { lead: textLead(`No encontré exactamente '${intent.phrase}'. ${DID_YOU_MEAN}`), kind: "did_you_mean", buttons: dishButtons(recipes) };
     if (intent.outcome === "notFound") return { lead: textLead(`No encontré '${intent.phrase}' en tu plan ni en tus recetas.`) };
-    return pending("dish");
+    return dishClarify(db, userId);
   },
   water: (db, userId, question, intent, today) => waterAnswer(db, userId, question, intent, today),
   exercise: (db, userId, question, intent, today) => exerciseAnswer(db, userId, question, intent, today),
@@ -132,6 +134,42 @@ const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: st
 
 /** The interim answer of a topic whose builder has not landed (plan D3). Never asserted by a test; T063 requires none left. */
 const pending = (topic: TopicId): Built => ({ lead: textLead(`Pronto podré responder sobre ${TOPICS[topic].title ?? "esta pregunta"}.`) });
+
+/** REQ-3: only the user's own, live, non-generic recipes can be named; the array is already in seq order. */
+const namedRecipes = (db: AppDb, userId: string) => db.recipes.filter((recipe) => recipe.user_id === userId && !recipe.deleted_at && !isGeneric(recipe.name));
+
+const DISH_CHOICES = 3;
+
+/** REQ-25: a dish cue with no dish asks which one, offering the first recipes, or the plan's slots when there are none. */
+function dishClarify(db: AppDb, userId: string): Built {
+  const recipes = namedRecipes(db, userId).slice(0, DISH_CHOICES);
+  const buttons = recipes.length ? dishButtons(recipes) : slotChoices(planSlots(db, userId)?.slots ?? [], "options");
+  return { lead: textLead("¿De qué platillo?"), kind: "clarify", buttons };
+}
+
+/** The message that offers an intent's topic as a button (Topics, Button column). A slot topic is offered only for one concrete slot of the plan: no button is better than one that asks again. */
+function offerOf(db: AppDb, userId: string, intent: Intent): string | undefined {
+  const topic = intent.topic as TopicId;
+  const ask = topic === "mealTimes" ? "times" : topic === "slotOptions" ? "options" : undefined;
+  if (!ask || !intent.slot) return TOPICS[topic].button ?? undefined;
+  const plan = planSlots(db, userId);
+  const chosen = plan && chooseSlot(plan, intent.slot, ask, intent.ordinal);
+  return chosen && "slot" in chosen ? slotMessage(ask, chosen.slot.ref) : undefined;
+}
+
+/** A block that asks something (REQ-7, REQ-11, REQ-25, REQ-26) stands alone in its answer (REQ-24). */
+const asks = (built: Built) => built.kind === "clarify" || built.kind === "did_you_mean";
+
+/** A navigation button that an earlier block already has (the same label and destination) is dropped from the later one. */
+function withoutRepeatedLinks(buttons: Button[], seen: Set<string>): Button[] {
+  return buttons.filter((button) => {
+    if (button.type !== "link") return true;
+    const key = `${button.label} ${button.href}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 const DID_YOU_MEAN = "¿Quisiste decir…?";
 
@@ -157,8 +195,7 @@ export function ragAnswer(db: AppDb, user: AppUser, message: string, today: stri
     return reply("greeting", standalone(lead), starters, [], trace ? [{ topic: "greeting" }] : undefined);
   }
 
-  // REQ-3: only the user's own, live, non-generic recipes can be named; the array is already in seq order.
-  const recipes = db.recipes.filter((recipe) => recipe.user_id === user.id && !recipe.deleted_at && !isGeneric(recipe.name));
+  const recipes = namedRecipes(db, user.id);
   const { intents, overflow: further } = resolve(message, recipes, today);
   if (!intents.length) {
     // REQ-29 (step 8): recipe words in a question with nothing else resolved are offered, never opened.
@@ -168,17 +205,41 @@ export function ragAnswer(db: AppDb, user: AppUser, message: string, today: stri
   }
 
   // The resolver only returns topics of the table.
-  const answered = intents.map((intent) => intent.topic as TopicId);
-  // A topic without a button (identity, slots, ...) is left out silently.
-  const overflow = further.flatMap((intent) => TOPICS[intent.topic as TopicId].button ?? []);
+  const parts = intents.map((intent) => {
+    const topic = intent.topic as TopicId;
+    return { topic, intent, built: BUILDERS[topic]?.(db, user.id, message, intent, today) ?? pending(topic) };
+  });
+
+  // REQ-24: a clarification stands alone (a later one is omitted), and only one block holds buttons: a second block that
+  // would hold them too is offered as its topic button instead.
+  const [first, second] = parts;
+  let kept = parts;
+  const offers: (string | undefined)[] = [];
+  if (asks(first.built) || (second && asks(second.built))) kept = [first];
+  else if (second && first.built.buttons && second.built.buttons) {
+    kept = [first];
+    offers.push(offerOf(db, user.id, second.intent));
+  }
+  // A topic without a button (identity, a slot the plan lacks, ...) is left out silently.
+  offers.push(...further.map((intent) => offerOf(db, user.id, intent)));
+
+  const seenLinks = new Set<string>();
+  const blocks = kept.map(({ topic, built }): Block => ({
+    title: kept.length > 1 ? (built.title ?? TOPICS[topic].title) : null,
+    lead: built.lead,
+    sections: built.sections ?? [],
+    buttons: withoutRepeatedLinks(built.blockButtons ?? [], seenLinks)
+  }));
+
+  // A block that asks something (REQ-7, REQ-11, REQ-27) brings its own buttons in place of the follow-ups; the last
+  // block's follow-ups, then the overflow, follow them (REQ-24). A clarification brings nothing else.
+  const own = kept.find((part) => part.built.buttons)?.built.buttons ?? [];
+  const last = kept[kept.length - 1];
   const asked = normalizeText(message);
-  const builts = answered.map((topic, index) => BUILDERS[topic]?.(db, user.id, message, intents[index], today) ?? pending(topic));
-  const blocks = builts.map((built, index): Block => ({ title: answered.length > 1 ? TOPICS[answered[index]].title : null, lead: built.lead, sections: built.sections ?? [], buttons: built.blockButtons ?? [] }));
   // Repeat rule (chat-polish REQ-5): a follow-up that repeats the question just asked is not offered. Follow-ups only.
+  const followUps = last.built.buttons ? [] : (last.built.followUps ?? TOPICS[last.topic].followUps).filter((text) => normalizeText(text) !== asked);
   // A button is offered once: an overflow topic can also be one of the follow-ups (REQ-24).
-  const followUps = [...new Set([...TOPICS[answered[answered.length - 1]].followUps.filter((text) => normalizeText(text) !== asked), ...overflow])];
-  // A builder that asks something (REQ-7, REQ-11, REQ-27) brings its own buttons in place of the follow-ups.
-  const choice = builts.find((built) => built.buttons);
-  const kind = choice?.kind ?? builts.find((built) => built.kind === "detail")?.kind ?? "answer";
-  return reply(kind, blocks, choice?.buttons ?? followUps.map(questionButton), [...new Set(builts.flatMap((built) => built.sources ?? []))], trace ? intents : undefined);
+  const more = asks(first.built) ? [] : [...new Set([...followUps, ...offers.flatMap((offer) => offer ?? [])])].map(questionButton);
+  const kind = asks(first.built) ? first.built.kind! : kept.some((part) => part.built.kind === "detail") ? "detail" : "answer";
+  return reply(kind, blocks, [...own, ...more], [...new Set(kept.flatMap((part) => part.built.sources ?? []))], trace ? intents : undefined);
 }

@@ -11,9 +11,10 @@ import { recipeSteps } from "@/lib/recipe-steps";
 
 /**
  * What a builder returns; `ragAnswer` adds the kind and the follow-ups. `buttons` (a choice) replace the follow-ups;
- * `blockButtons` (navigation) stay on the answer's block.
+ * `blockButtons` (navigation) stay on the answer's block. `title` is the block title when the Topics table has none
+ * for the topic (a slot ref); `followUps` (messages) replace the topic's own (an option's detail offers its slot's time).
  */
-export type Built = { lead: Rich; sections?: Section[]; sources?: string[]; buttons?: Button[]; blockButtons?: Button[]; kind?: "clarify" | "detail" | "did_you_mean" };
+export type Built = { lead: Rich; sections?: Section[]; sources?: string[]; buttons?: Button[]; blockButtons?: Button[]; kind?: "clarify" | "detail" | "did_you_mean"; title?: string; followUps?: string[] };
 
 /** A meal type of the active plan. `ref` is its name, or with duplicate names its ordinal form ("Segunda colación"). */
 export type Slot = { id: string; name: string; time: string; ref: string };
@@ -55,7 +56,12 @@ function slotsNamed(slots: Slot[], word: string): Slot[] {
 const ASKS = { times: "¿A qué hora es mi", options: "¿Cuál es mi" } as const;
 export type SlotAsk = keyof typeof ASKS;
 
-const slotButton = (slot: Slot, ask: SlotAsk, label = slot.ref, text = slot.ref): Button => ({ type: "question", label, message: `${ASKS[ask]} ${text.toLowerCase()}?` });
+/** The message that asks `ask` of a slot (the Topics table's Button column). */
+export const slotMessage = (ask: SlotAsk, text: string) => `${ASKS[ask]} ${text.toLowerCase()}?`;
+const slotButton = (slot: Slot, ask: SlotAsk, label = slot.ref, text = slot.ref): Button => ({ type: "question", label, message: slotMessage(ask, text) });
+/** One button per slot, or the starters when the plan has none (REQ-27). */
+export const slotChoices = (slots: Slot[], ask: SlotAsk): Button[] =>
+  slots.length ? slots.map((slot) => slotButton(slot, ask)) : STARTERS.map((message): Button => ({ type: "question", label: message, message }));
 /** "colación" → "colaciones" (the accent goes), "desayuno" → "desayunos", "snack" → "snacks", "luz" → "luces". */
 function plural(name: string): string {
   const lower = name.toLowerCase();
@@ -86,8 +92,7 @@ export function chooseSlot(plan: SlotPlan, word: string, ask: SlotAsk, ordinal?:
       return { built: { lead: [{ text: "¿Te refieres al desayuno o a la comida?" }], buttons, kind: "clarify", sources } };
     }
   }
-  const buttons = plan.slots.length ? plan.slots.map((slot) => slotButton(slot, ask)) : STARTERS.map((message): Button => ({ type: "question", label: message, message }));
-  return { built: { lead: [{ text: `Tu plan no tiene ${withAccent(word)}.` }], buttons, sources } };
+  return { built: { lead: [{ text: `Tu plan no tiene ${withAccent(word)}.` }], buttons: slotChoices(plan.slots, ask), sources } };
 }
 
 const SLOT_TIME_LEADS: ((ref: string) => string)[] = [(ref) => `Tu horario de ${ref}: `, (ref) => `Tu ${ref} es: `];
@@ -182,7 +187,8 @@ export function slotOptions(db: AppDb, userId: string, intent: Intent, question:
   if (!plan) return { lead: [{ text: "No tienes un plan activo." }] };
   // The resolver always names the slot of a slotOptions intent.
   const chosen = chooseSlot(plan, intent.slot ?? "", "options", intent.ordinal);
-  if ("built" in chosen) return chosen.built;
+  // The block title of a 2-block answer (REQ-24): the slot ref, or the slot word when the plan lacks it.
+  if ("built" in chosen) return { ...chosen.built, title: withAccent(intent.slot ?? "").replace(/^./, (letter) => letter.toUpperCase()) };
   const { slot } = chosen;
   // A bare number ("cena 2") is option n unless the slot is duplicated, where it was the slot's ordinal (REQ-11).
   const bareOption = intent.numbered && slotsNamed(plan.slots, intent.slot ?? "").length === 1 ? intent.ordinal : undefined;
@@ -194,12 +200,12 @@ export function slotOptions(db: AppDb, userId: string, intent: Intent, question:
     .filter((option) => option.meal_type_id === slot.id && !option.deleted_at)
     .sort((a, b) => a.option_number - b.option_number)
     .flatMap((option) => db.recipes.find((recipe) => recipe.id === option.recipe_id && !recipe.deleted_at) ?? []);
-  if (!recipes.length) return { lead: [{ text: `Tu plan no tiene opciones para tu ${name}.` }], sources };
+  if (!recipes.length) return { lead: [{ text: `Tu plan no tiene opciones para tu ${name}.` }], sources, title: slot.ref };
 
   const outOfRange = asked !== undefined && !(Number.isInteger(asked) && asked >= 1 && asked <= recipes.length);
   if (!outOfRange && (asked !== undefined || recipes.length === 1)) {
     const position = asked ?? 1;
-    return recipeDetail(db, userId, recipes[position - 1], { slot, position });
+    return { ...recipeDetail(db, userId, recipes[position - 1], { slot, position }), title: slot.ref, followUps: [slotMessage("times", slot.ref)] };
   }
   const pages = Math.ceil(recipes.length / PAGE_SIZE);
   const current = outOfRange ? 1 : Math.min(Math.max(page, 1), pages);
@@ -214,5 +220,5 @@ export function slotOptions(db: AppDb, userId: string, intent: Intent, question:
   if (current < pages) buttons.push(pageButton("Ver más opciones", current + 1));
   if (current > 1) buttons.push(pageButton("Opciones anteriores", current - 1));
   const lead = outOfRange ? `Tu ${name} tiene ${countOptions(recipes.length)}.` : pickVariant(LEADS, question)(name);
-  return { lead: [{ text: lead }], buttons, sources };
+  return { lead: [{ text: lead }], buttons, sources, title: slot.ref };
 }
