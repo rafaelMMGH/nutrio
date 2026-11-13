@@ -972,8 +972,10 @@ test.describe("REQ-35: Enter and Space on buttons and links", () => {
     const nav = ui.navLinks.last();
     await nav.focus();
     // A native anchor ignores Space (it scrolls the page), so only Enter navigates.
+    const historyBefore = await chat.evaluate(() => history.length);
     await chat.keyboard.press("Space");
-    await expect(chat).toHaveURL(/\/$/);
+    await expect(nav).toBeFocused();
+    await expect.poll(() => chat.evaluate(() => `${location.pathname}|${history.length}`), { timeout: 1000 }).toBe(`/|${historyBefore}`);
     await chat.keyboard.press("Enter");
     await expect(chat).toHaveURL(new RegExp(`${LINK_HREF}$`));
   });
@@ -1044,9 +1046,9 @@ test.describe("REQ-34: navigation links at 360 px", () => {
     const ui = await openSheet(chat);
     await ask(chat, QUESTION);
     await expect(ui.assistantTurns).toHaveCount(1);
-    // Ctrl-click opens a new tab; the new page is not under test, so it is closed again.
+    // Ctrl-click (Cmd on macOS) opens a new tab: that event proves the click acted; the new page is closed again.
     const opened = chat.context().waitForEvent("page");
-    await ui.navLinks.first().click({ modifiers: ["Control"] });
+    await ui.navLinks.first().click({ modifiers: ["ControlOrMeta"] });
     await (await opened).close();
     await expect(ui.panel).toBeVisible();
     await expect(chat).toHaveURL(/\/$/);
