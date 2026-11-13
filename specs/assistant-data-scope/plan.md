@@ -1,6 +1,6 @@
 # Plan: Assistant data scope
 
-**Spec:** [spec.md](spec.md) (v1.7) · **Contract:** [contracts/chat-api.md](contracts/chat-api.md) · **Checklist:** [checklists/ux.md](checklists/ux.md) · **Also:** chat-polish REQ-23 ([assistant-chat-polish/spec.md](../assistant-chat-polish/spec.md) v1.9) · **Revision 9** (2026-10-29): verifier-spec analyze round 1 folded (PASS, no HIGH): rule 1 beats not-a-dish-name (D11), more REQ-26/29 answer rows, optional T080 split out of T079. Revision 8: spec v1.7, no fuse.js, in-house dish matcher; batch 1e split into 1e1/1e2 (revision 7: batches re-estimated with tests after 1a2 and split at ~450; revision 6: unit-first cadence, spec v1.6).
+**Spec:** [spec.md](spec.md) (v1.7) · **Contract:** [contracts/chat-api.md](contracts/chat-api.md) · **Checklist:** [checklists/ux.md](checklists/ux.md) · **Also:** chat-polish REQ-23 ([assistant-chat-polish/spec.md](../assistant-chat-polish/spec.md) v1.9) · **Revision 10** (2026-11-12): user decision: Batch 4a (~490 added lines) is split into 4a1 (~270) and 4a2 (~220) instead of accepted over the cap (Batches). Revision 9 (2026-10-29): verifier-spec analyze round 1 folded (PASS, no HIGH): rule 1 beats not-a-dish-name (D11), more REQ-26/29 answer rows, optional T080 split out of T079. Revision 8: spec v1.7, no fuse.js, in-house dish matcher; batch 1e split into 1e1/1e2 (revision 7: batches re-estimated with tests after 1a2 and split at ~450; revision 6: unit-first cadence, spec v1.6).
 
 **User asks (nothing else needs a yes):** (1) the one snapshot refresh at the end of Batch E (T057); (2) the manual ≤1 s check on real data before merge (T065); (3) push and PR. No dependency is added (spec v1.7; T025 dropped).
 
@@ -112,14 +112,15 @@ Sizes are changed lines including tests (revision 7: the earlier estimates left 
 | 3c1 water / 3c2 exercise | T042, T043 pt 1 / pt 2 | ~260 / ~250 | — |
 | 3d1 weight / 3d2 meals done | T044, T045 pt 1 / pt 2 | ~310 / ~200 | — |
 | 3e | T046, T047 | ~430 | — |
-| 4a / 4b1 / 4b2 | T048, T049 / T050 pt 1, T051 / T050 pt 2, T052 | ~490 / ~250 / ~290 | — |
+| 4a1 greeting, variants, no-match / 4a2 dish answers, REQ-29 step 8 | T048 pt 1, T049 pt 1 / T048 pt 2, T049 pt 2 | ~270 / ~220 | — |
+| 4b1 / 4b2 | T050 pt 1, T051 / T050 pt 2, T052 | ~250 / ~290 | — |
 | 5 identity | T053, T054 | ~240 | — |
 | 6a1 / 6a2 | T055 (e2e, not run) / T056 | ~250 / ~260 | — |
 | 6b1 / 6b2 / 6c | T058 / T059, T060 / T061, T062 | ~110 / ~370 / ~350 | — |
 | E stabilization | T076, T077, T057 | ≤ ~450 per fix round incl. tests; T077 commits nothing | — |
 | Final | T063–T065 | ~200 | — |
 
-41 batches (15 done, counting 1b2a/1b2b, 3a1 and 3a2; 26 to go). Revision 8 splits 1e (no install; ~530 added lines in one batch would pass the cap). The user accepted 1a1, 1a2, 1b1, 4b, 2c, 3c, 3d, 6a over the old ~300 target (2026-10-29); 1b1, 1d, 2a, 2b, 2c, 3c, 3d, 4b, 6a, 6b are now split (conservative). 4a (~490 after the revision 9 REQ-26/REQ-29 answer rows) has no clean split and passes the cap; the running-estimate stop applies (decision for the user: accept, or split T048 by builder before 4a starts).
+42 batches (30 done through 3e, counting 1b2a/1b2b, 3a1 and 3a2, plus the unplanned cleanup batches 2c3 and 3b3; 12 to go). Revision 8 splits 1e (no install; ~530 added lines in one batch would pass the cap). The user accepted 1a1, 1a2, 1b1, 4b, 2c, 3c, 3d, 6a over the old ~300 target (2026-10-29); 1b1, 1d, 2a, 2b, 2c, 3c, 3d, 4b, 6a, 6b are now split (conservative). **Revision 10 (user decision 2026-11-12):** 4a (~490 after the revision 9 REQ-26/REQ-29 answer rows) passed the cap; the user chose to split rather than accept it. Seam: REQ-23 greeting/thanks, every REQ-28 variant (incl. the slot-time variant and the picker's variety) and the plain no-match reply (4a1) vs the REQ-26 dish did-you-mean/not-found builders and the REQ-6 step-8 `rankDish` call (4a2). T048 and T049 are each split into part 1 and part 2 (tasks.md), each test part committed just before its code; 4a1 opens with a green test-only prep commit that makes the existing slot-time and no-match assertions variant-agnostic. Each half has its own review checkpoint.
 
 **Worktree rules:** created from the current feature-branch tip; only write code and run tsc and unit tests (never e2e); path-limited per-task commits; each worktree needs `node_modules` (a symlink to the main checkout's is fine) for tsc and unit tests. Merged back by the orchestrator by cherry-pick or `git merge --no-ff` (a fast-forward is impossible once the main line has advanced), which then reruns tsc and `npm run test:unit` on the merged tip. If a parallel batch finds it must edit a file the other batch owns, it stops and the two run sequentially.
 
@@ -151,4 +152,4 @@ Sizes are changed lines including tests (revision 7: the earlier estimates left 
 - [x] 4 Dependencies: none added (spec v1.7: fuse.js dropped, T025 dropped). The unit runner adds a script, not a package.
 - [x] 5 No secrets: hooks use a non-secret env flag; `.env.local` untouched.
 - [x] 6 Errors: the 500 path logs route, user id, message length and stack; invalid input is 400 without an error log.
-- [x] 7 Small changes: per-task path-limited commits; batch sizes (tests included) in the Batches table, cap ~450 after the revision 7 re-estimate; done overs 1a1 (~436) and 1a2 (~557) accepted by the user 2026-10-29; the other accepted overs (1b1, 2c, 3c, 3d, 4b, 6a) are now split; 4a sits at ~490 (revision 9; user decision pending, Batches).
+- [x] 7 Small changes: per-task path-limited commits; batch sizes (tests included) in the Batches table, cap ~450 after the revision 7 re-estimate; done overs 1a1 (~436) and 1a2 (~557) accepted by the user 2026-10-29; the other accepted overs (1b1, 2c, 3c, 3d, 4b, 6a) are now split; 4a (~490, revision 9) is split into 4a1/4a2 (revision 10, user decision 2026-11-12).
