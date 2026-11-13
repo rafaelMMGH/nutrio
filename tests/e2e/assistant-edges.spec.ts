@@ -13,6 +13,8 @@ test.afterAll(() => deleteChatUser());
 const messages = (buttons: { type: string }[]) => (buttons as Button[]).flatMap((button) => (button.type === "question" ? [button.message] : []));
 
 test("REQ-23 hola and a fuzzy thanks get a lead of their variants and the 4 starters, which resolve", async ({ chatContext }) => {
+  // The resend sweep asks "Mi cena de hoy", which needs a plan to answer with options.
+  seedPlan({ times: "all" });
   const hello = await ask(chatContext.request, "hola");
   expect(hello.status).toBe(200);
   expect(hello.body.kind).toBe("greeting");
