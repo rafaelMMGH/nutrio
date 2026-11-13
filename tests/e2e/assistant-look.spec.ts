@@ -142,7 +142,8 @@ test.describe("REQ-14: forced colors", () => {
     const ui = await openAssistant(chat);
     await ask(chat, QUESTION);
     await expect(ui.assistantTurns).toHaveCount(1);
-    for (const turn of [ui.userTurns.first(), ui.assistantTurns.first()]) {
+    // The bubble sits inside the full-width turn row, so the edge is the bubble's.
+    for (const turn of [ui.userTurns.first().locator(".assistant-bubble"), ui.assistantTurns.first().locator(".assistant-bubble")]) {
       expect(await turn.evaluate((node) => parseFloat(getComputedStyle(node).borderTopWidth))).toBeGreaterThan(0);
     }
   });
@@ -239,7 +240,7 @@ test.describe("Look: width and long tokens at 360 px", () => {
       const log = document.querySelector(".assistant-chat-log") as HTMLElement;
       const style = getComputedStyle(log);
       const content = log.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
-      const user = (document.querySelector(".assistant-turn.user") as HTMLElement).getBoundingClientRect().width;
+      const user = (document.querySelector(".assistant-turn.user .assistant-bubble") as HTMLElement).getBoundingClientRect().width;
       return { content, user, logOverflow: log.scrollWidth - log.clientWidth, page: document.documentElement.scrollWidth - document.documentElement.clientWidth };
     });
     expect(widths.user).toBeLessThanOrEqual(widths.content * 0.8 + 0.5);
@@ -257,7 +258,10 @@ async function colorOf(page: Page, locator: Locator, property: "color" | "stroke
   return toRgb(page, await locator.evaluate((node, name) => getComputedStyle(node)[name], property));
 }
 
-/** Boundary contrast against `against`: the better of the fill and an opaque, visible border. */
+/**
+ * Boundary contrast against `against`: the better of the fill and an opaque, visible border. Interpretation: the better of
+ * fill vs opaque border against the log (WCAG 1.4.11 reading); the border must be opaque, `edge[3] === 1`.
+ */
 async function boundary(page: Page, locator: Locator, against: [number, number, number, number]) {
   const fill = contrast(await effectiveBackground(locator), against);
   const width = await locator.evaluate((node) => parseFloat(getComputedStyle(node).borderTopWidth));
@@ -292,7 +296,8 @@ test.describe("REQ-32: sides and avatar", () => {
     expect(Math.abs(geometry.avatar.left - geometry.inner.left)).toBeLessThanOrEqual(1);
     expect(geometry.avatar.width).toBeCloseTo(32, 0);
     expect(geometry.avatar.height).toBeCloseTo(32, 0);
-    expect(parseFloat(geometry.radius)).toBeGreaterThanOrEqual(16);
+    // Circular: 50%, or a pixel radius of at least half the 32 px side.
+    expect(geometry.radius === "50%" || (geometry.radius.endsWith("px") && parseFloat(geometry.radius) >= 16), `radius ${geometry.radius}`).toBe(true);
     // The bubble starts after the avatar and runs to the right edge of the log.
     expect(geometry.bubble.left).toBeGreaterThanOrEqual(geometry.avatar.right - 0.5);
     expect(Math.abs(geometry.bubble.right - geometry.inner.right)).toBeLessThanOrEqual(1);
@@ -350,12 +355,15 @@ test.describe("REQ-32: 360 px wrapping", () => {
   test.use({ viewport: { width: 360, height: 740 } });
 
   test("a 500-character message and an 80-character token wrap in both bubbles with no overflow", async ({ chat }) => {
-    const sentence = "palabra ".repeat(62).trim().slice(0, 500);
     const token = "z".repeat(80);
-    await mockChat(chat, buildAnswer({ lead: [{ text: `${sentence} ${token}` }], sections: [{ title: "Detalle", items: [[{ text: token }]] }] }));
+    // The whole user message is exactly MAX_MESSAGE: a sentence, a space and the token (Send is disabled above the limit).
+    const sentence = "palabra ".repeat(60).slice(0, MAX_MESSAGE - token.length - 1);
+    const message = `${sentence} ${token}`;
+    expect(message).toHaveLength(MAX_MESSAGE);
+    await mockChat(chat, buildAnswer({ lead: [{ text: `${message} ${message}` }], sections: [{ title: "Detalle", items: [[{ text: token }]] }] }));
     await chat.goto("/");
     const ui = await openAssistant(chat);
-    await ask(chat, `${sentence} ${token}`);
+    await ask(chat, message);
     await expect(ui.assistantTurns).toHaveCount(1);
 
     const overflow = await chat.evaluate(() => {
@@ -364,6 +372,8 @@ test.describe("REQ-32: 360 px wrapping", () => {
       const bubbles = [...document.querySelectorAll(".assistant-turn .assistant-bubble")] as HTMLElement[];
       return {
         count: bubbles.length,
+        content: log.clientWidth - parseFloat(getComputedStyle(log).paddingLeft) - parseFloat(getComputedStyle(log).paddingRight),
+        user: (document.querySelector(".assistant-turn.user .assistant-bubble") as HTMLElement).getBoundingClientRect().width,
         log: log.scrollWidth - log.clientWidth,
         page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
         // No bubble, and no element inside one, reaches past the log's right edge.
@@ -372,6 +382,8 @@ test.describe("REQ-32: 360 px wrapping", () => {
       };
     });
     expect(overflow.count).toBe(2);
+    // REQ-32: the user bubble is at most 80% of the log width; only meaningful with a message this long.
+    expect(overflow.user).toBeLessThanOrEqual(overflow.content * 0.8 + 0.5);
     expect(overflow.log).toBeLessThanOrEqual(0);
     expect(overflow.page).toBeLessThanOrEqual(0);
     expect(overflow.outside).toBe(0);

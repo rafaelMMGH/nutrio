@@ -2,7 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expectIssues } from "./fixtures";
 import { auditNow, visit } from "./theme-audit";
 import { canvasColor, contrast, effectiveBackground, toRgb, type Rgba, type Theme } from "./theme-helpers";
-import { assistantUi, cartAnswer, createChatUser, deleteChatUser, expect, focusWalk, LINK_HREF, LINK_LABEL, mockChat, openAssistant, OPTION_LABELS, optionsAnswer, test } from "./assistant-helpers";
+import { assistantUi, cartAnswer, createChatUser, deleteChatUser, expect, focusWalk, CHIP_LABEL, LINK_HREF, LINK_LABEL, mockChat, openAssistant, OPTION_LABELS, optionsAnswer, test } from "./assistant-helpers";
 
 // The assistant as a phone sheet. Spec assistant-chat-polish, US5: REQ-15 (geometry, touch targets, safe areas, the
 // on-screen keyboard, long tokens), REQ-14 at 360 px (backdrop, focus rings), REQ-17 (turn names, live region) and REQ-22
@@ -753,6 +753,7 @@ test.describe("REQ-34: buttons at 360 px", () => {
     await expect(ui.assistantTurns).toHaveCount(1);
     await expect(ui.options).toHaveCount(OPTION_LABELS.length);
 
+    // Interpretation: the width is measured against the bubble's inner width (clientWidth minus padding); the spec only says the buttons stretch to it.
     const measured = await ui.options.evaluateAll((nodes) =>
       nodes.map((node) => {
         const bubble = node.closest(".assistant-bubble") as HTMLElement;
@@ -787,9 +788,12 @@ test.describe("REQ-34: question buttons and links by answer", () => {
 
     const first = ui.assistantTurns.nth(0);
     const last = ui.assistantTurns.nth(1);
-    await expect(first.locator("button[data-variant]")).toHaveCount(0);
+    // By role, so the answer-level chip is covered as well as the options.
+    await expect(first.getByRole("button")).toHaveCount(0);
     await expect(first.getByRole("link", { name: LINK_LABEL })).toHaveCount(1);
     await expect(last.locator('button[data-variant="option"]')).toHaveCount(OPTION_LABELS.length);
+    await expect(last.getByRole("button")).toHaveCount(OPTION_LABELS.length + 1);
+    await expect(last.getByRole("button", { name: CHIP_LABEL })).toHaveAttribute("data-variant", "chip");
     await expect(last.getByRole("link", { name: LINK_LABEL })).toHaveCount(1);
 
     await first.getByRole("link", { name: LINK_LABEL }).click();
@@ -808,9 +812,11 @@ test.describe("REQ-34: question buttons and links by answer", () => {
     const held = await mockChat(chat, optionsAnswer(), { hold: true });
     await ask(chat, QUESTION);
     await expect(ui.pending).toHaveCount(1);
-    const buttons = ui.assistantTurns.last().locator("button[data-variant]");
+    // By role: the three options and the "Mi cena de hoy" chip.
+    const buttons = ui.assistantTurns.last().getByRole("button");
     const count = await buttons.count();
-    expect(count).toBeGreaterThan(0);
+    expect(count).toBe(OPTION_LABELS.length + 1);
+    await expect(ui.assistantTurns.last().getByRole("button", { name: CHIP_LABEL })).toHaveAttribute("aria-disabled", "true");
     for (let index = 0; index < count; index++) {
       const button = buttons.nth(index);
       await expect(button).toHaveAttribute("aria-disabled", "true");
@@ -819,11 +825,13 @@ test.describe("REQ-34: question buttons and links by answer", () => {
       await expect(button).toBeFocused();
       await button.click({ force: true });
     }
+    // Nothing was added to the thread (synchronous evidence), and nothing reached the route.
+    await expect(ui.userTurns).toHaveCount(2);
     expect(held.requests).toHaveLength(1);
 
     held.release();
     await expect(ui.assistantTurns).toHaveCount(2);
-    await expect(ui.assistantTurns.last().locator("button[data-variant]").first()).not.toHaveAttribute("aria-disabled", "true");
+    await expect(ui.assistantTurns.last().getByRole("button").first()).not.toHaveAttribute("aria-disabled", "true");
   });
 });
 
@@ -868,6 +876,7 @@ test.describe("REQ-35: names, bubbles and focus order", () => {
     }
     // Three options, one link, then the answer-level question button, in the order they are drawn.
     expect(order.map((stop) => stop.tag)).toEqual(["BUTTON", "BUTTON", "BUTTON", "A", "BUTTON"]);
+    expect(order.map((stop) => stop.variant)).toEqual(["option", "option", "option", "link", "chip"]);
     expect(order.map((stop) => stop.top)).toEqual([...order.map((stop) => stop.top)].sort((a, b) => a - b));
   });
 });
@@ -883,7 +892,12 @@ for (const theme of ["light", "dark"] as Theme[]) {
       const ui = await openSheet(chat);
       await ask(chat, QUESTION);
       await expect(ui.assistantTurns).toHaveCount(1);
-      expect(await focusWalk(chat, theme)).toEqual([]);
+      const visited: string[] = [];
+      expect(await focusWalk(chat, theme, visited)).toEqual([]);
+      // Each failure above is a ring under 3:1 on that stop, so these stops were all measured.
+      for (const label of OPTION_LABELS) expect(visited, `option ${label}`).toContain(`option:${label}`);
+      expect(visited, "the link").toContain(`link:${LINK_LABEL}`);
+      expect(visited, "the chip").toContain(`chip:${CHIP_LABEL}`);
     });
   });
 }

@@ -394,6 +394,8 @@ export function assistantUi(page: Page) {
     /** The one button component's variants (spec REQ-34), by `data-variant`; links are real anchors. */
     options: page.locator('.assistant-turn [data-variant="option"]'),
     navLinks: page.locator('.assistant-turn a[data-variant="link"]'),
+    /** The answer-level question button (follow-up), variant `chip`: not one of the vertical options. */
+    questionChips: page.locator('.assistant-turn [data-variant="chip"]'),
     /** The bubble of a turn and the assistant's avatar (spec REQ-32). */
     bubbles: page.locator(".assistant-turn .assistant-bubble"),
     avatars: page.locator(".assistant-turn .assistant-avatar"),
@@ -454,11 +456,13 @@ export function cartAnswer(count = 3): ChatAnswer {
 export const LONG_OPTION_LABEL = "Opción número tres con una descripción larga que debe partirse en varias líneas sin cortarse";
 export const OPTION_LABELS = ["Opción 1", "Opción 2", LONG_OPTION_LABEL];
 export const LINK_LABEL = "Ver receta completa";
-export const LINK_HREF = "/recipes";
+/** The answer-level question button; it has its own variant, `chip`, apart from the options. */
+export const CHIP_LABEL = "Mi cena de hoy";
+export const LINK_HREF = "/plans";
 
 /** An answer whose block carries vertical option buttons (spec REQ-34) and a navigation link, plus one answer-level question button. */
 export function optionsAnswer(): ChatAnswer {
-  const base = buildAnswer({ lead: [{ text: "Encontré varias opciones." }], buttons: [question("Mi cena de hoy")] });
+  const base = buildAnswer({ kind: "options", lead: [{ text: "Encontré varias opciones." }], buttons: [question(CHIP_LABEL)] });
   const options: Button[] = OPTION_LABELS.map((label) => ({ type: "question", label, message: label, layout: "option" }));
   base.blocks[0].buttons = [...options, { type: "link", label: LINK_LABEL, href: LINK_HREF }];
   return base;
@@ -507,9 +511,10 @@ export async function mockChat(page: Page, answer: ChatAnswer | ((body: { messag
 
 /**
  * Tabs through the panel's controls and reports every one whose focus indicator is below 3:1. The field draws its
- * ring as the pill's border (the field itself has no outline), so it is measured on that border.
+ * ring as the pill's border (the field itself has no outline), so it is measured on that border. When `visited` is
+ * given, each stop is pushed to it as `<variant or tag>:<text>`, so a test can prove the walk reached specific controls.
  */
-export async function focusWalk(page: Page, theme: Theme) {
+export async function focusWalk(page: Page, theme: Theme, visited?: string[]) {
   await page.evaluate(installToolkit);
   await page.keyboard.press("Shift");
   // The first visible control of the header.
@@ -520,6 +525,7 @@ export async function focusWalk(page: Page, theme: Theme) {
     const inside = await page.evaluate(() => Boolean(document.activeElement?.closest(".assistant-chat")));
     if (!inside) break;
     stops++;
+    visited?.push(await page.evaluate(() => `${document.activeElement?.getAttribute("data-variant") ?? document.activeElement?.tagName}:${document.activeElement?.textContent?.trim()}`));
     if (await page.evaluate(() => document.activeElement instanceof HTMLTextAreaElement)) {
       const form = page.locator(".assistant-chat-form");
       const border = await toRgb(page, await form.evaluate((node) => getComputedStyle(node).borderTopColor));
