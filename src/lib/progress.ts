@@ -62,8 +62,13 @@ export function weekMeals(logOf: LogOf, slotIds: string[], monday: string, endDa
   return weekDays(monday, endDay).reduce((sum, day) => sum + mealsDoneOn(logOf(day), slotIds), 0);
 }
 
+/** Days of `days` with exercise logged. */
+export function exerciseOver(logOf: LogOf, days: string[]) {
+  return days.filter((day) => logOf(day).exercised).length;
+}
+
 export function weekExercise(logOf: LogOf, monday: string, endDay: string) {
-  return weekDays(monday, endDay).filter((day) => logOf(day).exercised).length;
+  return exerciseOver(logOf, weekDays(monday, endDay));
 }
 
 /**
