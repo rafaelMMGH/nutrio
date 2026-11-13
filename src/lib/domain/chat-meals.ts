@@ -21,9 +21,10 @@ export const PLAN_LINK: Button = { type: "link", label: "Subir mi plan", href: "
 
 /**
  * REQ-27: the reply to a plan, slot or meals-done question without an active plan (or with a plan without slots): the line
- * and "Subir mi plan". `title` and `followUps` are the Built fields of the same names, for a slot question.
+ * and "Subir mi plan". It has no follow-ups (empty, so the topic's own do not apply): the link is its only button (user
+ * ruling 2026-11-13); every follow-up would answer this same line. `title` is the block title of a slot question.
  */
-export const noActivePlan = (title?: string, followUps?: string[]): Built => ({ lead: [{ text: NO_PLAN_LINE }], blockButtons: [PLAN_LINK], title, followUps });
+export const noActivePlan = (title?: string): Built => ({ lead: [{ text: NO_PLAN_LINE }], blockButtons: [PLAN_LINK], title, followUps: [] });
 
 /** A meal type of the active plan. `ref` is its name, or with duplicate names its ordinal form ("Segunda colación"). */
 export type Slot = { id: string; name: string; time: string; ref: string };
@@ -79,8 +80,6 @@ function plural(name: string): string {
   return /[aeiouk]$/.test(lower) ? `${lower}s` : `${lower}es`;
 }
 const withAccent = (word: string) => (word === "colacion" ? "colación" : word);
-/** The message that asks `ask` of a slot word the plan cannot answer (the word has its accent back: "colación"). */
-export const slotWordMessage = (ask: SlotAsk, word: string) => slotMessage(ask, withAccent(word));
 /** The block title of a slot word the plan cannot answer (REQ-24): "Cena", "Colación". */
 const wordTitle = (word: string) => withAccent(word).replace(/^./, (letter) => letter.toUpperCase());
 
@@ -199,7 +198,7 @@ export function slotOptions(db: AppDb, userId: string, intent: Intent, question:
   const plan = planSlots(db, userId);
   // The resolver always names the slot of a slotOptions intent.
   const word = intent.slot ?? "";
-  if (!plan) return noActivePlan(wordTitle(word), [slotWordMessage("times", word)]);
+  if (!plan) return noActivePlan(wordTitle(word));
   const chosen = chooseSlot(plan, word, "options", intent.ordinal);
   // The block title of a 2-block answer (REQ-24): the slot ref, or the slot word when the plan lacks it.
   if ("built" in chosen) return { ...chosen.built, title: wordTitle(word) };

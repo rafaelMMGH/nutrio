@@ -2,7 +2,7 @@ import type { AppDb, AppUser } from "@/lib/types";
 import { type Block, type Button, type ChatAnswer, type Intent, type ReplyKind, type Rich, type Section, normalizeText, STARTERS, words } from "@/lib/assistant";
 import { consolidateCart } from "@/lib/domain/cart";
 import { isGeneric, rankDish } from "@/lib/domain/chat-dish";
-import { type Built, chooseSlot, noActivePlan, pickVariant, planSlots, recipeDetail, slotChoices, slotMessage, slotOptions, slotTimeLead, slotWordMessage } from "@/lib/domain/chat-meals";
+import { type Built, chooseSlot, noActivePlan, pickVariant, planSlots, recipeDetail, slotChoices, slotMessage, slotOptions, slotTimeLead } from "@/lib/domain/chat-meals";
 import { exerciseAnswer, goalsAnswer, mealsDoneAnswer, waterAnswer, weeklyAnswer, weightAnswer } from "@/lib/domain/chat-metrics";
 import { resolve } from "@/lib/domain/chat-intent";
 import { greetingOf, TOPICS, type TopicId } from "@/lib/domain/chat-topics";
@@ -52,7 +52,7 @@ const quantity = (item: { quantity: number; unit: string }) => `${formatQty(item
 /** Slot times (REQ-8): the slot the intent names, or every slot when it names none. */
 function mealTimes(db: AppDb, userId: string, question: string, intent: Intent): Built {
   const plan = planSlots(db, userId);
-  if (!plan) return noActivePlan(undefined, intent.slot ? [slotWordMessage("options", intent.slot)] : undefined);
+  if (!plan) return noActivePlan();
   const sources = [`Plan activo: ${plan.planName}`];
   if (intent.slot) {
     const chosen = chooseSlot(plan, intent.slot, "times", intent.ordinal);
