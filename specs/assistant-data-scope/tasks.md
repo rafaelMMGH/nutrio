@@ -590,12 +590,31 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
   - e2e, written: extend T066 (tests/e2e/assistant-parity.spec.ts) with the same pin header, chat water week liters and exercise days equal the tiles; through `ask()` with `today` pinned, "¿Cuánta agua tomé hoy?" changes with the pin and one exercise answer (tests/e2e/assistant-progress.spec.ts).
   - Split: part 1 (3c1) = the water rows, REQ-13 future-day log, the label/clamp/fallback rows through water, the water e2e; part 2 (3c2) = the exercise rows, the remaining label rows, the exercise e2e.
   - Batch note 3b2/3b3: the user's answers on MEDIUM-1 and MEDIUM-2 were received (2026-11-12) and their fixes plus the LOW-4/LOW-5 rows landed first in 3b3 (tip b7ebcb7); LOW-3 left as is. The fallback line can be wired.
+  - **Part 1 done in 3c1** (120dc20 red unit rows, b706c8b water e2e rows, written not run; reviewer PASS). Part 2 (exercise rows, remaining label rows, exercise e2e) plus the 3c1 review rows (MEDIUM-1/2, LOW-1/2 in Batch note 3c1) remain in 3c2. Stays unticked until 3c2 passes review.
 - [ ] T043 [US3] Water and exercise builders on `progress.ts`, `endDay` = today, incl. the 0-with-label empty range (src/lib/domain/chat-metrics.ts). Part 1 (3c1) water, part 2 (3c2) exercise.
   - 1c1 review: any liters/number read from the message comes from the raw text, not `words` (decimals split under `normalizeText`).
+  - **Part 1 done in 3c1** (f1ecb67: `waterAnswer`, reviewer PASS). Part 2 (exercise builder) plus the MEDIUM-1 bold fix remain in 3c2. Stays unticked until 3c2 passes review.
 
 **Review checkpoint 3c1:** tsc + unit.
 
-**Batch 3c2: exercise**, about 250 lines with tests: T042 part 2, then T043 part 2.
+**Batch note 3c1 (done; T042 part 1, T043 part 1; commits on top of 688a283: 120dc20 T042 red, f1ecb67 T042/T043 water code, b706c8b e2e rows; tip b706c8b; tsc clean, unit 653/653; no dependency change; no `specs/` in code commits; +176/-8 (src +82/-6, unit +65, e2e +29/-2) vs ~260 estimated; reviewer PASS, no HIGH; no task ticks, 52 of 78):**
+
+- Commits: 120dc20 red rows in tests/unit/chat-metrics.test.ts (tsc clean; unit 644 pass / 9 fail = the 9 new water rows: default, hoy, ayer, uncapped, range, future log, empty, clamp, fallback; the reviewer re-checked this from a clean extract); f1ecb67 code; b706c8b e2e rows.
+- What landed: new src/lib/domain/chat-metrics.ts with `waterAnswer` (uses `periodLabel`, `clampPeriod`, `CLAMP_LINE`, `notUnderstoodLine`). `Intent.periodUnrecognized` in src/lib/assistant.ts, set in chat-intent.ts `dated()` only when `parsePeriod` returns `"unrecognized"`, and only for the dated metric intents and mealsDone. `pickVariant` exported from chat-meals.ts (its second real use: REQ-28 water lead variants "has tomado"/"llevas"). `today` passed through `BUILDERS` in chat.ts. progress.ts gained `daysBetween` and `waterOver`; `weekWater` now delegates to `waterOver`, so chat and dashboard share one calculation (dashboard unchanged, DashboardView still calls `weekWater`). `needs.chat` already loaded dailyLogs/plans/planVersions (same as `needs.dashboard`), so no loader change.
+- Behavior: the default answer is today plus the week line; "hoy" gives today only; "ayer" gives that day only. Today is uncapped; ranges cap each day at the goal; the average divides by every day in the range; days met uses >= goal. An empty range shows 0 with its label; a log dated after today is excluded. The clamp line comes first for spans over 366 days. A missing goal uses the 8-glass default; goal 0 clamps to 4.
+- Rounding decision: amounts use at most one decimal (spec Numbers rule), so the chat shows e.g. "0.8 litros" where the dashboard tile shows two decimals. This is intentional; the parity e2e rounds the tile the same way before comparing.
+- e2e, written, NOT run (first run in Batch E): tests/e2e/assistant-progress.spec.ts gets two rows ("ayer" follows the pinned `x-e2e-today` with its label; the fallback "No entendí la fecha; te muestro hoy." and the clamp line for "últimos 400 días"); tests/e2e/assistant-parity.spec.ts gets one row (the chat's "Esta semana" water liters equal the dashboard tile under the same today, rounded to one decimal).
+- Incident: a rate limit cut the first code-writer after the red commit and left uncommitted partial code (a patch backup was saved in the scratchpad). A second code-writer checked it and kept all of it. It fixed only Span/Rich type errors in chat-metrics.ts (`plain` and `bold` return a single Span; lead sentences are `Rich[]` arrays). Nothing was discarded.
+- Proof: the reviewer ran 28 mutations against the full suite and 23 were killed. Survivors: goal hardcoded to 8 (no row with a non-default goal → LOW-1); only variant 0 and only variant 1 (no REQ-28 row → MEDIUM-2); logs not scoped to the user (memDb is single-user; defense in depth, no action); range-summary bold removed (untested → MEDIUM-1); the `named !== undefined` flag (equivalent mutant).
+- Carry-forwards to 3c2 (Part A of the 3c2 code-writer prompt):
+  - **MEDIUM-1:** the range summary bolds "<L> litros en total" and "<a> litros por día en promedio", but the spec Copy bolds only **<L> litros** en total and **<a> litros** por día en promedio (chat-metrics.ts ~56). Fix it and add a row that asserts the highlight spans on a range answer. Do the same check for exercise.
+  - **MEDIUM-2:** there is no REQ-28 row for water. Add rows proving both variants are reachable, deterministic for the same question and give the same numbers; the `water()` test helper masks the variant.
+  - **LOW-1:** no unit row with a non-default water goal (memDb has no water-goal option). Add one (goal 0 or 3 L to check the 4..12 clamp), or record it as e2e/T052 territory.
+  - **LOW-2:** no resolve-level row for `periodUnrecognized` in tests/unit/chat-intent.test.ts. Add one.
+  - LOW-3 (info, accepted): `activeSchedule` builds every meal's recipe details only to read the water goal; the dashboard does the same.
+  - LOW-4 (pre-existing, no action): `daysBetween`/`weekDays` are near-duplicates, and `addDays` exists in both progress.ts and chat-dates.ts.
+
+**Batch 3c2: exercise**, about 250 lines with tests: T042 part 2, then T043 part 2, plus the 3c1 carry-forwards MEDIUM-1, MEDIUM-2, LOW-1, LOW-2 (Batch note 3c1). **In progress.**
 
 **Review checkpoint 3c2:** tsc + unit.
 
