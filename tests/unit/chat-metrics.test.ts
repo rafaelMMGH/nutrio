@@ -562,3 +562,26 @@ test("REQ-21 REQ-22 an active plan without a current version is no plan: no obje
   assert.deepEqual(without("¿Cuál es mi meta?").blocks[0].buttons, [{ type: "link", label: "Subir mi plan", href: "/plans" }]);
   assert.deepEqual(itemsOf(without("Mi avance de la semana")).slice(-1), ["Aún no tienes un plan activo."]);
 });
+
+// User ruling 2026-11-13: an active plan with zero meal slots is no plan, here as in the plan and slot answers. The plan
+// has a 4 L water goal and an objective, so a leak of either shows.
+const zeroSlots = (message: string) => {
+  const { db, user } = memDb({ goals: { weight: 63 }, logs: weeklyLogs, meals: [] });
+  db.planVersions[0].structured_data.nutrition_summary = { water_liters: { min: 4 } };
+  return ragAnswer(db, user, message, TODAY);
+};
+
+test("REQ-21 REQ-27 an active plan with zero slots is no plan for goals: no objective, the 2 L default, the no-plan line; narrowed answers carry no plan line", () => {
+  const bare = zeroSlots("¿Cuál es mi meta?");
+  assert.deepEqual(itemsOf(bare), ["Peso: 63 kg", "Ejercicio: 4 días por semana", "Agua: 8 vasos (2 litros) al día", "Aún no tienes un plan activo."]);
+  assert.deepEqual(bare.blocks[0].buttons, [{ type: "link", label: "Subir mi plan", href: "/plans" }]);
+  const narrowed = zeroSlots("¿Cuál es mi meta de agua?");
+  assert.equal(narrowed.answer, "Tu meta de agua es 8 vasos (2 litros) al día.");
+  assert.deepEqual(narrowed.blocks[0].buttons, []);
+});
+
+test("REQ-22 REQ-27 an active plan with zero slots is no plan for the weekly answer: the 2 L default water goal, the no-plan line and 'Subir mi plan'", () => {
+  const reply = zeroSlots("Mi avance de la semana");
+  assert.deepEqual(itemsOf(reply), ["Ejercicio: 2 de 4 días", "Agua: 5 litros", "Peso: bajaste 0.4 kg", "Aún no tienes un plan activo."]);
+  assert.deepEqual(reply.blocks[0].buttons, [{ type: "link", label: "Subir mi plan", href: "/plans" }]);
+});
