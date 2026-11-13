@@ -196,6 +196,8 @@ test("REQ-27 an active plan with no slots is treated as no plan (user ruling 202
   assert.equal(planSlots(db, user.id), null);
 });
 
+// Through ragAnswer this state is unreachable since a plan without slots is no plan (planSlots returns null); the starters
+// fallback survives through `slotChoices` in the dish clarify, which this calls directly.
 test("REQ-27 the choice of a slot in a slot list that is empty offers the starters", () => {
   const chosen = chooseSlot({ planName: PLAN_NAME, slots: [] }, "cena", "options");
   assert.ok("built" in chosen);
