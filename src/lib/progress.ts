@@ -58,8 +58,13 @@ export function mealsDoneOn(log: ProgressLog, slotIds: string[]) {
   return Math.min(slotIds.length, log.meals_done.filter((id) => slots.has(id)).length);
 }
 
+/** Meals done over `days`, each day counted by `mealsDoneOn`. */
+export function mealsOver(logOf: LogOf, slotIds: string[], days: string[]) {
+  return days.reduce((sum, day) => sum + mealsDoneOn(logOf(day), slotIds), 0);
+}
+
 export function weekMeals(logOf: LogOf, slotIds: string[], monday: string, endDay: string) {
-  return weekDays(monday, endDay).reduce((sum, day) => sum + mealsDoneOn(logOf(day), slotIds), 0);
+  return mealsOver(logOf, slotIds, weekDays(monday, endDay));
 }
 
 /** Days of `days` with exercise logged. */

@@ -3,7 +3,7 @@ import type { Button, Intent, Rich, Span } from "@/lib/assistant";
 import { CLAMP_LINE, clampPeriod, dateLabel, notUnderstoodLine, type Period, periodLabel } from "@/lib/domain/chat-dates";
 import { type Built, pickVariant } from "@/lib/domain/chat-meals";
 import { activeSchedule } from "@/lib/domain/plans";
-import { daysBetween, exerciseOver, type LogOf, mondayOf, WATER_GLASS_LITERS, waterGoalGlasses, waterOver, weightStats } from "@/lib/progress";
+import { daysBetween, exerciseOver, type LogOf, mealsOver, mondayOf, WATER_GLASS_LITERS, waterGoalGlasses, waterOver, weightStats } from "@/lib/progress";
 
 // Metric answers (spec assistant-data-scope REQ-15 to REQ-18): numbers come from `progress.ts`, the same math as the dashboard tiles (REQ-16).
 
@@ -156,4 +156,34 @@ export function weightAnswer(db: AppDb, userId: string, question: string, intent
     buttons.push(link("Registrar mi peso"));
   }
   return respond(sentences, buttons);
+}
+
+const TODAY_MEALS: ((done: string) => Rich)[] = [
+  (done) => [plain("Hoy llevas "), bold(done), plain(".")],
+  (done) => [plain("Hoy has hecho "), bold(done), plain(".")]
+];
+
+/**
+ * Meals done (REQ-20): with no period, today against the slots plus the week; "hoy", today only; a week against slots × 7
+ * (the dashboard's total), any other range against slots × its days, with a whole-number %. Undefined without an active
+ * plan or slots: that reply is T052's, so the caller keeps its interim answer.
+ */
+export function mealsDoneAnswer(db: AppDb, userId: string, question: string, intent: Intent, today: string): Built | undefined {
+  const slotIds = activeSchedule(db, userId)?.meals.map((meal) => meal.id) ?? [];
+  if (!slotIds.length) return undefined;
+  const logOf = logLookup(db, userId);
+  const { period, lead } = namedPeriod(intent, today, "hoy");
+  const count = (done: number, total: number) => `${done} de ${plural(total, "comida", "comidas")}`;
+  const todaySentence = () => pickVariant(TODAY_MEALS, question)(count(mealsOver(logOf, slotIds, [today]), slotIds.length));
+  /** "<Periodo>: **D de N comidas** (p%)." over `days`, against `total` meals. */
+  const rangeSentence = (range: Period, days: string[], total: number): Rich => {
+    const done = mealsOver(logOf, slotIds, days);
+    return [plain(`${periodLabel(range, today)}: `), bold(count(done, total)), plain(` (${Math.round((done / total) * 100)}%).`)];
+  };
+  const weekSentence = (week: Period) => rangeSentence(week, daysBetween(week.from, week.to), slotIds.length * 7);
+
+  if (period?.kind === "today") return { lead: joinSentences([...lead, todaySentence()]) };
+  if (!period) return { lead: joinSentences([...lead, todaySentence(), weekSentence({ kind: "thisWeek", from: mondayOf(today), to: today })]) };
+  const days = daysBetween(period.from, period.to);
+  return { lead: joinSentences([...lead, period.kind === "thisWeek" ? weekSentence(period) : rangeSentence(period, days, slotIds.length * days.length)]) };
 }

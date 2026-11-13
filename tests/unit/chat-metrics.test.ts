@@ -347,7 +347,7 @@ test("REQ-20 marks of a slot not in the plan are ignored and a day never counts 
 
 test("REQ-13 a log dated after today is not counted", () => {
   assert.match(meals("¿Cuántas comidas llevo?", [marked(TODAY, 0), marked("2026-10-29", 0, 1, 2, 3)]), /Esta semana \(lun 26 – hoy\): 1 de 28 comidas \(4%\)\.$/);
-  assert.match(meals("comidas desde el 26 de octubre", [marked(TODAY, 0), marked("2026-10-29", 0, 1, 2, 3)]), /^Desde el 26 de octubre \(lun 26 – hoy\): 1 de 12 comidas \(8%\)\./);
+  assert.match(meals("¿Cuántas comidas llevo desde el 26 de octubre?", [marked(TODAY, 0), marked("2026-10-29", 0, 1, 2, 3)]), /^Desde el 26 de octubre \(lun 26 – hoy\): 1 de 12 comidas \(8%\)\./);
 });
 
 test("REQ-27 an empty range shows 0 with its label", () => {
@@ -364,11 +364,11 @@ test("REQ-14 labels through meals answers: last week, month; the clamp line firs
 
 test("REQ-28 questions hitting different meals lead variants show identical numbers, and the same question twice gives the same variant", () => {
   const logs = [marked(TODAY, 0, 1)];
-  const [made, held] = [mealsReply("¿Cuántas comidas llevo hoy?", logs).answer, mealsReply("comidas hoy", logs).answer];
+  const [made, held] = [mealsReply("¿Cuántas comidas llevo hoy?", logs).answer, mealsReply("hoy, ¿cuántas comidas llevo?", logs).answer];
   assert.equal(made, "Hoy llevas 2 de 4 comidas.");
   assert.equal(held, "Hoy has hecho 2 de 4 comidas.");
   assert.equal(mealsReply("¿Cuántas comidas llevo hoy?", logs).answer, made);
-  assert.equal(mealsReply("comidas hoy", logs).answer, held);
+  assert.equal(mealsReply("hoy, ¿cuántas comidas llevo?", logs).answer, held);
 });
 
 test("REQ-27 with no active plan the meals answer is left to T052: no counts are invented", () => {
