@@ -636,15 +636,17 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
 
 **Batch 3d1: weight**, about 310 lines with tests (revision 7 split of 3d; T044 and T045 split by metric). **Done** (T044 part 1, T045 part 1, plus the 3c2 cleanups LOW-2 (un-skip the stale PENDING rows) and LOW-4 (the 2.7 L water goal row); Batch note 3c2; see Batch note 3d1).
 
-- [ ] T044 [US3] Tests REQ-19, REQ-20, REQ-14 text, REQ-16 (meals, weight), REQ-27 (weight)
+- [x] T044 [US3] Tests REQ-19, REQ-20, REQ-14 text, REQ-16 (meals, weight), REQ-27 (weight)
   - Unit (tests/unit/chat-metrics.test.ts): REQ-19 exact sentence; no week line without a record this week; "sin cambio"; "meta alcanzada"; no goal → "Fijar mi meta"; last record over 7 days → the line + "Registrar mi peso"; range min/max. REQ-20: today 3 de 5, week ×7, a range with %. REQ-14 range labels and the fallback line in weight and meals answers. REQ-27: no weight logs → "Aún no registras tu peso." + "Registrar mi peso" (/); an empty weight range → "<Periodo>: no registraste tu peso."; an empty meals range → 0 with the label. Red first.
   - e2e, written: extend T066 (meals done D de N, weight change) (tests/e2e/assistant-parity.spec.ts); the T012 search-bar question shows the weight copy (tests/e2e/assistant-noscope.spec.ts); no weight logs through `ask()` (tests/e2e/assistant-progress.spec.ts).
   - Split: part 1 (3d1) = REQ-19, REQ-27 weight rows, weight labels/fallback, the weight e2e and parity; part 2 (3d2) = REQ-20, the meals labels and empty range, the meals parity.
-  - **Part 1 done in 3d1** (c969fa8 red unit rows, c6611a3 survivor rows, 59878d9 e2e rows written not run; reviewer PASS). Part 2 remains in 3d2, plus the ratio-boundary pin row (Batch note 3d1 LOW-1). Stays unticked until 3d2 passes review.
-- [ ] T045 [US3] Weight and meals-done builders, incl. the no-weight-logs reply and empty ranges; the no-active-plan reply for meals done is left to T052 (src/lib/domain/chat-metrics.ts). Part 1 (3d1) weight, which also removes "Mi peso" from the sweep `skip` list; part 2 (3d2) meals done.
+  - **Part 1 done in 3d1** (c969fa8 red unit rows, c6611a3 survivor rows, 59878d9 e2e rows written not run; reviewer PASS).
+  - **Done** (3d1 and 3d2; reviewer PASS on both): part 1 in 3d1 as above; part 2 in 3d2: 9fdc847 ratio-boundary pin row, 81c2990 meals-done red rows plus the `mealsOver` row and the sweep change, 5b428b0 e2e rows written, not run (Batch note 3d2).
+- [x] T045 [US3] Weight and meals-done builders, incl. the no-weight-logs reply and empty ranges; the no-active-plan reply for meals done is left to T052 (src/lib/domain/chat-metrics.ts). Part 1 (3d1) weight, which also removes "Mi peso" from the sweep `skip` list; part 2 (3d2) meals done.
   - 3a1 review: the REQ-19 week line needs `weightStats` `latestDate >= monday` and `beforeWeek !== null` (`change` alone is not enough).
   - 1c1 review: any weight number read from the message (e.g. "66,5") comes from the raw text, not `words` (decimals split under `normalizeText`).
-  - **Part 1 done in 3d1** (7b178b4 `weightAnswer`; reviewer PASS). Part 2 (meals done) remains in 3d2. Stays unticked until 3d2 passes review.
+  - **Part 1 done in 3d1** (7b178b4 `weightAnswer`; reviewer PASS).
+  - **Done** (3d1 and 3d2; reviewer PASS on both): part 1 7b178b4; part 2 20f8c3f (`mealsOver` in progress.ts, `mealsDoneAnswer` in chat-metrics.ts, `BUILDERS.mealsDone`). The no-active-plan / zero-slots reply stays with T052 (Batch note 3d2 LOW-1).
 
 **Review checkpoint 3d1:** tsc + unit.
 
@@ -673,11 +675,32 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
   - **LOW-1 (user ruling pending, non-blocking):** "Te faltan 0 kg para tu meta de 65 kg." when the remaining distance is under 0.05 kg (latest 65.04, start 70, goal 65: ratio 0.99, not reached). Same rounded-zero family as choice 1. Options: (a) leave it; (b) treat a distance that rounds to 0 as reached. 3d2 adds a boundary row between ratio 0.98 and 1.0 that pins the current output (HANDOFF section 6).
   - **LOW-3 (accepted):** `db.users.find(id)` is not pinned by a multi-user row.
 
-**Batch 3d2: meals done**, about 200 lines with tests: T044 part 2, then T045 part 2, plus the 3d1 LOW-1 ratio-boundary pin row. **In progress.**
+**Batch 3d2: meals done**, about 200 lines with tests: T044 part 2, then T045 part 2, plus the 3d1 LOW-1 ratio-boundary pin row. **Done** (see Batch note 3d2).
 
 **Review checkpoint 3d2:** tsc + unit.
 
-**Batch 3e: goals, weekly progress**, about 430 lines with tests
+**Batch note 3d2 (done; T044 part 2, T045 part 2, plus the 3d1 LOW-1 ratio-boundary pin row; commits on top of 59878d9 (docs commit 55af933 in the history): 9fdc847, 81c2990, 20f8c3f, 5b428b0; tip 5b428b0; tsc clean, unit 700/700; no dependency change; no `specs/` in code commits; src +40/-3, tests +112/-4 (src+tests +152/-7) vs ~200 estimated; reviewer PASS, no HIGH, no MEDIUM; T044 and T045 ticked, 56 of 78):**
+
+- Commits: 9fdc847 weight goal boundary row (3d1 LOW-1; test only; pins the current output at start 100, goal 50, latest 50.04: "Tu último peso es 50 kg (27 oct). Te faltan 0 kg para tu meta de 50 kg. Esta semana bajaste 50 kg."; kills the `ratio >= 0.99` mutant); 81c2990 T044 meals-done rows, a `mealsOver` row in tests/unit/progress.test.ts, and the sweep change (red; from a clean extract 681 tests, 670 pass / 11 fail: 9 meals rows, the sweep row, progress.test.ts failing to import `mealsOver`); 20f8c3f T045 part 2 code (two test phrasings fixed inside the code commit; harmless, as the 1c1 precedent); 5b428b0 e2e rows (written, not run).
+- What landed: `mealsOver(logOf, slotIds, days)` in src/lib/progress.ts, with `weekMeals` delegating (dashboard unchanged, still slots × 7); `mealsDoneAnswer` in src/lib/domain/chat-metrics.ts; `BUILDERS.mealsDone` in chat.ts; "¿Cuántas comidas llevo?" out of PENDING and into the sweep.
+- Behavior (REQ-20): default = today plus the week; "hoy" = today only ("Hoy llevas" / "Hoy has hecho **D de N comidas**."); explicit "esta semana" = the week line only ("Esta semana (<…>): **D de N comidas** (p%)." with N = slots × 7); other ranges count slots × days elapsed up to today, with a whole-number %; singular "<d> de 1 comida"; bold only "<d> de <n> comidas", "(p%)" plain; REQ-28 variants; clamp line first; fallback line "No entendí la fecha; te muestro hoy."; future logs excluded. No active plan, a deleted/inactive plan or a plan with zero slots: `mealsDoneAnswer` returns `undefined` and chat.ts keeps `pending("mealsDone")` until T052.
+- Proof: 31 mutants run against the full suite, 27 killed. Survivors: the "Hoy llevas" variant's bold span (only "Hoy has hecho" is asserted; LOW-3); `logLookup` user scoping (memDb single-user; the known 3c2 LOW-4 / 3d1 LOW-3 carry); the explicit `?? pending("mealsDone")` at chat.ts:122 (equivalent: chat.ts:155 `BUILDERS[topic]?.() ?? pending(topic)` already covers `undefined`); the clamp/today reorder in the "hoy" branch (equivalent).
+- Reviewer rulings on the code-writer's 6 choices (none needs a user ruling):
+  1. No plan / zero slots stays on the placeholder until T052 (REQ-27 covers "no active plan"; only the zero-slots case is a spec gap; decide at T052).
+  2. The fallback line names "hoy" (REQ-15 default is today plus the week; the spec allows "hoy" as <periodo>).
+  3. Explicit "esta semana" gives the week line only (REQ-15: an explicit cue wins; same as water).
+  4. Singular at 1 is spec Copy.
+  5. Variants and bold are verbatim from the Copy.
+  6. Mid-week ranges count slots × days elapsed (REQ-14: future days are never counted; only "esta semana" is × 7). Add one line to the spec Copy at the next spec-change: a week-to-date is × 7, a month-to-date is × elapsed days (HANDOFF section 6).
+- e2e, written, NOT run (first run in Batch E): tests/e2e/assistant-progress.spec.ts (pinned-today meals row); tests/e2e/assistant-parity.spec.ts (chat week meals vs the fixture `expected` "D de 28 comidas (p%)"). Assumptions for Batch E to check: (a) `x-e2e-today` reaches the route through `testHooks()` with `E2E_HOOKS=1`; (b) the default plan has four slots (28 = 4 × 7); (c) `chatUserId()` is valid in the test; (d) the parity row compares the fixture `expected`, not the tile DOM (its title overclaims; LOW-2).
+- Carry-forwards (all LOW, non-blocking):
+  - **LOW-1 → T052:** state the `mealsDoneAnswer` returns-`undefined` contract; delete the redundant `?? pending("mealsDone")` (chat.ts:122); decide the zero-slots plan reply. PENDING in tests/unit/chat-answer.test.ts now holds only "¿Cuál es mi meta?" and "Mi avance de la semana" (owned by T046/T047, batch 3e). Placeholders left in chat.ts: dish did-you-mean/not-found (T048), clarify/ambiguous (T051/T052), goals and weekly (T047); T063 requires none left.
+  - **LOW-2 → Batch E:** the parity row titles for weight, exercise and meals say "equal the dashboard tile" but compare the fixture `expected`; retitle them or compare the tile DOM.
+  - **LOW-3 (optional rows):** assert the "Hoy llevas" variant's bold span; a row with another user's log to kill the `logLookup` user-scoping mutant; add the meals-done and weight answers to the sweep inputs.
+  - **LOW-5 (user ruling, non-blocking):** the percentage uses `Math.round` (the spec says only "whole-number %"), so 1463 of 1464 shows 100%. `Math.round` or `Math.floor`? (HANDOFF section 6.)
+  - **Open user rulings (non-blocking; record at the next spec-change and in HANDOFF section 6):** percentage rounding (LOW-5); the reply for a plan with zero slots; "¿Cuántas comidas hoy?" without llevo/hice resolves to meal times (spec-consistent per the Topics table; leave unless the user wants it changed).
+
+**Batch 3e: goals, weekly progress**, about 430 lines with tests. **In progress** (T046, T047).
 
 - [ ] T046 [US3] Tests REQ-21, REQ-22, REQ-16
   - Unit (tests/unit/chat-metrics.test.ts): REQ-21 bare goals, narrowed water goal, no active plan; a plan of 1 L → "Tu meta de agua es **4 vasos** (1 litro) al día."; 4 L → "**12 vasos** (4 litros)". REQ-22: 4 items / 3 without a weight change / no plan. `sweep()` over metric follow-ups ("Fijar mi meta"/"Subir mi plan" are links, excluded). Red first.
@@ -730,6 +753,7 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
 - [ ] T052 [US4] Clarify replies and the missing-data replies tested in T050 only (src/lib/domain/chat-meals.ts, src/lib/domain/chat-metrics.ts)
   - 1c2 review (M6), owned here: tests/e2e/assistant-api.spec.ts:117-118 ("¿Cuál es el objetivo de mi plan?" → "No tienes un plan activo.") and :307 use the old copy; rewrite to the spec Copy no-active-plan reply ("Aún no tienes…") for the topic each question resolves to.
   - 2a1 review (L2): tests/unit/chat-meals.test.ts:52 pins "No tienes un plan activo."; flip it to the spec Copy reply in the T050 red commit, and prefer asserting `sources` is `[]` over the exact old text.
+  - 3d2 review (LOW-1), owned here: `mealsDoneAnswer` returns `undefined` for no active plan, a deleted/inactive plan, or a plan with zero slots; state that contract, replace it with the spec Copy no-active-plan reply, delete the redundant `?? pending("mealsDone")` at chat.ts:122 (chat.ts:155 `BUILDERS[topic]?.() ?? pending(topic)` already covers it), and decide the zero-slots plan reply (spec gap; user ruling, HANDOFF section 6).
 
 **Checkpoint:** US4 code complete (REQ-23 to REQ-29), unit-green.
 
