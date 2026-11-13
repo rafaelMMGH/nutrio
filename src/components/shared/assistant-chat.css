@@ -1,6 +1,8 @@
 /* Assistant chat (shared): floating action button + panel anchored to the bottom-right corner */
 /* The light theme's --focus-ring is a pale brand tint (1.4:1 on white); rings here need 3:1, so light takes a darker brand step. */
 .assistant-fab, .assistant-chat { --assistant-focus: light-dark(var(--brand-600), var(--focus-ring)); }
+/* Opaque edges for the bubbles, avatar and buttons: the fills alone are under 3:1 against the log in places (spec REQ-32). The own-side edge is the fill in light and a lighter brand step in dark. */
+.assistant-chat { --assistant-edge: light-dark(var(--text-3), var(--field-line)); --assistant-own-edge: light-dark(var(--brand-fill), var(--brand-300)); }
 .assistant-fab {
   position: fixed;
   right: 24px;
@@ -67,26 +69,35 @@
 .assistant-chat-log { display: flex; flex: 1; flex-direction: column; gap: 10px; min-height: 0; padding: 16px; overflow-y: auto; }
 .assistant-chat-empty { display: grid; gap: 14px; margin-top: auto; }
 .assistant-chat-empty p { margin: 0; color: var(--text-muted); font-size: 14px; line-height: 1.45; }
-.assistant-chips { display: grid; gap: 8px; margin-top: 10px; }
+.assistant-chips, .assistant-actions { display: grid; gap: 8px; margin-top: 10px; }
 .assistant-chat-empty .assistant-chips { margin-top: 0; }
-.assistant-chips .assistant-suggestion { padding: 11px 14px; border: 1px solid var(--hairline); border-radius: 16px; background: var(--surface-raised); color: var(--text-1); font-size: 14px; font-weight: 500; text-align: left; cursor: pointer; }
-.assistant-chips .assistant-suggestion:hover:not(:disabled) { border-color: var(--brand-200); background: var(--brand-50); }
-.assistant-chips .assistant-suggestion:focus-visible { outline: 2px solid var(--assistant-focus); outline-offset: 2px; }
-.assistant-chips .assistant-suggestion:disabled { background: var(--pill); color: var(--text-2); cursor: default; }
-.assistant-turn { max-width: 90%; padding: 12px 14px; border-radius: 18px; font-size: 14px; line-height: 1.45; animation: assistant-fade-in 160ms ease-out; }
-.assistant-chips .assistant-suggestion { animation: assistant-fade-in 160ms ease-out; }
+/* The one button component (REQ-34): option, chip and link share the look; the variants differ in size and layout. aria-disabled, never native disabled, so the focus stop stays. */
+.assistant-button { display: flex; align-items: center; justify-content: space-between; gap: 8px; box-sizing: border-box; min-width: 0; min-height: 44px; padding: 10px 14px; border: 1px solid var(--assistant-edge); border-radius: 16px; background: var(--surface-raised); color: var(--text-1); font: inherit; font-size: 14px; font-weight: 500; line-height: 1.35; text-align: left; text-decoration: none; overflow-wrap: anywhere; cursor: pointer; animation: assistant-fade-in 160ms ease-out; }
+.assistant-button:hover:not([aria-disabled="true"]) { border-color: var(--brand-200); background: var(--brand-50); }
+.assistant-button:focus-visible { outline: 2px solid var(--assistant-focus); outline-offset: 2px; }
+.assistant-button[aria-disabled="true"] { background: var(--pill); color: var(--text-2); cursor: default; }
+/* A long option label wraps and the button grows: no fixed height, no ellipsis. */
+.assistant-button[data-variant="option"] { width: 100%; white-space: normal; }
+.assistant-button[data-variant="chip"] { border-radius: 22px; }
+.assistant-button.assistant-button[data-variant="link"] svg { flex: none; color: var(--brand-text); }
+.assistant-turn { display: grid; grid-template-columns: minmax(0, 1fr); font-size: 14px; line-height: 1.45; animation: assistant-fade-in 160ms ease-out; }
 @keyframes assistant-fade-in { from { opacity: 0; } }
+/* The turn is the full-width row; the bubble carries the look (REQ-32). */
+.assistant-bubble { min-width: 0; padding: 12px 14px; border: 1px solid transparent; border-radius: 18px; overflow-wrap: anywhere; word-break: break-word; }
 /* The global `p` rule paints paragraphs muted; turn text takes the bubble's color instead. */
 .assistant-turn p { margin: 0; color: inherit; white-space: pre-wrap; overflow-wrap: anywhere; }
 .assistant-turn:focus-visible { outline: 2px solid var(--assistant-focus); outline-offset: 2px; }
-.assistant-turn.user { align-self: flex-end; max-width: 80%; border-bottom-right-radius: 6px; background: var(--brand-fill); color: var(--on-brand); }
-.assistant-turn.assistant { align-self: flex-start; border-bottom-left-radius: 6px; background: var(--canvas); color: var(--text-1); }
-.assistant-turn-head { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; color: var(--text-2); }
+.assistant-turn.user { justify-items: end; }
+.assistant-turn.user .assistant-bubble { max-width: 80%; border-color: var(--assistant-own-edge); border-bottom-right-radius: 6px; background: var(--brand-fill); color: var(--on-brand); }
+/* Assistant row: the avatar column, then the bubble and whatever follows it (retry, answer-level chips) in the second column. */
+.assistant-turn.assistant { grid-template-columns: 32px minmax(0, 1fr); column-gap: 8px; }
+.assistant-turn.assistant > :not(.assistant-avatar) { grid-column: 2; }
+.assistant-turn.assistant > .assistant-bubble { grid-row: 1; border-color: var(--assistant-edge); border-bottom-left-radius: 6px; background: var(--canvas); color: var(--text-1); }
+.assistant-avatar { grid-column: 1; grid-row: 1; display: grid; place-items: center; box-sizing: border-box; width: 32px; height: 32px; border: 1px solid var(--assistant-own-edge); border-radius: 50%; background: var(--brand-fill); color: var(--on-brand); }
 .assistant-turn-live { display: grid; gap: 8px; overflow-wrap: anywhere; }
 .assistant-turn-block { display: grid; gap: 8px; }
 .assistant-turn-block-title { margin: 0; font-size: 15px; font-weight: 700; }
-.assistant-turn-block .assistant-chips { margin-top: 0; }
-.assistant-chips .assistant-link { display: block; text-decoration: none; }
+.assistant-actions { margin-top: 8px; }
 .assistant-turn-section h4 { margin: 0 0 2px; color: var(--text-2); font-size: 13px; font-weight: 700; }
 .assistant-turn-section ul { margin: 0; padding-left: 18px; list-style: disc; }
 .assistant-turn-section li { padding: 1px 0; }
@@ -97,7 +108,7 @@
 .assistant-loader { font-weight: 500; animation: assistant-loader-blink 2s ease-in-out infinite; }
 @keyframes assistant-loader-blink { 0%, 100% { color: var(--text-1); } 50% { color: var(--text-2); } }
 @media (prefers-reduced-motion: reduce) { .assistant-loader { animation: none; } }
-.assistant-retry { display: inline-flex; align-items: center; gap: 6px; margin-top: 8px; padding: 6px 12px; border: 1px solid var(--hairline); border-radius: 999px; background: var(--surface-raised); color: var(--text-1); font-size: 13px; font-weight: 600; cursor: pointer; }
+.assistant-retry { display: inline-flex; justify-self: start; align-items: center; gap: 6px; margin-top: 8px; padding: 6px 12px; border: 1px solid var(--hairline); border-radius: 999px; background: var(--surface-raised); color: var(--text-1); font-size: 13px; font-weight: 600; cursor: pointer; }
 .assistant-retry:hover { border-color: var(--brand-200); background: var(--brand-50); }
 .assistant-retry:focus-visible { outline: 2px solid var(--assistant-focus); outline-offset: 2px; }
 .assistant-composer { margin: 0 14px 14px; }
@@ -118,12 +129,12 @@
 .assistant-scroll:focus-visible { outline: 2px solid var(--assistant-focus); outline-offset: 2px; }
 @media (prefers-reduced-motion: reduce) { .assistant-scroll, .assistant-scroll.visible { transition: none; } }
 @media (prefers-reduced-motion: reduce) {
-  .assistant-turn, .assistant-chips .assistant-suggestion { animation: none; }
+  .assistant-turn, .assistant-button { animation: none; }
   .assistant-chat-form button { transition: none; }
 }
 /* Forced colors drops the fills that tell the two speakers apart and frame the field: keep an edge on them. */
 @media (forced-colors: active) {
-  .assistant-turn { border: 1px solid CanvasText; }
+  .assistant-bubble, .assistant-avatar { border: 1px solid CanvasText; }
   .assistant-turn strong { font-weight: 700; text-decoration: underline; }
   .assistant-chat-form { border-color: CanvasText; }
   .assistant-chat-form:focus-within { border-color: Highlight; }
@@ -153,7 +164,6 @@
   }
   .assistant-chat-close { width: 44px; height: 44px; }
   .assistant-chat-new { min-height: 44px; padding-block: 0; }
-  .assistant-chips .assistant-suggestion { min-height: 44px; }
   .assistant-retry { min-height: 44px; }
   .assistant-scroll { width: 44px; height: 44px; }
   .assistant-chat-form button { width: 44px; height: 44px; }

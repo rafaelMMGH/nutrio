@@ -331,7 +331,7 @@ test.describe("REQ-17: turns and the live region", () => {
     await expect(ui.assistantTurns).toHaveCount(1);
     await expect(ui.panel.getByRole("article", { name: "Tú", exact: true })).toHaveCount(1);
     await expect(ui.panel.getByRole("article", { name: "Asistente", exact: true })).toHaveCount(1);
-    const icon = ui.assistantTurns.locator(".assistant-turn-head svg");
+    const icon = ui.assistantTurns.locator(".assistant-avatar svg");
     await expect(icon).toHaveCount(1);
     await expect(icon).toHaveAttribute("aria-hidden", "true");
   });
