@@ -130,18 +130,23 @@ export function clampPeriod(period: Period, today: string): { period: Period; cl
   return { period: { ...period, to }, clamped: false };
 }
 
+/** "<wd> <d> <mon>" with the parts asked for; a date outside today's year always names its month and year. */
+function formatDate(key: string, today: string, withWeekday: boolean, withMonth: boolean): string {
+  const [dayNumber, month] = [Number(key.slice(8, 10)), MONTH_ABBREVIATIONS[Number(key.slice(5, 7)) - 1]];
+  const foreignYear = key.slice(0, 4) !== today.slice(0, 4);
+  const parts = [withWeekday ? WEEKDAY_ABBREVIATIONS[weekdayIndex(key)] : undefined, dayNumber, withMonth || foreignYear ? month : undefined, foreignYear ? key.slice(0, 4) : undefined];
+  return parts.filter((part) => part !== undefined).join(" ");
+}
+
+/** A day as "26 oct" ("30 dic 2025" outside today's year), for answers that name a record's date. */
+export const dateLabel = (key: string, today: string) => formatDate(key, today, false, true);
+
 /** REQ-14 label: "Ayer (mar 27 oct)", "Esta semana (lun 26 – hoy)", "Últimos 8 días (21 oct – hoy)". */
 export function periodLabel(period: Period, today: string): string {
-  const year = today.slice(0, 4);
   const short = spanDays(period) <= 7;
   // A short range that crosses a year boundary names its months, so "dom 4" is never ambiguous.
   const withMonth = !short || period.from.slice(0, 4) !== period.to.slice(0, 4);
-  const date = (key: string, withWeekday: boolean, withMonth: boolean) => {
-    const [dayNumber, month] = [Number(key.slice(8, 10)), MONTH_ABBREVIATIONS[Number(key.slice(5, 7)) - 1]];
-    const foreignYear = key.slice(0, 4) !== year;
-    const parts = [withWeekday ? WEEKDAY_ABBREVIATIONS[weekdayIndex(key)] : undefined, dayNumber, withMonth || foreignYear ? month : undefined, foreignYear ? key.slice(0, 4) : undefined];
-    return parts.filter((part) => part !== undefined).join(" ");
-  };
+  const date = (key: string, withWeekday: boolean, withMonth: boolean) => formatDate(key, today, withWeekday, withMonth);
   const single = (title: string) => `${title} (${date(period.from, true, true)})`;
   const range = (title: string) => `${title} (${date(period.from, short, withMonth)} – ${period.to === today ? "hoy" : date(period.to, short, withMonth)})`;
   switch (period.kind) {

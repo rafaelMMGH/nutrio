@@ -279,8 +279,9 @@ test("REQ-14 a date cue with no phrase gives the fallback line naming the last r
 
 test("REQ-28 questions hitting different weight lead variants show identical numbers, deterministic per question", () => {
   const logs = kilos(["2026-10-27", 66]);
-  const [first, second] = [weightReply("Mi peso", logs).answer, weightReply("¿Cuál es mi peso?", logs).answer];
-  assert.deepEqual([first, second].sort(), ["Tu registro más reciente es 66 kg (27 oct). No has fijado meta de peso.", "Tu último peso es 66 kg (27 oct). No has fijado meta de peso."]);
-  assert.equal(weightReply("Mi peso", logs).answer, first);
-  assert.equal(weightReply("¿Cuál es mi peso?", logs).answer, second);
+  const [last, recent] = [weightReply("Mi peso", logs).answer, weightReply("¿Cuál es mi peso?", logs).answer];
+  assert.equal(last, "Tu último peso es 66 kg (27 oct). No has fijado meta de peso.");
+  assert.equal(recent, "Tu registro más reciente es 66 kg (27 oct). No has fijado meta de peso.");
+  assert.equal(weightReply("Mi peso", logs).answer, last);
+  assert.equal(weightReply("¿Cuál es mi peso?", logs).answer, recent);
 });
