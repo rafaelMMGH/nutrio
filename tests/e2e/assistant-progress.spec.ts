@@ -1,4 +1,4 @@
-import { ask, createChatUser, deleteChatUser, expect, seedLogs, setGoals, test } from "./assistant-helpers";
+import { ask, chatUserId, createChatUser, deleteChatUser, expect, seedLogs, seedPlan, setGoals, test } from "./assistant-helpers";
 
 // REQ-13 (the date pin) and REQ-14 (periods) through POST /api/rag/chat as a seeded user. Written, not run, until Batch E.
 
@@ -67,4 +67,16 @@ test("REQ-27 no weight logs: the empty state with its button, and no weight goal
   const noGoal = await ask(chatContext.request, "Mi peso", { today: "2026-10-28" });
   expect(noGoal.body.answer).toContain("No has fijado meta de peso.");
   expect(noGoal.body.blocks[0].buttons).toEqual([{ type: "link", label: "Fijar mi meta", href: "/" }]);
+});
+
+test("REQ-20 the meals answer follows the pinned today: today, the week against slots × 7, a past day and an empty day", async ({ chatContext }) => {
+  seedPlan({ times: "all", fixture: true });
+  const slot = (position: number) => `${chatUserId()}-plan-v1-meal-${position}`;
+  seedLogs([{ date: "2026-10-27", meals_done: [slot(0), slot(1), slot(2)] }, { date: "2026-10-28", meals_done: [slot(0)] }]);
+  const week = await ask(chatContext.request, "¿Cuántas comidas llevo?", { today: "2026-10-28" });
+  expect(week.body.answer).toMatch(/^(Hoy llevas|Hoy has hecho) 1 de 4 comidas\. Esta semana \(lun 26 – hoy\): 4 de 28 comidas \(14%\)\.$/);
+  const yesterday = await ask(chatContext.request, "¿Cuántas comidas hice ayer?", { today: "2026-10-28" });
+  expect(yesterday.body.answer).toBe("Ayer (mar 27 oct): 3 de 4 comidas (75%).");
+  const monday = await ask(chatContext.request, "¿Cuántas comidas hice el lunes?", { today: "2026-10-28" });
+  expect(monday.body.answer).toBe("El lunes (lun 26 oct): 0 de 4 comidas (0%).");
 });
