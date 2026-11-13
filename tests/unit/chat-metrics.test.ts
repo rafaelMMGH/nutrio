@@ -230,6 +230,10 @@ test("REQ-19 'meta alcanzada' once the progress from the first weight reaches 10
   assert.match(weight("Mi peso", kilos(["2026-10-01", 70], ["2026-10-27", 65.1]), 65), /Te faltan 0.1 kg para tu meta de 65 kg\./);
 });
 
+test("REQ-19 just short of the goal (progress 99.92%) is not 'meta alcanzada': the distance shows even when it rounds to 0 (current behavior)", () => {
+  assert.equal(weight("Mi peso", kilos(["2026-10-01", 100], ["2026-10-27", 50.04]), 50), "Tu último peso es 50 kg (27 oct). Te faltan 0 kg para tu meta de 50 kg. Esta semana bajaste 50 kg.");
+});
+
 test("REQ-19 no goal: the 'no goal' line and the 'Fijar mi meta' button", () => {
   const reply = weightReply("Mi peso", kilos(["2026-10-27", 66]));
   assert.equal(weight("Mi peso", kilos(["2026-10-27", 66])), "Tu último peso es 66 kg (27 oct). No has fijado meta de peso.");
