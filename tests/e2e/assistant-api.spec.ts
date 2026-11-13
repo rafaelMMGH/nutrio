@@ -234,21 +234,15 @@ test.describe("builders", () => {
     expect(body.answer).not.toContain("Recomendaciones");
   });
 
-  test("REQ-1 a plan with zero meals omits the Comidas section in the plan answer, and the slot-time and schedule answers say the plan has none", async ({ chatContext }) => {
+  test("REQ-27 a plan with zero meals is no plan: the plan, slot-time and schedule answers say so, with 'Subir mi plan' only", async ({ chatContext }) => {
     seedPlan({ times: "all", meals: [] });
-    const plan = await answer(chatContext, "¿Cuál es mi plan?");
-    expect(plainOf(plan.blocks[0].lead)).toBe(`Tu objetivo: ${OBJECTIVE}`);
-    expect(plan.blocks[0].sections).toEqual([]);
-    expect(plan.answer).toBe(`Tu objetivo: ${OBJECTIVE}`);
-
-    const times = await answer(chatContext, "¿A qué hora es mi comida?");
-    expect(plainOf(times.blocks[0].lead)).toBe("Tu plan no tiene comida.");
-    expect(times.blocks[0].sections).toEqual([]);
-    expect(times.answer).not.toContain("Comidas");
-
-    const schedule = await answer(chatContext, "¿Cuál es mi horario?");
-    expect(plainOf(schedule.blocks[0].lead)).toBe("Tu plan no tiene horarios para tus comidas.");
-    expect(schedule.blocks[0].sections).toEqual([]);
+    for (const message of ["¿Cuál es mi plan?", "¿A qué hora es mi comida?", "¿Cuál es mi horario?"]) {
+      const body = await answer(chatContext, message);
+      expect(plainOf(body.blocks[0].lead), message).toBe("Aún no tienes un plan activo.");
+      expect(body.blocks[0].sections, message).toEqual([]);
+      expect(body.blocks[0].buttons, message).toEqual([{ type: "link", label: "Subir mi plan", href: "/plans" }]);
+      expect(body.buttons, message).toEqual([]);
+    }
   });
 
   test("REQ-1 a plan with no supplements says so", async ({ chatContext }) => {
