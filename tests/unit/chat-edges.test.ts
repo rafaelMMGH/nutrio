@@ -428,18 +428,21 @@ for (const [name, options, tweak] of WITHOUT_PLAN) {
       assert.equal(reply.answer, NO_PLAN, message);
       assert.deepEqual(reply.blocks[0].sections, [], message);
       assert.deepEqual(reply.blocks[0].buttons, [NO_PLAN_LINK], message);
+      assert.deepEqual(reply.buttons, [], message);
       assert.deepEqual(reply.sources, [], message);
     }
   });
 }
 
-test("REQ-27 a no-plan answer about a slot offers the other question about that slot; one about all the times keeps the topic's follow-ups", () => {
+test("REQ-27 the no-plan reply has no follow-up buttons, whatever the topic: 'Subir mi plan' is the only button", () => {
   const noPlan = (db: AppDb) => { db.plans = []; };
-  assert.deepEqual(messages(askIn("¿Qué puedo cenar?", undefined, noPlan)), ["¿A qué hora es mi cena?"]);
-  assert.deepEqual(messages(askIn("¿Qué puedo tomar de colación?", undefined, noPlan)), ["¿A qué hora es mi colación?"]);
-  assert.deepEqual(messages(askIn("¿A qué hora es mi cena?", undefined, noPlan)), ["¿Cuál es mi cena?"]);
-  assert.deepEqual(messages(askIn("¿Cuál es mi horario?", undefined, noPlan)), ["Mi cena de hoy", "Mi carrito"]);
-  assert.deepEqual(messages(askIn("¿Cuántas comidas llevo?", undefined, noPlan)), ["¿Cuánta agua llevo?", "Mi cena de hoy"]);
+  for (const message of ["¿Qué puedo cenar?", "¿Qué puedo tomar de colación?", "¿A qué hora es mi cena?", "¿Cuál es mi horario?", "¿Cuántas comidas llevo?", "¿Cuál es mi plan?", "¿Qué suplementos tomo?"]) {
+    assert.deepEqual(messages(askIn(message, undefined, noPlan)), [], message);
+  }
+  // A no-plan block that ends a 2-block answer brings no follow-ups either, and the blocks keep their titles.
+  const beside = askIn("mi peso y qué puedo desayunar", undefined, noPlan);
+  assert.deepEqual(titles(beside), ["Peso", "Desayuno"]);
+  assert.deepEqual(messages(beside), []);
 });
 
 test("REQ-24 REQ-27 no-plan slot blocks beside another block are titled, and 'Subir mi plan' shows once", () => {

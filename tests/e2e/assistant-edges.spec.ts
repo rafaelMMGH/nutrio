@@ -110,13 +110,13 @@ test("REQ-9 an option's detail offers its slot's time beside 'Ver receta complet
   await resendSweep(chatContext.request, [body]);
 });
 
-test("REQ-27 with no active plan a slot question says so, with 'Subir mi plan' and the time as a follow-up", async ({ chatContext }) => {
+test("REQ-27 with no active plan a slot question says so, with 'Subir mi plan' as its only button", async ({ chatContext }) => {
   clearPlan();
   const { body } = await ask(chatContext.request, "¿Qué puedo cenar?");
   expect(body.kind).toBe("answer");
   expect(body.answer).toBe("Aún no tienes un plan activo.");
   expect(links(body.blocks)).toEqual([{ type: "link", label: "Subir mi plan", href: "/plans" }]);
-  expect(messages(body.buttons)).toEqual(["¿A qué hora es mi cena?"]);
+  expect(body.buttons).toEqual([]);
   expect(body.sources).toEqual([]);
 });
 
