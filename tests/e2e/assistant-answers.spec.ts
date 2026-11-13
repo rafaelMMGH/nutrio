@@ -2,7 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expectIssues } from "./fixtures";
 import { auditNow, visit } from "./theme-audit";
 import { contrast, effectiveBackground, toRgb } from "./theme-helpers";
-import { NO_MATCH_ANSWER, NO_MATCH_LEAD, assistantUi, buildAnswer, cartAnswer, createChatUser, deleteChatUser, expect, mockChat, openAssistant, seedPlan, test } from "./assistant-helpers";
+import { NO_MATCH_ANSWER, NO_MATCH_LEAD_TEXT, assistantUi, buildAnswer, cartAnswer, createChatUser, deleteChatUser, expect, mockChat, openAssistant, seedPlan, test } from "./assistant-helpers";
 
 // UI tests of what an answer turn shows. Spec assistant-chat-polish: the structured content of a turn (REQ-2, REQ-3,
 // REQ-18 UI) and the error copy (REQ-8, REQ-23). There are no scopes (assistant-data-scope REQ-4), so nothing here
@@ -109,7 +109,7 @@ test.describe("REQ-2, REQ-3, REQ-18: an answer shows exactly its structure", () 
 
     const noMatch = await answerTurn(chat, NO_MATCH_ANSWER);
     await expect(noMatch).not.toContainText("Basado en");
-    await expect(noMatch.getByRole("paragraph")).toHaveText([NO_MATCH_LEAD]);
+    await expect(noMatch.getByRole("paragraph")).toHaveText([NO_MATCH_LEAD_TEXT]);
     await expect(noMatch.getByRole("button")).toHaveText(["Mi cena de hoy", "Mi avance de la semana", "Mi peso", "Mi carrito"]);
   });
 

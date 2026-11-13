@@ -419,10 +419,10 @@ export function buildAnswer(parts: { kind?: ChatAnswer["kind"]; lead: Rich; sect
 }
 
 /** The "no match" reply (spec Copy): its lead and the 4 starters as question buttons. */
-export const NO_MATCH_LEAD = "No entendí tu pregunta. Puedo ayudarte con:";
+export const NO_MATCH_LEAD_TEXT = "No entendí tu pregunta. Puedo ayudarte con:";
 export const NO_MATCH_ANSWER = buildAnswer({
   kind: "no_match",
-  lead: [{ text: NO_MATCH_LEAD }],
+  lead: [{ text: NO_MATCH_LEAD_TEXT }],
   buttons: ["Mi cena de hoy", "Mi avance de la semana", "Mi peso", "Mi carrito"].map(question)
 });
 

@@ -3,7 +3,7 @@ import { test } from "node:test";
 import type { Block, ChatAnswer } from "@/lib/assistant";
 import { ragAnswer, recipeList } from "@/lib/domain/chat";
 import { isGeneric } from "@/lib/domain/chat-dish";
-import { NO_MATCH_LEAD } from "../shared/assistant-copy";
+import { GREETINGS, NO_MATCH_LEAD, THANKS } from "../shared/assistant-copy";
 import { memDb, sweep } from "./memdb";
 
 // The answer path of the chat over in-memory data (plan D10): the same ragAnswer the route calls, with today passed in.
@@ -53,10 +53,10 @@ test("a greeting answers with a greeting kind and the four starters; greetings a
   const hello = ragAnswer(db, user, "¡Hola!", TODAY);
   assert.equal(hello.kind, "greeting");
   assert.deepEqual(messagesOf(hello.buttons), STARTERS);
-  assert.ok(["¡Hola! ¿En qué te ayudo?", "¡Hola! ¿Qué quieres saber?", "¡Hola! Pregúntame por tu plan, tu avance o tu carrito."].includes(hello.answer), hello.answer);
+  assert.ok(GREETINGS.includes(hello.answer), hello.answer);
   const thanks = ragAnswer(db, user, "gracias", TODAY);
   assert.equal(thanks.kind, "greeting");
-  assert.ok(["¡Con gusto!", "¡De nada!", "Para eso estoy."].includes(thanks.answer), thanks.answer);
+  assert.ok(THANKS.includes(thanks.answer), thanks.answer);
 });
 
 test("a question with no topic is no_match with the lead, the four starters and no sources", () => {

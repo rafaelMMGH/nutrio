@@ -172,7 +172,7 @@ test("REQ-29 a question with no dish cue is ranked as a phrase: did-you-mean wit
   }
 });
 
-test("REQ-5 the did-you-mean buttons of both replies open that recipe's detail, and the not-found follow-ups resolve", () => {
+test("REQ-5 the did-you-mean buttons of both replies and the not-found follow-ups are swept and resolve", () => {
   const { db, user } = memDb();
   const answers = ["¿Qué lleva el pollo?", "pollo atún ensalada", "¿Qué lleva la pizza?"].map((message) => ragAnswer(db, user, message, TODAY));
   const swept = sweep(db, user, answers, TODAY);
