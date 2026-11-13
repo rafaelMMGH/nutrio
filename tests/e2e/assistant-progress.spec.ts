@@ -80,3 +80,15 @@ test("REQ-20 the meals answer follows the pinned today: today, the week against 
   const monday = await ask(chatContext.request, "¿Cuántas comidas hice el lunes?", { today: "2026-10-28" });
   expect(monday.body.answer).toBe("El lunes (lun 26 oct): 0 de 4 comidas (0%).");
 });
+
+test("REQ-21 REQ-22 goals and weekly progress through ask(): one block each, the weekly label follows the pinned today", async ({ chatContext }) => {
+  seedPlan({ times: "all", fixture: true });
+  seedLogs([{ date: "2026-10-20", weight_kg: 66.6 }, { date: "2026-10-26", weight_kg: 66.2, exercised: true, water_glasses: 8 }]);
+  setGoals({ weight: 63, days: 4 });
+  const goals = await ask(chatContext.request, "¿Cuál es mi meta?", { today: "2026-10-28" });
+  expect(goals.body.kind).toBe("answer");
+  expect(goals.body.answer).toContain("Estas son tus metas:");
+  expect(goals.body.answer).toContain("Peso: 63 kg\nEjercicio: 4 días por semana\nAgua: 8 vasos (2 litros) al día");
+  const weekly = await ask(chatContext.request, "Mi avance de la semana", { today: "2026-10-28" });
+  expect(weekly.body.answer).toBe("Tu avance de esta semana (lun 26 – hoy):\nAvance\nEjercicio: 1 de 4 días\nAgua: 2 litros\nComidas: 0 de 28\nPeso: bajaste 0.4 kg");
+});

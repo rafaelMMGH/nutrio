@@ -65,7 +65,7 @@ async function answer(chatContext: BrowserContext, message: string) {
 
 test.describe("plan summary", () => {
   test("REQ-6 a plan-topic question returns the plan summary", async ({ chatContext }) => {
-    const body = await answer(chatContext, "¿Cuál es mi objetivo?");
+    const body = await answer(chatContext, "¿Cuál es mi plan?");
     expect(body.answer).toContain(OBJECTIVE);
   });
 });
@@ -196,7 +196,7 @@ test.describe("builders", () => {
   });
 
   test("REQ-1 the plan lists the meals, plus supplements and recommendations only when the question names them", async ({ chatContext }) => {
-    const plain = await answer(chatContext, "¿Cuál es mi objetivo?");
+    const plain = await answer(chatContext, "¿Cuál es mi plan?");
     expect(plainOf(plain.blocks[0].lead)).toBe(`Tu objetivo: ${OBJECTIVE}`);
     expect(plain.blocks[0].sections.map((section) => section.title)).toEqual(["Comidas"]);
     expect(items(plain, "Comidas")).toEqual(MEALS);
@@ -234,7 +234,7 @@ test.describe("builders", () => {
 
   test("REQ-1 a plan with zero meals omits the Comidas section in the plan answer, and the slot-time and schedule answers say the plan has none", async ({ chatContext }) => {
     seedPlan({ times: "all", meals: [] });
-    const plan = await answer(chatContext, "¿Cuál es mi objetivo?");
+    const plan = await answer(chatContext, "¿Cuál es mi plan?");
     expect(plainOf(plan.blocks[0].lead)).toBe(`Tu objetivo: ${OBJECTIVE}`);
     expect(plan.blocks[0].sections).toEqual([]);
     expect(plan.answer).toBe(`Tu objetivo: ${OBJECTIVE}`);
@@ -261,7 +261,7 @@ test.describe("builders", () => {
       return body.sources;
     };
     expect(await sourcesOf("¿Qué hay en mi carrito?")).toEqual(["Carrito actual"]);
-    expect(await sourcesOf("¿Cuál es mi objetivo?")).toEqual([`Plan activo: ${PLAN_NAME}`]);
+    expect(await sourcesOf("¿Cuál es mi plan?")).toEqual([`Plan activo: ${PLAN_NAME}`]);
     expect(await sourcesOf("¿A qué hora es la cena?")).toEqual([`Plan activo: ${PLAN_NAME}`]);
     expect(await sourcesOf("¿Qué recetas hay en mi plan?")).toEqual(["Recetario"]);
 
@@ -273,7 +273,7 @@ test.describe("builders", () => {
     clearPlan();
     seedRecipes([]);
     expect(await sourcesOf("¿Qué hay en mi carrito?")).toEqual([]);
-    expect(await sourcesOf("¿Cuál es mi objetivo?")).toEqual([]);
+    expect(await sourcesOf("¿Cuál es mi plan?")).toEqual([]);
     expect(await sourcesOf("¿A qué hora es la cena?")).toEqual([]);
   });
 

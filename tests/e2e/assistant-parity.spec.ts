@@ -102,3 +102,33 @@ test("the chat's week meals equal the dashboard tile under the same today", asyn
   const percent = Math.round((expected.weekMeals / expected.weekMealsGoal) * 100);
   expect(body.answer).toContain(`${expected.weekMeals} de ${expected.weekMealsGoal} comidas (${percent}%)`);
 });
+
+test("the chat's weekly progress items equal the dashboard tiles under the same today", async ({ chatContext }) => {
+  const today = mexicoCityToday();
+  const { logs, weightGoal, exerciseGoalDays, expected } = parityLogs(mondayOf(today));
+  seedPlan({ times: "all", fixture: true });
+  seedLogs(logs.map((log) => ({ ...log, meals_done: log.meals_done?.map(seededId) })));
+  setGoals({ weight: weightGoal, days: exerciseGoalDays });
+
+  const { body } = await ask(chatContext.request, "Mi avance de la semana", { today });
+  const week = Math.round(expected.weekWaterLiters * 10) / 10;
+  expect(body.blocks[0].sections[0].items.map((item: { text: string }[]) => item.map((span) => span.text).join(""))).toEqual([
+    `Ejercicio: ${expected.weekExerciseDays} de ${exerciseGoalDays} días`,
+    `Agua: ${week} ${week === 1 ? "litro" : "litros"}`,
+    `Comidas: ${expected.weekMeals} de ${expected.weekMealsGoal}`,
+    `Peso: bajaste ${Math.abs(expected.weight.change)} kg`
+  ]);
+});
+
+test("the chat's goals equal the dashboard's exercise and water goals", async ({ chatContext }) => {
+  const today = mexicoCityToday();
+  const { weightGoal, exerciseGoalDays, expected } = parityLogs(mondayOf(today));
+  seedPlan({ times: "all", fixture: true });
+  setGoals({ weight: weightGoal, days: exerciseGoalDays });
+
+  const { body } = await ask(chatContext.request, "¿Cuál es mi meta?", { today });
+  expect(body.answer).toContain(`Peso: ${weightGoal} kg`);
+  expect(body.answer).toContain(`Ejercicio: ${exerciseGoalDays} días por semana`);
+  // The dashboard's weekly water goal is the daily goal times seven.
+  expect(body.answer).toContain(`Agua: ${expected.weekWaterGoalLiters / 7 / 0.25} vasos`);
+});
