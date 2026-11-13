@@ -174,3 +174,113 @@ test("REQ-28 questions hitting different exercise lead variants show identical n
 test("REQ-18 the exercise goal is the user's setting", () => {
   assert.match(exercise("¿Cuánto ejercicio llevo?", [], 6), /llevas 0 de 6 días de ejercicio\. Te faltan 6 días\.$/);
 });
+
+// Weight (REQ-19, REQ-27): today is Wed 2026-10-28, the week started Mon 26.
+
+const kilos = (...entries: [string, number][]): SeedLog[] => entries.map(([date, weight_kg]) => ({ date, weight_kg }));
+const weightReply = (message: string, logs: SeedLog[] = [], goal: number | null = null) => {
+  const { db, user } = memDb({ logs, goals: { weight: goal } });
+  return ragAnswer(db, user, message, TODAY);
+};
+/** The "Tu registro más reciente es" variant (REQ-28) reads the same numbers: compare through "Tu último peso es". */
+const weight = (message: string, logs?: SeedLog[], goal?: number | null) => weightReply(message, logs, goal).answer.replace("Tu registro más reciente es", "Tu último peso es");
+const linksOf = (reply: ChatAnswer) => reply.blocks[0].buttons.map((button) => (button.type === "link" ? [button.label, button.href] : [button.label]));
+
+test("REQ-19 the latest weight, the distance to the goal and the week change, with only number and unit bold", () => {
+  const reply = weightReply("Mi peso", kilos(["2026-10-20", 66.6], ["2026-10-26", 66.2]), 63);
+  assert.equal(reply.answer.replace("Tu registro más reciente es", "Tu último peso es"), "Tu último peso es 66.2 kg (26 oct). Te faltan 3.2 kg para tu meta de 63 kg. Esta semana bajaste 0.4 kg.");
+  assert.deepEqual(highlights(reply), ["66.2 kg", "3.2 kg", "0.4 kg"]);
+  assert.match(weight("Mi peso", kilos(["2026-10-20", 66], ["2026-10-27", 66.5]), 63), /Te faltan 3.5 kg para tu meta de 63 kg\. Esta semana subiste 0.5 kg\.$/);
+});
+
+test("REQ-19 the latest weight is the newest record up to today; a later log is ignored (REQ-13)", () => {
+  assert.match(weight("Mi peso", kilos(["2026-10-27", 66], ["2026-10-29", 60])), /^Tu último peso es 66 kg \(27 oct\)\./);
+});
+
+test("REQ-19 no week line without a record this week or without one before Monday", () => {
+  assert.doesNotMatch(weight("Mi peso", kilos(["2026-10-20", 67], ["2026-10-25", 66]), 63), /Esta semana/);
+  assert.doesNotMatch(weight("Mi peso", kilos(["2026-10-27", 66]), 63), /Esta semana/);
+});
+
+test("REQ-19 'sin cambio' for a zero change, bold, only with a record this week", () => {
+  const reply = weightReply("Mi peso", kilos(["2026-10-20", 66.6], ["2026-10-27", 66.6]), 63);
+  assert.match(reply.answer, /Esta semana: sin cambio\.$/);
+  assert.deepEqual(highlights(reply), ["66.6 kg", "3.6 kg", "sin cambio"]);
+  assert.doesNotMatch(weight("Mi peso", kilos(["2026-10-20", 66.6], ["2026-10-25", 66.6]), 63), /sin cambio/);
+});
+
+test("REQ-19 'meta alcanzada' once the progress from the first weight reaches 100%, losing or gaining", () => {
+  assert.match(weight("Mi peso", kilos(["2026-10-01", 70], ["2026-10-27", 64.5]), 65), /\(27 oct\)\. ¡Ya alcanzaste tu meta de 65 kg!/);
+  assert.match(weight("Mi peso", kilos(["2026-10-01", 70], ["2026-10-27", 65]), 65), /¡Ya alcanzaste tu meta de 65 kg!/);
+  assert.match(weight("Mi peso", kilos(["2026-10-01", 60], ["2026-10-27", 66]), 65), /¡Ya alcanzaste tu meta de 65 kg!/);
+  assert.match(weight("Mi peso", kilos(["2026-10-01", 70], ["2026-10-27", 65.1]), 65), /Te faltan 0.1 kg para tu meta de 65 kg\./);
+});
+
+test("REQ-19 no goal: the 'no goal' line and the 'Fijar mi meta' button", () => {
+  const reply = weightReply("Mi peso", kilos(["2026-10-27", 66]));
+  assert.equal(weight("Mi peso", kilos(["2026-10-27", 66])), "Tu último peso es 66 kg (27 oct). No has fijado meta de peso.");
+  assert.deepEqual(linksOf(reply), [["Fijar mi meta", "/"]]);
+  assert.deepEqual(linksOf(weightReply("Mi peso", kilos(["2026-10-27", 66]), 63)), []);
+});
+
+test("REQ-19 a last record over 7 days old adds the age line and 'Registrar mi peso'; 7 days does not", () => {
+  const old = weightReply("Mi peso", kilos(["2026-10-15", 66]), 63);
+  assert.match(old.answer, /Te faltan 3 kg para tu meta de 63 kg\. Tu último registro fue hace 13 días\.$/);
+  assert.deepEqual(linksOf(old), [["Registrar mi peso", "/"]]);
+  assert.match(weight("Mi peso", kilos(["2026-10-20", 66]), 63), /hace 8 días\.$/);
+  assert.doesNotMatch(weight("Mi peso", kilos(["2026-10-21", 66]), 63), /hace/);
+  assert.deepEqual(linksOf(weightReply("Mi peso", kilos(["2026-10-15", 66]))), [["Fijar mi meta", "/"], ["Registrar mi peso", "/"]]);
+});
+
+test("REQ-14 a date outside today's year adds its year", () => {
+  assert.match(weight("Mi peso", kilos(["2025-12-30", 66]), 63), /^Tu último peso es 66 kg \(30 dic 2025\)\./);
+});
+
+test("REQ-19 a range: first and last weights, the change, the minimum and the maximum", () => {
+  const logs = kilos(["2026-10-21", 70], ["2026-10-23", 66], ["2026-10-25", 64.9], ["2026-10-28", 65.2], ["2026-10-29", 50]);
+  const reply = weightReply("peso de los últimos 7 días", logs);
+  assert.equal(reply.answer, "Últimos 7 días (jue 22 – hoy): empezaste en 66 kg y terminaste en 65.2 kg (bajaste 0.8 kg; mínimo 64.9 kg, máximo 66 kg).");
+  assert.deepEqual(highlights(reply), ["66 kg", "65.2 kg"]);
+  assert.match(weight("peso de los últimos 7 días", kilos(["2026-10-23", 65], ["2026-10-28", 66.5])), /\(subiste 1.5 kg; mínimo 65 kg, máximo 66.5 kg\)\.$/);
+  assert.match(weight("peso de los últimos 7 días", kilos(["2026-10-23", 65], ["2026-10-28", 65])), /\(sin cambio; mínimo 65 kg, máximo 65 kg\)\.$/);
+});
+
+test("REQ-19 a range or single day with one record names that record; no goal or week lines", () => {
+  const reply = weightReply("¿Cuánto pesé ayer?", kilos(["2026-10-27", 66.4]), 63);
+  assert.equal(reply.answer, "Ayer (mar 27 oct): registraste 66.4 kg (27 oct).");
+  assert.deepEqual(highlights(reply), ["66.4 kg"]);
+  assert.deepEqual(linksOf(reply), []);
+  assert.equal(weight("peso hoy", kilos(["2026-10-28", 66])), "Hoy: registraste 66 kg (28 oct).");
+});
+
+test("REQ-27 no weight logs, or only future ones: the empty state and 'Registrar mi peso'", () => {
+  for (const logs of [[], kilos(["2026-10-29", 66])]) {
+    const reply = weightReply("Mi peso", logs, 63);
+    assert.equal(reply.answer, "Aún no registras tu peso.");
+    assert.deepEqual(linksOf(reply), [["Registrar mi peso", "/"]]);
+  }
+});
+
+test("REQ-27 an empty weight range states its period", () => {
+  assert.equal(weight("¿Cuánto pesé ayer?", kilos(["2026-10-20", 66])), "Ayer (mar 27 oct): no registraste tu peso.");
+  assert.equal(weight("peso de los últimos 7 días", kilos(["2026-10-20", 66])), "Últimos 7 días (jue 22 – hoy): no registraste tu peso.");
+});
+
+test("REQ-14 labels through weight answers, and the clamp line first", () => {
+  assert.match(weight("peso el lunes", kilos(["2026-10-26", 66])), /^El lunes \(lun 26 oct\): registraste 66 kg/);
+  assert.match(weight("peso el mes pasado", kilos(["2026-09-30", 66], ["2026-09-02", 67])), /^El mes pasado \(1 sep – 30 sep\): empezaste en 67 kg y terminaste en 66 kg/);
+  assert.match(weight("peso de los últimos 400 días", kilos(["2026-10-27", 66])), new RegExp(`^${CLAMP_LINE} Últimos 366 días \\(28 oct 2025 – hoy\\): registraste 66 kg`));
+});
+
+test("REQ-14 a date cue with no phrase gives the fallback line naming the last record, then the default answer", () => {
+  assert.equal(weight("¿Cuánto pesé hace dos semanas?", kilos(["2026-10-27", 66])), "No entendí la fecha; te muestro tu último registro. Tu último peso es 66 kg (27 oct). No has fijado meta de peso.");
+  assert.doesNotMatch(weight("¿Cuánto peso en la semana?", kilos(["2026-10-27", 66])), /No entendí/);
+});
+
+test("REQ-28 questions hitting different weight lead variants show identical numbers, deterministic per question", () => {
+  const logs = kilos(["2026-10-27", 66]);
+  const [first, second] = [weightReply("Mi peso", logs).answer, weightReply("¿Cuál es mi peso?", logs).answer];
+  assert.deepEqual([first, second].sort(), ["Tu registro más reciente es 66 kg (27 oct). No has fijado meta de peso.", "Tu último peso es 66 kg (27 oct). No has fijado meta de peso."]);
+  assert.equal(weightReply("Mi peso", logs).answer, first);
+  assert.equal(weightReply("¿Cuál es mi peso?", logs).answer, second);
+});
