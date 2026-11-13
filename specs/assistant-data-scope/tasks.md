@@ -634,19 +634,46 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
   - **LOW-3 (optional rows):** untested edges, both acceptable: a 7-day range starting on Monday ("últimos 7 días" asked on a Sunday) counts as a full Mon-Sun week and shows "d de G días"; "este mes" asked on the 1st gives the single-day sentence "Este mes (jue 1 – hoy): sí hiciste ejercicio.".
   - **LOW-4 (surviving mutants):** `logLookup` not scoped to the user (memDb is single-user; defense in depth, no action); `waterGoalGlasses` `Math.floor` vs `Math.round` (a 2.7 L row kills it; being added in 3d1).
 
-**Batch 3d1: weight**, about 310 lines with tests (revision 7 split of 3d; T044 and T045 split by metric). **In progress** (T044 part 1, T045 part 1, plus the 3c2 cleanups LOW-2 (un-skip the stale PENDING rows) and LOW-4 (the 2.7 L water goal row); Batch note 3c2).
+**Batch 3d1: weight**, about 310 lines with tests (revision 7 split of 3d; T044 and T045 split by metric). **Done** (T044 part 1, T045 part 1, plus the 3c2 cleanups LOW-2 (un-skip the stale PENDING rows) and LOW-4 (the 2.7 L water goal row); Batch note 3c2; see Batch note 3d1).
 
 - [ ] T044 [US3] Tests REQ-19, REQ-20, REQ-14 text, REQ-16 (meals, weight), REQ-27 (weight)
   - Unit (tests/unit/chat-metrics.test.ts): REQ-19 exact sentence; no week line without a record this week; "sin cambio"; "meta alcanzada"; no goal → "Fijar mi meta"; last record over 7 days → the line + "Registrar mi peso"; range min/max. REQ-20: today 3 de 5, week ×7, a range with %. REQ-14 range labels and the fallback line in weight and meals answers. REQ-27: no weight logs → "Aún no registras tu peso." + "Registrar mi peso" (/); an empty weight range → "<Periodo>: no registraste tu peso."; an empty meals range → 0 with the label. Red first.
   - e2e, written: extend T066 (meals done D de N, weight change) (tests/e2e/assistant-parity.spec.ts); the T012 search-bar question shows the weight copy (tests/e2e/assistant-noscope.spec.ts); no weight logs through `ask()` (tests/e2e/assistant-progress.spec.ts).
   - Split: part 1 (3d1) = REQ-19, REQ-27 weight rows, weight labels/fallback, the weight e2e and parity; part 2 (3d2) = REQ-20, the meals labels and empty range, the meals parity.
+  - **Part 1 done in 3d1** (c969fa8 red unit rows, c6611a3 survivor rows, 59878d9 e2e rows written not run; reviewer PASS). Part 2 remains in 3d2, plus the ratio-boundary pin row (Batch note 3d1 LOW-1). Stays unticked until 3d2 passes review.
 - [ ] T045 [US3] Weight and meals-done builders, incl. the no-weight-logs reply and empty ranges; the no-active-plan reply for meals done is left to T052 (src/lib/domain/chat-metrics.ts). Part 1 (3d1) weight, which also removes "Mi peso" from the sweep `skip` list; part 2 (3d2) meals done.
   - 3a1 review: the REQ-19 week line needs `weightStats` `latestDate >= monday` and `beforeWeek !== null` (`change` alone is not enough).
   - 1c1 review: any weight number read from the message (e.g. "66,5") comes from the raw text, not `words` (decimals split under `normalizeText`).
+  - **Part 1 done in 3d1** (7b178b4 `weightAnswer`; reviewer PASS). Part 2 (meals done) remains in 3d2. Stays unticked until 3d2 passes review.
 
 **Review checkpoint 3d1:** tsc + unit.
 
-**Batch 3d2: meals done**, about 200 lines with tests: T044 part 2, then T045 part 2.
+**Batch note 3d1 (done; T044 part 1, T045 part 1, plus the 3c2 cleanups LOW-2 and LOW-4; commits on top of 3b503f3 (docs commits 7555776, b04bd7f sit in the history): efaa830, 9fc25bf, c969fa8, 7b178b4, c6611a3, 59878d9; tip 59878d9; tsc clean, unit 688/688; no dependency change; no `specs/` in code commits; src+tests +244/-15 by the reviewer's count (the code-writer reported +240/-19) vs ~310 estimated; reviewer PASS, no HIGH, no MEDIUM; no task ticks (T044 and T045 are split by metric and stay open until 3d2), 54 of 78):**
+
+- Commits: efaa830 cleanup (LOW-2: "¿Cuánto ejercicio llevo?" and "¿Cuánta agua llevo?" out of the PENDING list in tests/unit/chat-answer.test.ts and into the sweep inputs); 9fc25bf the 2.7 L water goal row (LOW-4: kills the floor and ceil mutants); c969fa8 T044 weight rows (red; from a clean extract 685 tests, 671 pass / 14 fail; the 15th new row is a negative `doesNotMatch` that passes against the placeholder); 7b178b4 T045 part 1 code; c6611a3 three rows for mutation survivors (a change that rounds to zero reads "sin cambio" (66.04 → 66); goal above the weight (`Math.abs` on the distance); other users' records); 59878d9 e2e rows (written, not run).
+- What landed: `weightAnswer` in src/lib/domain/chat-metrics.ts; `weight:` in `BUILDERS` (chat.ts); `dateLabel` exported from chat-dates.ts, sharing `formatDate` with `periodLabel`; "Mi peso" out of PENDING. Every number comes from `weightStats`, the same call the dashboard tile makes; the tile is unchanged.
+- Behavior: default (no period) = latest record up to today, distance to the goal, the week line (needs `latestDate >= monday` and a record before Monday), the age line (last record over 7 days old), and the links "Registrar mi peso" and "Fijar mi meta", both to `/`, in `blockButtons`. Named periods: a range gives first/last/change/min/max; a single record gives "<Periodo>: registraste **w kg** (<fecha>)." (verbatim Copy); an empty one gives "<Periodo>: no registraste tu peso."; named periods have no goal, week or age lines and no buttons. The clamp line comes first; the fallback names "tu último registro"; dates read "26 oct", plus the year when it differs from today's; REQ-28 variants "Tu último peso es…" / "Tu registro más reciente es…".
+- Proof: 52 mutants run against the full suite, 48 killed. Survivors: `change < 0` vs `<= 0` (equivalent); `db.users.find(id)` vs `db.users[0]` (memDb is single-user; defense in depth, LOW-3); `goal === null` vs `!goal` (equivalent: the schema minimum is 20); `ratio >= 0.99` (no boundary row; LOW-1, pinned in 3d2).
+- Reviewer rulings on the code-writer's 8 wording/design choices: all accepted. Record them in the spec Copy at the next spec-change (HANDOFF section 6):
+  1. A change that rounds to 0.0 reads "sin cambio" (REQ-19 says "sin cambio" for 0; the rounded-zero case is not literally covered); the same in the range line.
+  2. A range with zero change reads "(sin cambio; mínimo X kg, máximo Y kg)".
+  3. Not a choice: the Copy has the single-record line verbatim.
+  4. An empty named period says "<Periodo>: no registraste tu peso." even if the user never logged weight; the default no-period question says "Aún no registras tu peso." (REQ-27: an empty range states its period).
+  5. Named periods show no goal, week or age lines and no buttons.
+  6. Both links go to `/` (REQ-27 names `/`; weight and goal are entered only in the dashboard WeightTile popover on `/`, the only caller of /api/goals and of weight_kg entry). The link lands on the dashboard but does not open the popover.
+  7. Dates read "26 oct", with the year when it differs from today's.
+  8. The goal counts as reached when ratio >= 1, including start === goal, as the dashboard gauge does.
+- e2e, written, NOT run (first run in Batch E): tests/e2e/assistant-parity.spec.ts (chat weight and week change vs the fixture `expected`); tests/e2e/assistant-progress.spec.ts (pinned today; the week line replaced by the age line later; no logs → empty state with "Registrar mi peso"; no goal → "Fijar mi meta"); tests/e2e/assistant-noscope.spec.ts (the search bar shows "Aún no registras tu peso."). Assumptions for Batch E to check:
+  - (a) **LOW-2:** the parity row compares the chat against the fixture `expected`, not the tile DOM; its title overclaims "equal the dashboard tile". Tile = fixture comes from the T066 dashboard row. Retitle or compare the tile DOM in Batch E.
+  - (b) It assumes `parityLogs` puts 66.2 on Monday and 66.6 before Monday.
+  - (c) The progress rows need `x-e2e-today` to reach the route through `testHooks()` with `E2E_HOOKS=1` (as in Batch note 3c2 (b)).
+  - (d) The `later` row pins today to 2026-11-12 (17 days after the last record).
+  - (e) The noscope row assumes the noscope chat user has no weight logs.
+- Carry-forwards:
+  - **LOW-1 (user ruling pending, non-blocking):** "Te faltan 0 kg para tu meta de 65 kg." when the remaining distance is under 0.05 kg (latest 65.04, start 70, goal 65: ratio 0.99, not reached). Same rounded-zero family as choice 1. Options: (a) leave it; (b) treat a distance that rounds to 0 as reached. 3d2 adds a boundary row between ratio 0.98 and 1.0 that pins the current output (HANDOFF section 6).
+  - **LOW-3 (accepted):** `db.users.find(id)` is not pinned by a multi-user row.
+
+**Batch 3d2: meals done**, about 200 lines with tests: T044 part 2, then T045 part 2, plus the 3d1 LOW-1 ratio-boundary pin row. **In progress.**
 
 **Review checkpoint 3d2:** tsc + unit.
 
