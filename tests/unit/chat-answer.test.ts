@@ -156,9 +156,9 @@ const GIVENS: [string, string, RegExp?][] = [
   ["¿CUÁL ES MI HORARIO?", "mealTimes", /horarios/],
   ["¿Qué horarios tengo?", "mealTimes", /horarios/],
   ["¿Cuándo?", "mealTimes", /horarios/],
-  ["Dame las recomendaciones", "plan", /Tu objetivo/],
-  ["¿Qué suplementos tomo?", "plan", /Tu objetivo/],
-  ["Mis planes", "plan", /Tu objetivo/],
+  ["Dame las recomendaciones", "plan", /Tu plan activo es .*Tu objetivo/],
+  ["¿Qué suplementos tomo?", "plan", /Tu plan activo es .*Tu objetivo/],
+  ["Mis planes", "plan", /Tu plan activo es .*Tu objetivo/],
   ["desayuno", "slotOptions"],
   ["mi colacion", "slotOptions"],
   ["¿Qué colaciones tengo?", "slotOptions"]

@@ -18,7 +18,7 @@ test("every vocabulary entry is normalized, in the singular, and belongs to a to
 });
 
 // The Topics table of the spec (Button, Title, Follow-ups), written out independently of the code. A null is a cell
-// that is "–" or holds a <slot>/<receta>/"Nombre / Plan" placeholder: those get their text with their builders.
+// that is "–" or holds a <slot>/<receta> placeholder: those get their text with their builders.
 const SPEC_TOPICS: Record<string, { title: string | null; button: string | null; followUps: string[] }> = {
   mealTimes: { title: "Horarios", button: "¿Cuál es mi horario?", followUps: ["Mi cena de hoy", "Mi carrito"] },
   slotOptions: { title: null, button: null, followUps: [] },
@@ -33,7 +33,7 @@ const SPEC_TOPICS: Record<string, { title: string | null; button: string | null;
   cart: { title: "Carrito", button: "Mi carrito", followUps: ["¿Qué recetas hay en mi plan?", "Mi cena de hoy"] },
   recipes: { title: "Recetas", button: "¿Qué recetas hay en mi plan?", followUps: ["Mi carrito", "Mi cena de hoy"] },
   plan: { title: "Plan", button: "¿Cuál es mi plan?", followUps: ["¿Cuál es mi meta?", "¿Qué suplementos tomo?", "¿Qué recetas hay en mi plan?"] },
-  identity: { title: null, button: null, followUps: ["¿Cuál es mi plan?", "Mi avance de la semana"] }
+  identity: { title: "Nombre / Plan", button: null, followUps: ["¿Cuál es mi plan?", "Mi avance de la semana"] }
 };
 
 test("REQ-24 the TOPICS table holds the Title, Button and Follow-ups of the spec Topics table for all 14 topics", () => {
