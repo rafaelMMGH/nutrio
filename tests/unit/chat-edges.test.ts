@@ -489,3 +489,15 @@ test("REQ-5 the options and times follow-ups of the slot answers resolve", () =>
   assert.ok(messages(noOptions).includes("¿A qué hora es mi cena?"));
   assert.ok(sweep(db, user, [noOptions], TODAY).includes("¿A qué hora es mi cena?"));
 });
+
+test("REQ-27 REQ-5 a duplicated slot with no options offers its time by ref, and the offer resolves to that slot", () => {
+  const { db, user } = memDb(TWO_COLACIONES);
+  db.mealOptions = db.mealOptions.filter((option) => !option.meal_type_id.endsWith("-meal-3"));
+  const reply = ragAnswer(db, user, "¿Qué puedo tomar de segunda colación?", TODAY);
+  assert.equal(reply.answer, "Tu plan no tiene opciones para tu segunda colación.");
+  assert.deepEqual(messages(reply), ["¿A qué hora es mi segunda colación?"]);
+  const followUp = ragAnswer(db, user, "¿A qué hora es mi segunda colación?", TODAY);
+  assert.equal(followUp.kind, "answer");
+  assert.match(followUp.answer, /segunda colación/i);
+  assert.ok(sweep(db, user, [reply], TODAY).includes("¿A qué hora es mi segunda colación?"));
+});
