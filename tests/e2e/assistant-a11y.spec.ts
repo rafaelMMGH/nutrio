@@ -972,10 +972,31 @@ test.describe("REQ-35: Enter and Space on buttons and links", () => {
     const nav = ui.navLinks.last();
     await nav.focus();
     // A native anchor ignores Space (it scrolls the page), so only Enter navigates.
-    const historyBefore = await chat.evaluate(() => history.length);
+    // A router.push navigation only touches the URL after its RSC fetch, so hold a real interval in the page
+    // before asserting once: expect.poll would return on the first matching sample and pass vacuously.
+    const before = await chat.evaluate(() => {
+      const counts = { push: 0, replace: 0 };
+      const wrap = (method: "pushState" | "replaceState", key: "push" | "replace") => {
+        const original = history[method].bind(history);
+        history[method] = (...args: Parameters<History["pushState"]>) => {
+          counts[key] += 1;
+          original(...args);
+        };
+      };
+      wrap("pushState", "push");
+      wrap("replaceState", "replace");
+      (window as unknown as { __historyCalls: typeof counts }).__historyCalls = counts;
+      return { pathname: location.pathname, length: history.length };
+    });
     await chat.keyboard.press("Space");
+    await chat.evaluate(() => new Promise((resolve) => setTimeout(resolve, 500)));
+    const after = await chat.evaluate(() => ({
+      calls: (window as unknown as { __historyCalls: { push: number; replace: number } }).__historyCalls,
+      pathname: location.pathname,
+      length: history.length,
+    }));
+    expect(after).toEqual({ calls: { push: 0, replace: 0 }, pathname: before.pathname, length: before.length });
     await expect(nav).toBeFocused();
-    await expect.poll(() => chat.evaluate(() => `${location.pathname}|${history.length}`), { timeout: 1000 }).toBe(`/|${historyBefore}`);
     await chat.keyboard.press("Enter");
     await expect(chat).toHaveURL(new RegExp(`${LINK_HREF}$`));
   });
