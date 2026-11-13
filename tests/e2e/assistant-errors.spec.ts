@@ -12,6 +12,9 @@ const API = /\/api\/rag\/chat$/;
 const FAILED_500 = [/POST \/api\/rag\/chat → 500/, /Failed to load resource.*500/];
 const FAILED_400 = [/POST \/api\/rag\/chat → 400/, /Failed to load resource.*400/];
 const LOG_MARK = "[api/rag/chat]";
+// An entry starts a line with the mark and its context object; the code frame Next prints under it repeats the mark mid-line.
+const LOG_ENTRY = /^\[api\/rag\/chat\] \{/gm;
+const entriesIn = (text: string) => text.match(LOG_ENTRY)?.length ?? 0;
 const INJECTED = "Injected chat failure";
 
 test.beforeAll(() => {
@@ -33,7 +36,7 @@ async function logWith(log: ReturnType<typeof serverLog>, needle: string) {
 async function expectNoErrorLog(request: APIRequestContext, log: ReturnType<typeof serverLog>) {
   await ask(request, "x", { fail: true });
   const text = await logWith(log, INJECTED);
-  expect(text.split(LOG_MARK).length - 1).toBe(1);
+  expect(entriesIn(text)).toBe(1);
 }
 
 test.describe("API", () => {
@@ -47,6 +50,7 @@ test.describe("API", () => {
 
     const text = await logWith(log, INJECTED);
     expect(text).toContain(LOG_MARK);
+    expect(entriesIn(text)).toBe(1);
     expect(text).toContain(chatUserId());
     expect(text).toMatch(new RegExp(`messageLength:\\s*${message.length}\\b`));
     expect(text).toMatch(/Error: Injected chat failure[\s\S]*\n\s+at /);

@@ -298,7 +298,10 @@ export async function pinToday(context: BrowserContext, date: string) {
 // From this file, not the cwd, so the log is found wherever Playwright is started.
 const SERVER_LOG = path.join(path.dirname(fileURLToPath(import.meta.url)), ".server.log");
 
-/** Marks the end of the e2e server's log now: `since()` returns the text appended after that point (a missing file counts as empty). */
+// Next's dev server colours the log (also when piped to a file), which splits "messageLength: 23" with escapes.
+const ANSI = /\x1b\[[0-9;]*m/g;
+
+/** Marks the end of the e2e server's log now: `since()` returns the text appended after that point without colour escapes (a missing file counts as empty). */
 export function serverLog() {
   const read = () => {
     try {
@@ -308,7 +311,7 @@ export function serverLog() {
     }
   };
   const offset = read().length;
-  return { offset, since: () => read().subarray(offset).toString("utf8") };
+  return { offset, since: () => read().subarray(offset).toString("utf8").replace(ANSI, "") };
 }
 
 type SweepButton = { type: string; message?: string };
