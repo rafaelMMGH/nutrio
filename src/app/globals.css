@@ -516,6 +516,8 @@ label.check input { width: auto; }
   margin: 0 auto;
   padding: 10px 28px 36px;
 }
+/* Only ever focused by script (fallback after a navigation while the page loads): no ring on a whole region. */
+main[tabindex="-1"]:focus { outline: none; }
 
 .page-head {
   display: flex;

@@ -9,11 +9,14 @@ import { PromptInput } from "./PromptInput";
 import { ScrollButton } from "./ScrollButton";
 import { useChatScroll } from "./useChatScroll";
 import { useDictation } from "./useDictation";
+import { mayUpgradeFocus } from "@/lib/client/focus-upgrade";
 import { questionButtonsTurnId } from "@/lib/client/assistant-thread";
 import "./assistant-chat.css";
 
 // Same breakpoint as the sheet rules in assistant-chat.css.
 export const SHEET_QUERY = "(max-width: 640px)";
+/** How long to wait for a destination heading to stream in before leaving focus on the main region. */
+const HEADING_WAIT_MS = 3000;
 
 type Props = {
   title?: string;
@@ -117,11 +120,29 @@ export function AssistantChat({ title = "Asistente", subtitle, turns, busy, open
   useEffect(() => {
     if (navigatingFrom.current === null || navigatingFrom.current === pathname) return;
     navigatingFrom.current = null;
-    // While the destination's loading state shows there may be no heading yet; the main region is the fallback.
-    const target = document.querySelector<HTMLElement>("main h1") ?? document.querySelector<HTMLElement>("main");
-    if (!target) return;
-    if (!target.hasAttribute("tabindex")) target.tabIndex = -1;
-    target.focus();
+    const focusTarget = (target: HTMLElement) => {
+      if (!target.hasAttribute("tabindex")) target.tabIndex = -1;
+      target.focus();
+    };
+    const heading = document.querySelector<HTMLElement>("main h1");
+    if (heading) return focusTarget(heading);
+    const main = document.querySelector<HTMLElement>("main");
+    if (!main) return;
+    // The destination's loading state commits first and has no heading: the main region holds focus meanwhile, and the
+    // heading takes it when the page streams in, unless the user moved focus since.
+    focusTarget(main);
+    const observer = new MutationObserver(() => {
+      const arrived = main.querySelector<HTMLElement>("h1");
+      if (!arrived) return;
+      observer.disconnect();
+      if (mayUpgradeFocus(document.activeElement, document.body, main)) focusTarget(arrived);
+    });
+    observer.observe(main, { childList: true, subtree: true });
+    const giveUp = setTimeout(() => observer.disconnect(), HEADING_WAIT_MS);
+    return () => {
+      observer.disconnect();
+      clearTimeout(giveUp);
+    };
   }, [pathname]);
 
   function wrapTab(event: KeyboardEvent) {
