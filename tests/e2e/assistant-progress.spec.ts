@@ -36,3 +36,13 @@ test("REQ-14 a date cue with no phrase gets the fallback line, and over 366 days
   const clamped = await ask(chatContext.request, "agua de los últimos 400 días", { today: "2026-10-28" });
   expect(clamped.body.answer).toMatch(/^Solo puedo revisar hasta 366 días; te muestro los últimos 366\. /);
 });
+
+test("REQ-18 an exercise answer follows the pinned today and labels its period", async ({ chatContext }) => {
+  seedLogs([{ date: "2026-10-27", exercised: true }, { date: "2026-10-28", exercised: false }]);
+  const yesterday = await ask(chatContext.request, "¿Hice ejercicio ayer?", { today: "2026-10-28" });
+  expect(yesterday.body.answer).toBe("Ayer (mar 27 oct): sí hiciste ejercicio.");
+  const today = await ask(chatContext.request, "¿Hice ejercicio hoy?", { today: "2026-10-28" });
+  expect(today.body.answer).toBe("Hoy no has registrado ejercicio.");
+  const fallback = await ask(chatContext.request, "¿Cuántos días hice ejercicio hace dos semanas?", { today: "2026-10-28" });
+  expect(fallback.body.answer).toMatch(/^No entendí la fecha; te muestro esta semana\. Esta semana \(lun 26 – hoy\) /);
+});

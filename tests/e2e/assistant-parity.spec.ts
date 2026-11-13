@@ -66,3 +66,16 @@ test("the chat's week water line equals the dashboard tile under the same today"
   const week = Math.round(expected.weekWaterLiters * 10) / 10;
   expect(body.answer).toContain(`: ${week} ${week === 1 ? "litro" : "litros"}.`);
 });
+
+test("the chat's week exercise days equal the dashboard tile under the same today", async ({ chatContext }) => {
+  const today = mexicoCityToday();
+  const { logs, exerciseGoalDays, expected } = parityLogs(mondayOf(today));
+  seedPlan({ times: "all", fixture: true });
+  seedLogs(logs.map((log) => ({ ...log, meals_done: log.meals_done?.map(seededId) })));
+  setGoals({ days: exerciseGoalDays });
+
+  const { body } = await ask(chatContext.request, "¿Cuánto ejercicio llevo?", { today });
+  const left = exerciseGoalDays - expected.weekExerciseDays;
+  expect(body.answer).toContain(`${expected.weekExerciseDays} de ${exerciseGoalDays} días`);
+  expect(body.answer).toContain(`Te ${left === 1 ? "falta" : "faltan"} ${left} ${left === 1 ? "día" : "días"}.`);
+});
