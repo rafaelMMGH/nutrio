@@ -68,3 +68,12 @@ test("REQ-17 a range bolds only the number and unit of the total and the average
   const reply = ask("agua de esta semana", [lit("2026-10-26", 8), lit("2026-10-28", 8)]);
   assert.deepEqual(reply.blocks[0].lead.filter((span) => span.highlight).map((span) => span.text), ["4 litros", "1.3 litros", "2 de 3 días"]);
 });
+
+test("REQ-28 questions hitting different lead variants show identical numbers, and the same question twice gives the same variant", () => {
+  const logs = [lit("2026-10-28", 6)];
+  const [taken, held] = [ask("¿Cuánta agua tomé hoy?", logs).answer, ask("agua hoy", logs).answer];
+  assert.equal(taken, "Hoy has tomado 6 vasos de agua (1.5 litros) de tu meta de 8 vasos.");
+  assert.equal(held, "Hoy llevas 6 vasos de agua (1.5 litros) de tu meta de 8 vasos.");
+  assert.equal(ask("¿Cuánta agua tomé hoy?", logs).answer, taken);
+  assert.equal(ask("agua hoy", logs).answer, held);
+});
