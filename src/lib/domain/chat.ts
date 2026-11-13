@@ -2,7 +2,7 @@ import type { AppDb, AppUser } from "@/lib/types";
 import { type Block, type Button, type ChatAnswer, type Intent, type ReplyKind, type Rich, type Section, normalizeText, STARTERS, words } from "@/lib/assistant";
 import { consolidateCart } from "@/lib/domain/cart";
 import { isGeneric } from "@/lib/domain/chat-dish";
-import { type Built, chooseSlot, planSlots, recipeDetail, slotOptions, slotTimeLead } from "@/lib/domain/chat-meals";
+import { type Built, chooseSlot, pickVariant, planSlots, recipeDetail, slotOptions, slotTimeLead } from "@/lib/domain/chat-meals";
 import { exerciseAnswer, goalsAnswer, mealsDoneAnswer, waterAnswer, weeklyAnswer, weightAnswer } from "@/lib/domain/chat-metrics";
 import { resolve } from "@/lib/domain/chat-intent";
 import { greetingOf, TOPICS, type TopicId } from "@/lib/domain/chat-topics";
@@ -51,13 +51,13 @@ const withValue = (name: string, value: string): Rich => [{ text: `${name} · ` 
 const quantity = (item: { quantity: number; unit: string }) => `${formatQty(item.quantity)} ${item.unit}`.trim();
 
 /** Slot times (REQ-8): the slot the intent names, or every slot when it names none. */
-function mealTimes(db: AppDb, userId: string, intent: Intent): Built {
+function mealTimes(db: AppDb, userId: string, question: string, intent: Intent): Built {
   const plan = planSlots(db, userId);
   if (!plan) return { lead: textLead(NO_PLAN_LEAD) };
   const sources = [`Plan activo: ${plan.planName}`];
   if (intent.slot) {
     const chosen = chooseSlot(plan, intent.slot, "times", intent.ordinal);
-    return "built" in chosen ? chosen.built : { lead: slotTimeLead(chosen.slot), sources };
+    return "built" in chosen ? chosen.built : { lead: slotTimeLead(chosen.slot, question), sources };
   }
   const lead = plan.slots.some((slot) => slot.time) ? "Estos son los horarios de tus comidas." : "Tu plan no tiene horarios para tus comidas.";
   const items = plan.slots.map((slot): Rich => (slot.time ? withValue(slot.ref, slot.time) : [{ text: slot.ref }]));
@@ -108,7 +108,7 @@ export function recipeList(db: AppDb, userId: string, question: string): Built {
 }
 
 const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: string, intent: Intent, today: string) => Built>> = {
-  mealTimes: (db, userId, _question, intent) => mealTimes(db, userId, intent),
+  mealTimes: (db, userId, question, intent) => mealTimes(db, userId, question, intent),
   slotOptions: (db, userId, question, intent) => slotOptions(db, userId, intent, question),
   // A dish found by name opens its detail; did-you-mean and not-found keep the interim answer until T048.
   dish: (db, userId, _question, intent) => {
@@ -130,6 +130,11 @@ const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: st
 /** The interim answer of a topic whose builder has not landed (plan D3). Never asserted by a test; T063 requires none left. */
 const pending = (topic: TopicId): Built => ({ lead: textLead(`Pronto podré responder sobre ${TOPICS[topic].title ?? "esta pregunta"}.`) });
 
+// REQ-28: the lead of a greeting, of thanks and of the no-match reply, one per variant of the spec Copy, in its order.
+const GREETINGS = ["¡Hola! ¿En qué te ayudo?", "¡Hola! ¿Qué quieres saber?", "¡Hola! Pregúntame por tu plan, tu avance o tu carrito."];
+const THANKS = ["¡Con gusto!", "¡De nada!", "Para eso estoy."];
+const NO_MATCH_LEADS = ["No entendí tu pregunta. Puedo ayudarte con:", "Perdón, no entendí. Puedo ayudarte con:"];
+
 /**
  * The answer to one message: depends only on the message, the user's data and `today` (REQ-5). `trace` adds the
  * resolved intents for the e2e suite (plan D2). `today` dates the metric questions
@@ -140,14 +145,14 @@ export function ragAnswer(db: AppDb, user: AppUser, message: string, today: stri
   const starters = STARTERS.map(questionButton);
   const greeting = greetingOf(message);
   if (greeting) {
-    const lead = greeting === "thanks" ? "¡Con gusto!" : "¡Hola! ¿En qué te ayudo?";
+    const lead = pickVariant(greeting === "thanks" ? THANKS : GREETINGS, message);
     return reply("greeting", standalone(lead), starters, [], trace ? [{ topic: "greeting" }] : undefined);
   }
 
   // REQ-3: only the user's own, live, non-generic recipes can be named; the array is already in seq order.
   const recipes = db.recipes.filter((recipe) => recipe.user_id === user.id && !recipe.deleted_at && !isGeneric(recipe.name));
   const { intents, overflow: further } = resolve(message, recipes, today);
-  if (!intents.length) return reply("no_match", standalone("No entendí tu pregunta. Puedo ayudarte con:"), starters, [], trace ? [] : undefined);
+  if (!intents.length) return reply("no_match", standalone(pickVariant(NO_MATCH_LEADS, message)), starters, [], trace ? [] : undefined);
 
   // The resolver only returns topics of the table.
   const answered = intents.map((intent) => intent.topic as TopicId);

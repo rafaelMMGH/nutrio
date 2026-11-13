@@ -57,13 +57,19 @@ for (const { topic, words: entries } of VOCABULARY) for (const entry of entries)
 // Words of phrases are entries too, so an exact "lleva" never fuzzy-matches the entry "llevo" (REQ-2), but they trigger nothing alone.
 const WORD_ENTRIES = [...new Set([...ENTRY_TOPICS.keys(), ...[...PHRASES.keys()].flatMap((phrase) => phrase.split(" "))])];
 
-const GREETING_WORDS = /(^| )(hola|buenos dias|buenas tardes|buenas noches|que tal|gracias)(?= |$)/g;
+// Entries are singular, as the matcher expects (REQ-2): "gracias" and "buenos dias" match through their plural forms.
+const GREETING_WORDS = ["hola"];
+const THANKS_WORD = "gracia";
+const GREETING_PHRASES = ["bueno dia", "buena tarde", "buena noche", "que tal"];
 
 /** "hello" or "thanks" when the message is made only of greeting or thanks words, else null (a greeting before a question is ignored by the matcher). */
 export function greetingOf(question: string): "hello" | "thanks" | null {
-  const text = words(question).join(" ");
-  if (!text || text.replace(GREETING_WORDS, "").trim()) return null;
-  return text.includes("gracias") ? "thanks" : "hello";
+  const tokens = words(question);
+  const consumed = new Set(matchPhrases(tokens, GREETING_PHRASES).flatMap(({ from, to }) => Array.from({ length: to - from }, (_, offset) => from + offset)));
+  const rest = tokens.filter((_, at) => !consumed.has(at));
+  const entries = [...GREETING_WORDS, THANKS_WORD];
+  if (!tokens.length || !rest.every((token) => matchWord(token, entries).length)) return null;
+  return rest.some((token) => matchWord(token, [THANKS_WORD]).length) ? "thanks" : "hello";
 }
 
 /** A vocabulary entry found in a question: the topic, the entry (a phrase or a word) and the index of its first word. */

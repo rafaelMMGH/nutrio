@@ -90,10 +90,12 @@ export function chooseSlot(plan: SlotPlan, word: string, ask: SlotAsk, ordinal?:
   return { built: { lead: [{ text: `Tu plan no tiene ${withAccent(word)}.` }], buttons, sources } };
 }
 
-/** REQ-8: one slot's time highlighted, or that it has none. */
-export function slotTimeLead(slot: Slot): Rich {
+const SLOT_TIME_LEADS: ((ref: string) => string)[] = [(ref) => `Tu horario de ${ref}: `, (ref) => `Tu ${ref} es: `];
+
+/** REQ-8, REQ-28: one slot's time highlighted, in the variant the question picks, or that it has none. */
+export function slotTimeLead(slot: Slot, question: string): Rich {
   const ref = slot.ref.toLowerCase();
-  return slot.time ? [{ text: `Tu horario de ${ref}: ` }, { text: slot.time, highlight: true }, { text: "." }] : [{ text: `Tu plan no tiene horario para tu ${ref}.` }];
+  return slot.time ? [{ text: pickVariant(SLOT_TIME_LEADS, question)(ref) }, { text: slot.time, highlight: true }, { text: "." }] : [{ text: `Tu plan no tiene horario para tu ${ref}.` }];
 }
 
 const PAGE_SIZE = 3;
