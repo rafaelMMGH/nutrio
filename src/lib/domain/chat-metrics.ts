@@ -1,7 +1,7 @@
 import type { AppDb } from "@/lib/types";
 import type { Button, Intent, Rich, Span } from "@/lib/assistant";
 import { CLAMP_LINE, clampPeriod, dateLabel, notUnderstoodLine, type Period, periodLabel } from "@/lib/domain/chat-dates";
-import { type Built, pickVariant } from "@/lib/domain/chat-meals";
+import { type Built, noActivePlan, NO_PLAN_LINE, pickVariant, PLAN_LINK } from "@/lib/domain/chat-meals";
 import { activePlan, activeSchedule } from "@/lib/domain/plans";
 import { daysBetween, exerciseOver, type LogOf, mealsOver, mondayOf, WATER_GLASS_LITERS, WATER_GOAL_LITERS, waterGoalGlasses, waterOver, weekExercise, weekMeals, weekWater, weightStats } from "@/lib/progress";
 
@@ -168,12 +168,12 @@ const TODAY_MEALS: ((done: string) => Rich)[] = [
 
 /**
  * Meals done (REQ-20): with no period, today against the slots plus the week; "hoy", today only; a week against slots × 7
- * (the dashboard's total), any other range against slots × its days, with a whole-number %. Undefined without an active
- * plan or slots: that reply is T052's, so the caller keeps its interim answer.
+ * (the dashboard's total), any other range against slots × its days, with a whole-number %. Without an active plan, or
+ * with a plan that has no slots, it is the REQ-27 no-plan reply: there is nothing to count against.
  */
-export function mealsDoneAnswer(db: AppDb, userId: string, question: string, intent: Intent, today: string): Built | undefined {
+export function mealsDoneAnswer(db: AppDb, userId: string, question: string, intent: Intent, today: string): Built {
   const slotIds = activeSchedule(db, userId)?.meals.map((meal) => meal.id) ?? [];
-  if (!slotIds.length) return undefined;
+  if (!slotIds.length) return noActivePlan();
   const logOf = logLookup(db, userId);
   const { period, lead } = namedPeriod(intent, today, "hoy");
   const count = (done: number, total: number) => `${done} de ${plural(total, "comida", "comidas")}`;
@@ -190,9 +190,6 @@ export function mealsDoneAnswer(db: AppDb, userId: string, question: string, int
   const days = daysBetween(period.from, period.to);
   return { lead: joinSentences([...lead, period.kind === "thisWeek" ? weekSentence(period) : rangeSentence(period, days, slotIds.length * days.length)]) };
 }
-
-const NO_PLAN_LINE = "Aún no tienes un plan activo.";
-const PLAN_LINK = link("Subir mi plan", "/plans");
 
 /**
  * Goals (REQ-21): the plan objective and the weight, exercise and water goals, or only the one the intent names. The water
@@ -214,7 +211,7 @@ export function goalsAnswer(db: AppDb, userId: string, intent: Intent): Built {
   if (intent.metric === "exercise") return { lead: [plain("Tu meta de ejercicio es "), bold(days), plain(" por semana.")] };
   if (intent.metric === "water") return { lead: [plain("Tu meta de agua es "), bold(glasses), plain(`${waterTail}.`)] };
 
-  const objective = activePlan(db, userId)?.current_version?.structured_data.objective;
+  const objective = activePlan(db, userId)?.current_version?.structured_data.objective?.trim();
   const items: Rich[] = [
     ...(objective ? [[plain(`Objetivo del plan: ${objective}`)]] : []),
     weightGoal === null ? [plain("Peso: sin meta")] : [plain("Peso: "), bold(kg(weightGoal))],

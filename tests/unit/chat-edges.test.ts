@@ -408,7 +408,7 @@ test("REQ-5 REQ-24 every clarify and overflow button resolves to a definite answ
   const answers = ["¿Cuánto llevo?", "colación", "¿A qué hora es mi almuerzo?", "¿Qué lleva?", "agua, ejercicio, peso y carrito"].map((message) => ragAnswer(db, user, message, TODAY));
   assert.deepEqual(answers.map((reply) => reply.kind), ["clarify", "clarify", "clarify", "clarify", "answer"]);
   const swept = sweep(db, user, answers, TODAY);
-  for (const message of ["¿Cuánta agua llevo?", "¿Cuál es mi primera colación?", "¿A qué hora es mi segunda colación?", "¿Qué lleva Pollo asado?", "Mi peso", "Mi carrito"]) assert.ok(swept.includes(message), message);
+  for (const message of ["¿Cuánta agua llevo?", "¿Cuál es mi primera colación?", "¿A qué hora es mi comida?", "¿Qué lleva Pollo asado?", "Mi peso", "Mi carrito"]) assert.ok(swept.includes(message), message);
 });
 
 // REQ-27: no active plan, for plan, slot and meals-done questions (T052). A plan with no slots is no plan (user ruling 2026-11-13).

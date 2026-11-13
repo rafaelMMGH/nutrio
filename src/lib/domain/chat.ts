@@ -2,7 +2,7 @@ import type { AppDb, AppUser } from "@/lib/types";
 import { type Block, type Button, type ChatAnswer, type Intent, type ReplyKind, type Rich, type Section, normalizeText, STARTERS, words } from "@/lib/assistant";
 import { consolidateCart } from "@/lib/domain/cart";
 import { isGeneric, rankDish } from "@/lib/domain/chat-dish";
-import { type Built, chooseSlot, pickVariant, planSlots, recipeDetail, slotChoices, slotMessage, slotOptions, slotTimeLead } from "@/lib/domain/chat-meals";
+import { type Built, chooseSlot, noActivePlan, pickVariant, planSlots, recipeDetail, slotChoices, slotMessage, slotOptions, slotTimeLead, slotWordMessage } from "@/lib/domain/chat-meals";
 import { exerciseAnswer, goalsAnswer, mealsDoneAnswer, waterAnswer, weeklyAnswer, weightAnswer } from "@/lib/domain/chat-metrics";
 import { resolve } from "@/lib/domain/chat-intent";
 import { greetingOf, TOPICS, type TopicId } from "@/lib/domain/chat-topics";
@@ -33,7 +33,6 @@ function reply(kind: ReplyKind, blocks: Block[], buttons: Button[], sources: str
 const standalone = (lead: string): Block[] => [{ title: null, lead: [{ text: lead }], sections: [], buttons: [] }];
 
 const textLead = (text: string): Rich => [{ text }];
-const NO_PLAN_LEAD = "No tienes un plan activo.";
 const MAX_ITEMS = 8;
 
 /** A section of plain items, capped at 8 with a last item "y <n> más" (REQ-1). With no items there is no section: the list is empty. */
@@ -53,11 +52,11 @@ const quantity = (item: { quantity: number; unit: string }) => `${formatQty(item
 /** Slot times (REQ-8): the slot the intent names, or every slot when it names none. */
 function mealTimes(db: AppDb, userId: string, question: string, intent: Intent): Built {
   const plan = planSlots(db, userId);
-  if (!plan) return { lead: textLead(NO_PLAN_LEAD) };
+  if (!plan) return noActivePlan(undefined, intent.slot ? [slotWordMessage("options", intent.slot)] : undefined);
   const sources = [`Plan activo: ${plan.planName}`];
   if (intent.slot) {
     const chosen = chooseSlot(plan, intent.slot, "times", intent.ordinal);
-    return "built" in chosen ? chosen.built : { lead: slotTimeLead(chosen.slot, question), sources };
+    return "built" in chosen ? chosen.built : { lead: slotTimeLead(chosen.slot, question), sources, followUps: [slotMessage("options", chosen.slot.ref)] };
   }
   const lead = plan.slots.some((slot) => slot.time) ? "Estos son los horarios de tus comidas." : "Tu plan no tiene horarios para tus comidas.";
   const items = plan.slots.map((slot): Rich => (slot.time ? withValue(slot.ref, slot.time) : [{ text: slot.ref }]));
@@ -66,7 +65,7 @@ function mealTimes(db: AppDb, userId: string, question: string, intent: Intent):
 
 function planSummary(db: AppDb, userId: string, q: string): Built {
   const plan = activePlan(db, userId);
-  if (!plan?.current_version) return { lead: textLead(NO_PLAN_LEAD) };
+  if (!plan?.current_version || !planSlots(db, userId)) return noActivePlan();
   const data = plan.current_version.structured_data;
   const sections = section("Comidas", data.meals.map((meal) => [{ text: meal.name }]));
   if (q.includes("suplement")) {
@@ -123,8 +122,8 @@ const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: st
   water: (db, userId, question, intent, today) => waterAnswer(db, userId, question, intent, today),
   exercise: (db, userId, question, intent, today) => exerciseAnswer(db, userId, question, intent, today),
   weight: (db, userId, question, intent, today) => weightAnswer(db, userId, question, intent, today),
-  // No active plan keeps the interim answer until T052.
-  mealsDone: (db, userId, question, intent, today) => mealsDoneAnswer(db, userId, question, intent, today) ?? pending("mealsDone"),
+  mealsDone: (db, userId, question, intent, today) => mealsDoneAnswer(db, userId, question, intent, today),
+  ambiguous: metricChoice,
   goals: (db, userId, _question, intent) => goalsAnswer(db, userId, intent),
   weekly: (db, userId, _question, _intent, today) => weeklyAnswer(db, userId, today),
   cart: (db, userId) => cartSummary(db, userId),
@@ -145,6 +144,12 @@ function dishClarify(db: AppDb, userId: string): Built {
   const recipes = namedRecipes(db, userId).slice(0, DISH_CHOICES);
   const buttons = recipes.length ? dishButtons(recipes) : slotChoices(planSlots(db, userId)?.slots ?? [], "options");
   return { lead: textLead("¿De qué platillo?"), kind: "clarify", buttons };
+}
+
+/** REQ-25: ambiguous progress asks which metric, each button being that metric's own topic button. */
+function metricChoice(): Built {
+  const buttons = (["water", "exercise", "mealsDone"] as const).map((topic): Button => ({ type: "question", label: TOPICS[topic].title!, message: TOPICS[topic].button! }));
+  return { lead: textLead("¿Te refieres a agua, ejercicio o comidas?"), kind: "clarify", buttons };
 }
 
 /** The message that offers an intent's topic as a button (Topics, Button column). A slot topic is offered only for one concrete slot of the plan: no button is better than one that asks again. */

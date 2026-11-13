@@ -16,6 +16,15 @@ import { recipeSteps } from "@/lib/recipe-steps";
  */
 export type Built = { lead: Rich; sections?: Section[]; sources?: string[]; buttons?: Button[]; blockButtons?: Button[]; kind?: "clarify" | "detail" | "did_you_mean"; title?: string; followUps?: string[] };
 
+export const NO_PLAN_LINE = "Aún no tienes un plan activo.";
+export const PLAN_LINK: Button = { type: "link", label: "Subir mi plan", href: "/plans" };
+
+/**
+ * REQ-27: the reply to a plan, slot or meals-done question without an active plan (or with a plan without slots): the line
+ * and "Subir mi plan". `title` and `followUps` are the Built fields of the same names, for a slot question.
+ */
+export const noActivePlan = (title?: string, followUps?: string[]): Built => ({ lead: [{ text: NO_PLAN_LINE }], blockButtons: [PLAN_LINK], title, followUps });
+
 /** A meal type of the active plan. `ref` is its name, or with duplicate names its ordinal form ("Segunda colación"). */
 export type Slot = { id: string; name: string; time: string; ref: string };
 export type SlotPlan = { planName: string; slots: Slot[] };
@@ -30,10 +39,10 @@ function ordinalRef(name: string, key: string, position: number): string {
   return `${(MASCULINE_SLOTS.includes(key) ? MASCULINE : FEMININE)[position - 1]} ${name.toLowerCase()}`;
 }
 
-/** The plan's slots in plan order, or null without an active plan. */
+/** The plan's slots in plan order, or null without an active plan or with a plan that has no slots (user ruling 2026-11-13: both are "no plan"). */
 export function planSlots(db: AppDb, userId: string): SlotPlan | null {
   const schedule = activeSchedule(db, userId);
-  if (!schedule) return null;
+  if (!schedule?.meals.length) return null;
   const keys = schedule.meals.map((meal) => normalizeText(meal.name));
   const seen = new Map<string, number>();
   const slots = schedule.meals.map((meal, index): Slot => {
@@ -70,6 +79,10 @@ function plural(name: string): string {
   return /[aeiouk]$/.test(lower) ? `${lower}s` : `${lower}es`;
 }
 const withAccent = (word: string) => (word === "colacion" ? "colación" : word);
+/** The message that asks `ask` of a slot word the plan cannot answer (the word has its accent back: "colación"). */
+export const slotWordMessage = (ask: SlotAsk, word: string) => slotMessage(ask, withAccent(word));
+/** The block title of a slot word the plan cannot answer (REQ-24): "Cena", "Colación". */
+const wordTitle = (word: string) => withAccent(word).replace(/^./, (letter) => letter.toUpperCase());
 
 /**
  * The slot a slot word names, or the reply that asks for it: several slots with that name (REQ-11), "almuerzo" with
@@ -184,11 +197,12 @@ export type SlotOptionsView = {
  */
 export function slotOptions(db: AppDb, userId: string, intent: Intent, question: string, view: SlotOptionsView = {}): Built {
   const plan = planSlots(db, userId);
-  if (!plan) return { lead: [{ text: "No tienes un plan activo." }] };
   // The resolver always names the slot of a slotOptions intent.
-  const chosen = chooseSlot(plan, intent.slot ?? "", "options", intent.ordinal);
+  const word = intent.slot ?? "";
+  if (!plan) return noActivePlan(wordTitle(word), [slotWordMessage("times", word)]);
+  const chosen = chooseSlot(plan, word, "options", intent.ordinal);
   // The block title of a 2-block answer (REQ-24): the slot ref, or the slot word when the plan lacks it.
-  if ("built" in chosen) return { ...chosen.built, title: withAccent(intent.slot ?? "").replace(/^./, (letter) => letter.toUpperCase()) };
+  if ("built" in chosen) return { ...chosen.built, title: wordTitle(word) };
   const { slot } = chosen;
   // A bare number ("cena 2") is option n unless the slot is duplicated, where it was the slot's ordinal (REQ-11).
   const bareOption = intent.numbered && slotsNamed(plan.slots, intent.slot ?? "").length === 1 ? intent.ordinal : undefined;
@@ -200,7 +214,7 @@ export function slotOptions(db: AppDb, userId: string, intent: Intent, question:
     .filter((option) => option.meal_type_id === slot.id && !option.deleted_at)
     .sort((a, b) => a.option_number - b.option_number)
     .flatMap((option) => db.recipes.find((recipe) => recipe.id === option.recipe_id && !recipe.deleted_at) ?? []);
-  if (!recipes.length) return { lead: [{ text: `Tu plan no tiene opciones para tu ${name}.` }], sources, title: slot.ref };
+  if (!recipes.length) return { lead: [{ text: `Tu plan no tiene opciones para tu ${name}.` }], sources, title: slot.ref, followUps: [slotMessage("times", slot.ref)] };
 
   const outOfRange = asked !== undefined && !(Number.isInteger(asked) && asked >= 1 && asked <= recipes.length);
   if (!outOfRange && (asked !== undefined || recipes.length === 1)) {
