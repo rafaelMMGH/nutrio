@@ -1,9 +1,9 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { MAX_MESSAGE } from "../../src/lib/assistant";
 import { expectIssues } from "./fixtures";
 import { auditNow, visit } from "./theme-audit";
-import type { Theme } from "./theme-helpers";
-import { assistantUi, focusWalk, buildAnswer, cartAnswer, createChatUser, deleteChatUser, expect, mockChat, openAssistant, test } from "./assistant-helpers";
+import { contrast, effectiveBackground, toRgb, type Theme } from "./theme-helpers";
+import { assistantUi, focusWalk, buildAnswer, cartAnswer, createChatUser, deleteChatUser, expect, mockChat, openAssistant, optionsAnswer, test } from "./assistant-helpers";
 
 // How the assistant looks and moves. Spec assistant-chat-polish, US5: REQ-14 (contrast in both themes, forced colors),
 // REQ-16 (motion) and the "Look" details (bubble width, long tokens, no horizontal overflow at 360 px).
@@ -246,5 +246,135 @@ test.describe("Look: width and long tokens at 360 px", () => {
     expect(widths.logOverflow).toBeLessThanOrEqual(0);
     expect(widths.page).toBeLessThanOrEqual(0);
     expect(await chat.locator(".assistant-chat").evaluate((node) => node.scrollWidth - node.clientWidth)).toBeLessThanOrEqual(0);
+  });
+});
+
+// ---------------------------------------------------------------------------------------------------------------------
+// assistant-data-scope US6 (REQ-32, REQ-35): bubbles, avatar, the arrow icon. Written before T056; first run in Batch E.
+
+/** A computed color property of `locator` as sRGB. */
+async function colorOf(page: Page, locator: Locator, property: "color" | "stroke" | "borderTopColor") {
+  return toRgb(page, await locator.evaluate((node, name) => getComputedStyle(node)[name], property));
+}
+
+/** Boundary contrast against `against`: the better of the fill and an opaque, visible border. */
+async function boundary(page: Page, locator: Locator, against: [number, number, number, number]) {
+  const fill = contrast(await effectiveBackground(locator), against);
+  const width = await locator.evaluate((node) => parseFloat(getComputedStyle(node).borderTopWidth));
+  const edge = await colorOf(page, locator, "borderTopColor");
+  return Math.max(fill, width > 0 && edge[3] === 1 ? contrast(edge, against) : 0);
+}
+
+test.describe("REQ-32: sides and avatar", () => {
+  test("the question is right-aligned without an avatar; the answer is left-aligned with a hidden 32 px Bot avatar and spans the rest", async ({ chat }) => {
+    await mockChat(chat, optionsAnswer());
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+
+    await expect(ui.userTurns.locator(".assistant-avatar")).toHaveCount(0);
+    await expect(ui.avatars).toHaveCount(1);
+    const avatar = ui.avatars.first();
+    await expect(avatar).toHaveAttribute("aria-hidden", "true");
+    await expect(avatar.locator("svg.lucide-bot")).toHaveCount(1);
+
+    const geometry = await chat.evaluate(() => {
+      const log = document.querySelector(".assistant-chat-log") as HTMLElement;
+      const style = getComputedStyle(log);
+      const rect = log.getBoundingClientRect();
+      const inner = { left: rect.left + log.clientLeft + parseFloat(style.paddingLeft), right: rect.left + log.clientLeft + log.clientWidth - parseFloat(style.paddingRight) };
+      const box = (selector: string) => (document.querySelector(selector) as HTMLElement).getBoundingClientRect();
+      const avatar = document.querySelector(".assistant-turn .assistant-avatar") as HTMLElement;
+      return { inner, user: box(".assistant-turn.user .assistant-bubble"), bubble: box(".assistant-turn.assistant .assistant-bubble"), avatar: avatar.getBoundingClientRect(), radius: getComputedStyle(avatar).borderTopLeftRadius };
+    });
+    expect(Math.abs(geometry.user.right - geometry.inner.right)).toBeLessThanOrEqual(1);
+    expect(Math.abs(geometry.avatar.left - geometry.inner.left)).toBeLessThanOrEqual(1);
+    expect(geometry.avatar.width).toBeCloseTo(32, 0);
+    expect(geometry.avatar.height).toBeCloseTo(32, 0);
+    expect(parseFloat(geometry.radius)).toBeGreaterThanOrEqual(16);
+    // The bubble starts after the avatar and runs to the right edge of the log.
+    expect(geometry.bubble.left).toBeGreaterThanOrEqual(geometry.avatar.right - 0.5);
+    expect(Math.abs(geometry.bubble.right - geometry.inner.right)).toBeLessThanOrEqual(1);
+  });
+
+  test.describe("an error", () => {
+    test.use({ expectedIssues: expectIssues(...FAILED_500) });
+
+    test("the error bubble has the avatar too", async ({ chat }) => {
+      await mockChat(chat, cartAnswer(), { status: 500 });
+      await chat.goto("/");
+      const ui = await openAssistant(chat);
+      await ask(chat, QUESTION);
+      await expect(chat.getByRole("button", { name: "Reintentar" })).toBeVisible();
+      await expect(ui.avatars).toHaveCount(1);
+      await expect(ui.avatars.first()).toHaveAttribute("aria-hidden", "true");
+      await expect(ui.avatars.first().locator("svg.lucide-bot")).toHaveCount(1);
+    });
+  });
+});
+
+for (const theme of THEMES) {
+  test.describe(`REQ-32, REQ-35: bubble, avatar and arrow contrast in the ${theme} theme`, () => {
+    test("text 4.5:1, boundaries and the arrow 3:1, and the audit finds nothing", async ({ chat }) => {
+      test.setTimeout(180_000);
+      await mockChat(chat, optionsAnswer());
+      await visit(chat, "/", theme);
+      const ui = await openAssistant(chat);
+      await ask(chat, QUESTION);
+      await expect(ui.assistantTurns).toHaveCount(1);
+
+      const log = await effectiveBackground(ui.log);
+      for (const [name, bubble] of [["user bubble", ui.userTurns.locator(".assistant-bubble")], ["assistant bubble", ui.assistantTurns.locator(".assistant-bubble")]] as const) {
+        const text = await colorOf(chat, bubble, "color");
+        expect(contrast(text, await effectiveBackground(bubble)), `${name} text`).toBeGreaterThanOrEqual(4.5);
+        expect(await boundary(chat, bubble, log), `${name} boundary`).toBeGreaterThanOrEqual(3);
+      }
+
+      // The avatar: its icon against its fill, and its edge against the bubble row it sits in.
+      const avatar = ui.avatars.first();
+      expect(contrast(await colorOf(chat, avatar.locator("svg"), "stroke"), await effectiveBackground(avatar)), "avatar icon").toBeGreaterThanOrEqual(3);
+      expect(await boundary(chat, avatar, log), "avatar boundary").toBeGreaterThanOrEqual(3);
+
+      // The arrow against the link it sits in.
+      const arrow = ui.navLinks.first().locator("svg.lucide-arrow-up-right");
+      expect(contrast(await colorOf(chat, arrow, "stroke"), await effectiveBackground(ui.navLinks.first())), "arrow icon").toBeGreaterThanOrEqual(3);
+
+      const result = await audit(chat);
+      expect(result.violations, "answer with options").toEqual([]);
+    });
+  });
+}
+
+test.describe("REQ-32: 360 px wrapping", () => {
+  test.use({ viewport: { width: 360, height: 740 } });
+
+  test("a 500-character message and an 80-character token wrap in both bubbles with no overflow", async ({ chat }) => {
+    const sentence = "palabra ".repeat(62).trim().slice(0, 500);
+    const token = "z".repeat(80);
+    await mockChat(chat, buildAnswer({ lead: [{ text: `${sentence} ${token}` }], sections: [{ title: "Detalle", items: [[{ text: token }]] }] }));
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await ask(chat, `${sentence} ${token}`);
+    await expect(ui.assistantTurns).toHaveCount(1);
+
+    const overflow = await chat.evaluate(() => {
+      const log = document.querySelector(".assistant-chat-log") as HTMLElement;
+      const logBox = log.getBoundingClientRect();
+      const bubbles = [...document.querySelectorAll(".assistant-turn .assistant-bubble")] as HTMLElement[];
+      return {
+        count: bubbles.length,
+        log: log.scrollWidth - log.clientWidth,
+        page: document.documentElement.scrollWidth - document.documentElement.clientWidth,
+        // No bubble, and no element inside one, reaches past the log's right edge.
+        outside: [...document.querySelectorAll(".assistant-turn *")].filter((node) => node.getBoundingClientRect().right > logBox.right + 0.5).length,
+        bubbleScroll: bubbles.map((bubble) => bubble.scrollWidth - bubble.clientWidth)
+      };
+    });
+    expect(overflow.count).toBe(2);
+    expect(overflow.log).toBeLessThanOrEqual(0);
+    expect(overflow.page).toBeLessThanOrEqual(0);
+    expect(overflow.outside).toBe(0);
+    expect(overflow.bubbleScroll.every((value) => value <= 0)).toBe(true);
   });
 });

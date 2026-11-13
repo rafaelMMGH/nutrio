@@ -2,7 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expectIssues } from "./fixtures";
 import { auditNow, visit } from "./theme-audit";
 import { canvasColor, contrast, effectiveBackground, toRgb, type Rgba, type Theme } from "./theme-helpers";
-import { assistantUi, cartAnswer, createChatUser, deleteChatUser, expect, focusWalk, mockChat, openAssistant, test } from "./assistant-helpers";
+import { assistantUi, cartAnswer, createChatUser, deleteChatUser, expect, focusWalk, LINK_HREF, LINK_LABEL, mockChat, openAssistant, OPTION_LABELS, optionsAnswer, test } from "./assistant-helpers";
 
 // The assistant as a phone sheet. Spec assistant-chat-polish, US5: REQ-15 (geometry, touch targets, safe areas, the
 // on-screen keyboard, long tokens), REQ-14 at 360 px (backdrop, focus rings), REQ-17 (turn names, live region) and REQ-22
@@ -734,6 +734,155 @@ for (const theme of ["light", "dark"] as Theme[]) {
       }
       result = await auditNow(chat, { scope: ".assistant-chat", tab: false, hover: true });
       expect(result.violations, "answers").toEqual([]);
+      expect(await focusWalk(chat, theme)).toEqual([]);
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------------------------------------------------
+// assistant-data-scope US6 (REQ-34, REQ-35): the one button component. Written before T056; first run in Batch E.
+
+test.describe("REQ-34: buttons at 360 px", () => {
+  test.use({ viewport: PHONE });
+
+  test("option buttons stretch to the bubble, wrap without truncating and are 44 px tall; nav links are 44x44", async ({ chat }) => {
+    await mockChat(chat, optionsAnswer());
+    await chat.goto("/");
+    const ui = await openSheet(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    await expect(ui.options).toHaveCount(OPTION_LABELS.length);
+
+    const measured = await ui.options.evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const bubble = node.closest(".assistant-bubble") as HTMLElement;
+        const style = getComputedStyle(bubble);
+        const inner = bubble.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+        const button = node as HTMLElement;
+        return { label: button.textContent, width: button.getBoundingClientRect().width, inner, height: button.getBoundingClientRect().height, clipped: button.scrollWidth - button.clientWidth, ellipsis: getComputedStyle(button).textOverflow === "ellipsis" };
+      })
+    );
+    for (const item of measured) {
+      expect(Math.abs(item.width - item.inner), `${item.label} stretches`).toBeLessThanOrEqual(1);
+      expect(item.height, `${item.label} height`).toBeGreaterThanOrEqual(44);
+      expect(item.clipped, `${item.label} is not clipped`).toBeLessThanOrEqual(0);
+      expect(item.ellipsis, `${item.label} is not truncated`).toBe(false);
+    }
+    // The long label wraps onto more lines, so it grows taller than the short ones.
+    expect(measured[2].height).toBeGreaterThan(measured[0].height);
+
+    await expectTargets({ options: ui.options, "Ver receta completa": ui.navLinks });
+  });
+});
+
+test.describe("REQ-34: question buttons and links by answer", () => {
+  test("only the latest answer has question buttons, while links keep working on an old answer", async ({ chat }) => {
+    await mockChat(chat, optionsAnswer());
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(2);
+
+    const first = ui.assistantTurns.nth(0);
+    const last = ui.assistantTurns.nth(1);
+    await expect(first.locator("button[data-variant]")).toHaveCount(0);
+    await expect(first.getByRole("link", { name: LINK_LABEL })).toHaveCount(1);
+    await expect(last.locator('button[data-variant="option"]')).toHaveCount(OPTION_LABELS.length);
+    await expect(last.getByRole("link", { name: LINK_LABEL })).toHaveCount(1);
+
+    await first.getByRole("link", { name: LINK_LABEL }).click();
+    await expect(chat).toHaveURL(new RegExp(`${LINK_HREF}$`));
+    // The old answer is still in the thread after navigating.
+    await expect(ui.assistantTurns).toHaveCount(2);
+  });
+
+  test("while a request is pending the question buttons are aria-disabled, still focusable, and send nothing", async ({ chat }) => {
+    await mockChat(chat, optionsAnswer());
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+
+    const held = await mockChat(chat, optionsAnswer(), { hold: true });
+    await ask(chat, QUESTION);
+    await expect(ui.pending).toHaveCount(1);
+    const buttons = ui.assistantTurns.last().locator("button[data-variant]");
+    const count = await buttons.count();
+    expect(count).toBeGreaterThan(0);
+    for (let index = 0; index < count; index++) {
+      const button = buttons.nth(index);
+      await expect(button).toHaveAttribute("aria-disabled", "true");
+      await expect(button).not.toHaveAttribute("disabled", /.*/);
+      await button.focus();
+      await expect(button).toBeFocused();
+      await button.click({ force: true });
+    }
+    expect(held.requests).toHaveLength(1);
+
+    held.release();
+    await expect(ui.assistantTurns).toHaveCount(2);
+    await expect(ui.assistantTurns.last().locator("button[data-variant]").first()).not.toHaveAttribute("aria-disabled", "true");
+  });
+});
+
+test.describe("REQ-35: names, bubbles and focus order", () => {
+  test("the arrow icon is hidden and the link's accessible name equals its label", async ({ chat }) => {
+    await mockChat(chat, optionsAnswer());
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    const link = ui.panel.getByRole("link", { name: LINK_LABEL, exact: true });
+    await expect(link).toHaveCount(1);
+    await expect(link).toHaveAttribute("href", LINK_HREF);
+    const arrow = link.locator("svg.lucide-arrow-up-right");
+    await expect(arrow).toHaveCount(1);
+    await expect(arrow).toHaveAttribute("aria-hidden", "true");
+    // The arrow comes after the label.
+    expect(await link.evaluate((node) => node.lastElementChild?.matches("svg.lucide-arrow-up-right"))).toBe(true);
+    for (const label of OPTION_LABELS) await expect(ui.panel.getByRole("button", { name: label, exact: true })).toHaveCount(1);
+  });
+
+  test("bubbles and the avatar have no tabindex and Tab visits only buttons, links and controls, in visual order", async ({ chat }) => {
+    await mockChat(chat, optionsAnswer());
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    await expect(chat.locator(".assistant-bubble[tabindex], .assistant-avatar[tabindex], .assistant-avatar [tabindex]")).toHaveCount(0);
+
+    await ui.log.evaluate((node) => (node.querySelector(".assistant-turn") as HTMLElement).scrollIntoView());
+    await chat.locator("#assistant-chat-panel header button:visible").first().focus();
+    const order: { tag: string; variant: string | null; top: number }[] = [];
+    for (let presses = 0; presses < 12; presses++) {
+      await chat.keyboard.press("Tab");
+      const stop = await chat.evaluate(() => {
+        const active = document.activeElement as HTMLElement;
+        const inside = Boolean(active.closest(".assistant-turn"));
+        return { inside, tag: active.tagName, variant: active.getAttribute("data-variant"), top: active.getBoundingClientRect().top, bubble: active.classList.contains("assistant-bubble") || active.classList.contains("assistant-turn") || active.classList.contains("assistant-avatar") };
+      });
+      expect(stop.bubble, "a bubble, turn or avatar took focus").toBe(false);
+      if (stop.inside) order.push(stop);
+    }
+    // Three options, one link, then the answer-level question button, in the order they are drawn.
+    expect(order.map((stop) => stop.tag)).toEqual(["BUTTON", "BUTTON", "BUTTON", "A", "BUTTON"]);
+    expect(order.map((stop) => stop.top)).toEqual([...order.map((stop) => stop.top)].sort((a, b) => a - b));
+  });
+});
+
+for (const theme of ["light", "dark"] as Theme[]) {
+  test.describe(`REQ-35: focus rings on buttons and links in the ${theme} theme`, () => {
+    test.use({ viewport: PHONE });
+
+    test("every option button and nav link shows a ring of 3:1", async ({ chat }) => {
+      test.setTimeout(120_000);
+      await mockChat(chat, optionsAnswer());
+      await visit(chat, "/", theme);
+      const ui = await openSheet(chat);
+      await ask(chat, QUESTION);
+      await expect(ui.assistantTurns).toHaveCount(1);
       expect(await focusWalk(chat, theme)).toEqual([]);
     });
   });

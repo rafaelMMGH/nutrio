@@ -391,6 +391,12 @@ export function assistantUi(page: Page) {
     labels: page.locator(".assistant-turn-label"),
     live: page.locator(".assistant-turn-live"),
     chips: page.locator(".assistant-chips button"),
+    /** The one button component's variants (spec REQ-34), by `data-variant`; links are real anchors. */
+    options: page.locator('.assistant-turn [data-variant="option"]'),
+    navLinks: page.locator('.assistant-turn a[data-variant="link"]'),
+    /** The bubble of a turn and the assistant's avatar (spec REQ-32). */
+    bubbles: page.locator(".assistant-turn .assistant-bubble"),
+    avatars: page.locator(".assistant-turn .assistant-avatar"),
     backdrop: page.locator(".assistant-chat-backdrop")
   };
 }
@@ -442,6 +448,20 @@ export function cartAnswer(count = 3): ChatAnswer {
     sources: ["Carrito actual"],
     buttons
   });
+}
+
+/** Label long enough to wrap onto several lines in a 360 px bubble, with a lone long token to prove wrapping never truncates. */
+export const LONG_OPTION_LABEL = "Opción número tres con una descripción larga que debe partirse en varias líneas sin cortarse";
+export const OPTION_LABELS = ["Opción 1", "Opción 2", LONG_OPTION_LABEL];
+export const LINK_LABEL = "Ver receta completa";
+export const LINK_HREF = "/recipes";
+
+/** An answer whose block carries vertical option buttons (spec REQ-34) and a navigation link, plus one answer-level question button. */
+export function optionsAnswer(): ChatAnswer {
+  const base = buildAnswer({ lead: [{ text: "Encontré varias opciones." }], buttons: [question("Mi cena de hoy")] });
+  const options: Button[] = OPTION_LABELS.map((label) => ({ type: "question", label, message: label, layout: "option" }));
+  base.blocks[0].buttons = [...options, { type: "link", label: LINK_LABEL, href: LINK_HREF }];
+  return base;
 }
 
 export type MockOptions = {
