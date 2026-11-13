@@ -8,7 +8,7 @@ import { GREETINGS, NO_MATCH_LEADS, THANKS } from "../shared/assistant-copy";
 import { memDb, sweep } from "./memdb";
 
 // Chat-like edge cases (spec assistant-data-scope US4): greeting and thanks (REQ-23), the REQ-28 variants and the
-// plain no-match reply (REQ-29). The dish answers (did-you-mean, not found) are tested in the next batch.
+// plain no-match reply and the dish answers, did-you-mean and not found (REQ-26, REQ-29).
 
 const TODAY = "2026-10-28";
 const ask = (message: string) => {
@@ -105,4 +105,75 @@ test("REQ-5 the starters of a greeting and of a no-match reply resolve to their 
   const { db, user } = memDb();
   const answers = ["hola", "¿Cuál es la capital de Francia?"].map((message) => ragAnswer(db, user, message, TODAY));
   assert.deepEqual(sweep(db, user, answers, TODAY).sort(), [...STARTERS].sort());
+});
+
+// Dish answers on the base fixture (REQ-26, REQ-29). The detail leads are REQ-28 variants, so "not a detail" is asserted by kind.
+const NOT_FOUND = (phrase: string) => `No encontré '${phrase}' en tu plan ni en tus recetas.`;
+const NEARBY = (phrase: string) => `No encontré exactamente '${phrase}'. ¿Quisiste decir…?`;
+const SUGGEST = "¿Quisiste decir…?";
+const offered = (reply: ChatAnswer) => reply.buttons.map((button) => (button.type === "question" ? [button.label, button.message] : [button.label]));
+const sends = (...names: string[]) => names.map((name) => [name, `¿Qué lleva ${name}?`]);
+
+function assertNotFound(message: string, phrase: string) {
+  const reply = ask(message);
+  assert.equal(reply.kind, "answer", message);
+  assert.equal(reply.answer, NOT_FOUND(phrase), message);
+  assert.deepEqual(starters(reply), ["Mi carrito", "Mi cena de hoy"], message);
+  assert.deepEqual(reply.resolved, [{ topic: "dish", outcome: "notFound", phrase }], message);
+  assert.deepEqual(reply.sources, [], message);
+}
+
+test("REQ-26 a dish no recipe resembles is not found: the lead quotes the phrase and the Recipes follow-ups show, no recipe is offered", () => {
+  assertNotFound("¿Qué lleva la pizza?", "pizza");
+  assertNotFound("¿Qué lleva la opcion 1?", "opcion 1");
+  assertNotFound("¿Qué lleva ab?", "ab");
+});
+
+test("REQ-26 a phrase that only partly matches is a did-you-mean: the lead quotes it, the candidates are buttons in rank order, nothing opens", () => {
+  const cases: [string, string, string[]][] = [
+    ["¿Qué lleva el pollo?", "pollo", ["Pollo asado", "Ensalada de pollo"]],
+    ["¿Qué lleva la pizza con atún?", "pizza con atún", ["Sándwich de atún"]],
+    ["¿Qué lleva la Pizza Con Atún?", "Pizza Con Atún", ["Sándwich de atún"]],
+    ["¿Qué lleva la ensalada de res?", "ensalada de res", ["Ensalada de pollo"]]
+  ];
+  for (const [message, phrase, names] of cases) {
+    const reply = ask(message);
+    assert.equal(reply.kind, "did_you_mean", message);
+    assert.equal(reply.answer, NEARBY(phrase), message);
+    assert.ok(!phrase.startsWith("la ") && !phrase.includes("lleva"), message);
+    assert.deepEqual(offered(reply), sends(...names), message);
+    assert.deepEqual(reply.blocks[0].sections, [], message);
+    assert.deepEqual(reply.resolved?.map((intent) => intent.outcome), ["didYouMean"], message);
+    assert.deepEqual(reply.sources, [], message);
+  }
+});
+
+test('REQ-26 "¿Qué lleva el agua?" is the water answer, not a dish reply', () => {
+  const reply = ask("¿Qué lleva el agua?");
+  assert.deepEqual(reply.resolved?.map((intent) => intent.topic), ["water"]);
+  assert.ok(!reply.answer.includes("No encontré"), reply.answer);
+  assert.ok(!["did_you_mean", "no_match"].includes(reply.kind), reply.kind);
+});
+
+test("REQ-29 a question with no dish cue is ranked as a phrase: did-you-mean with the candidates in order, never a detail", () => {
+  const cases: [string, string[]][] = [
+    ["una ensalada rica", ["Ensalada de pollo"]],
+    ["pollo atún ensalada", ["Ensalada de pollo", "Pollo asado", "Sándwich de atún"]],
+    ["estoy buscando algo rico con atún", ["Sándwich de atún"]],
+    ["Pollo asado", ["Pollo asado", "Ensalada de pollo"]]
+  ];
+  for (const [message, names] of cases) {
+    const reply = ask(message);
+    assert.equal(reply.kind, "did_you_mean", message);
+    assert.equal(reply.answer, SUGGEST, message);
+    assert.deepEqual(offered(reply), sends(...names), message);
+    assert.deepEqual(reply.sources, [], message);
+  }
+});
+
+test("REQ-5 the did-you-mean buttons of both replies open that recipe's detail, and the not-found follow-ups resolve", () => {
+  const { db, user } = memDb();
+  const answers = ["¿Qué lleva el pollo?", "pollo atún ensalada", "¿Qué lleva la pizza?"].map((message) => ragAnswer(db, user, message, TODAY));
+  const swept = sweep(db, user, answers, TODAY);
+  assert.ok(swept.includes("¿Qué lleva Sándwich de atún?") && swept.includes("¿Qué lleva Pollo asado?") && swept.includes("Mi carrito"), swept.join(" | "));
 });
