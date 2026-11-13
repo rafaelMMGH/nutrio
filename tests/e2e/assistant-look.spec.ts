@@ -243,6 +243,7 @@ test.describe("Look: width and long tokens at 360 px", () => {
       const user = (document.querySelector(".assistant-turn.user .assistant-bubble") as HTMLElement).getBoundingClientRect().width;
       return { content, user, logOverflow: log.scrollWidth - log.clientWidth, page: document.documentElement.scrollWidth - document.documentElement.clientWidth };
     });
+    // The spec says "80% of the log width"; read as 80% of the log's content box (clientWidth minus padding).
     expect(widths.user).toBeLessThanOrEqual(widths.content * 0.8 + 0.5);
     expect(widths.logOverflow).toBeLessThanOrEqual(0);
     expect(widths.page).toBeLessThanOrEqual(0);
@@ -336,7 +337,7 @@ for (const theme of THEMES) {
         expect(await boundary(chat, bubble, log), `${name} boundary`).toBeGreaterThanOrEqual(3);
       }
 
-      // The avatar: its icon against its fill, and its edge against the bubble row it sits in.
+      // The avatar: its icon against its fill, and its edge against the log it sits in (boundary() measures against the log).
       const avatar = ui.avatars.first();
       expect(contrast(await colorOf(chat, avatar.locator("svg"), "stroke"), await effectiveBackground(avatar)), "avatar icon").toBeGreaterThanOrEqual(3);
       expect(await boundary(chat, avatar, log), "avatar boundary").toBeGreaterThanOrEqual(3);
@@ -382,7 +383,7 @@ test.describe("REQ-32: 360 px wrapping", () => {
       };
     });
     expect(overflow.count).toBe(2);
-    // REQ-32: the user bubble is at most 80% of the log width; only meaningful with a message this long.
+    // REQ-32: the user bubble is at most 80% of the log width; only meaningful with a message this long Measured against the log's content box (clientWidth minus padding).
     expect(overflow.user).toBeLessThanOrEqual(overflow.content * 0.8 + 0.5);
     expect(overflow.log).toBeLessThanOrEqual(0);
     expect(overflow.page).toBeLessThanOrEqual(0);

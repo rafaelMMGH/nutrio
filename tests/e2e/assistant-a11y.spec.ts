@@ -772,7 +772,7 @@ test.describe("REQ-34: buttons at 360 px", () => {
     // The long label wraps onto more lines, so it grows taller than the short ones.
     expect(measured[2].height).toBeGreaterThan(measured[0].height);
 
-    await expectTargets({ options: ui.options, "Ver receta completa": ui.navLinks });
+    await expectTargets({ options: ui.options, "Ver receta completa": ui.navLinks, "answer chip": ui.assistantTurns.last().getByRole("button", { name: CHIP_LABEL }) });
   });
 });
 
@@ -789,8 +789,9 @@ test.describe("REQ-34: question buttons and links by answer", () => {
     const first = ui.assistantTurns.nth(0);
     const last = ui.assistantTurns.nth(1);
     // By role, so the answer-level chip is covered as well as the options.
-    await expect(first.getByRole("button")).toHaveCount(0);
+    // The link first: it proves the old answer rendered, so the zero-button count below is not an instant pass.
     await expect(first.getByRole("link", { name: LINK_LABEL })).toHaveCount(1);
+    await expect(first.getByRole("button")).toHaveCount(0);
     await expect(last.locator('button[data-variant="option"]')).toHaveCount(OPTION_LABELS.length);
     await expect(last.getByRole("button")).toHaveCount(OPTION_LABELS.length + 1);
     await expect(last.getByRole("button", { name: CHIP_LABEL })).toHaveAttribute("data-variant", "chip");
@@ -814,8 +815,8 @@ test.describe("REQ-34: question buttons and links by answer", () => {
     await expect(ui.pending).toHaveCount(1);
     // By role: the three options and the "Mi cena de hoy" chip.
     const buttons = ui.assistantTurns.last().getByRole("button");
+    await expect(buttons).toHaveCount(OPTION_LABELS.length + 1);
     const count = await buttons.count();
-    expect(count).toBe(OPTION_LABELS.length + 1);
     await expect(ui.assistantTurns.last().getByRole("button", { name: CHIP_LABEL })).toHaveAttribute("aria-disabled", "true");
     for (let index = 0; index < count; index++) {
       const button = buttons.nth(index);
