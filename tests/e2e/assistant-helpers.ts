@@ -168,6 +168,8 @@ export type SeedPlan = {
   /** `all`: every meal has a time window; `some`: only the first and third; `none`: no meal has one. */
   times: "all" | "some" | "none";
   meals?: string[];
+  /** The plan's name as stored (default `PLAN_NAME`); an upload leaves ".pdf" on it. */
+  planName?: string;
   supplements?: boolean;
   objective?: string;
   recommendations?: string;
@@ -196,7 +198,7 @@ function addOnStatements(versionId: string, meals: string[]): string[] {
 }
 
 /** Replaces the active plan: plan, current version (`structured_data`) and one meal type per meal. */
-export function seedPlan({ times, meals = DEFAULT_MEALS, supplements = true, objective = "Mejorar mi energía", recommendations = "Tomar agua durante el día", fixture = false, extras = false }: SeedPlan) {
+export function seedPlan({ times, meals = DEFAULT_MEALS, planName = PLAN_NAME, supplements = true, objective = "Mejorar mi energía", recommendations = "Tomar agua durante el día", fixture = false, extras = false }: SeedPlan) {
   clearPlan();
   const userId = currentUser().id;
   const placed = fixture ? planFixture(meals, { extras }) : [];
@@ -206,7 +208,7 @@ export function seedPlan({ times, meals = DEFAULT_MEALS, supplements = true, obj
   const versionId = `${planId}-v1`;
   const windows = meals.map((_, index) => (times === "all" || (times === "some" && index % 2 === 0) ? TIME_WINDOWS[index % TIME_WINDOWS.length] : ""));
   const structured = {
-    name: PLAN_NAME,
+    name: planName,
     objective,
     diagnosis: "",
     recommendations,
@@ -215,7 +217,7 @@ export function seedPlan({ times, meals = DEFAULT_MEALS, supplements = true, obj
     meals: meals.map((name, index) => ({ name, time_window: windows[index], options: [] }))
   };
   const statements = [
-    `insert into plans (id, user_id, name, objective, status, processing_status, created_at, updated_at) values (${lit(planId)}, ${lit(userId)}, ${lit(PLAN_NAME)}, ${lit(objective)}, 'active', 'ready', now(), now())`,
+    `insert into plans (id, user_id, name, objective, status, processing_status, created_at, updated_at) values (${lit(planId)}, ${lit(userId)}, ${lit(planName)}, ${lit(objective)}, 'active', 'ready', now(), now())`,
     `insert into plan_versions (id, plan_id, version_number, structured_data, change_summary, is_current, created_at, updated_at) values (${lit(versionId)}, ${lit(planId)}, 1, ${json(structured)}, '', true, now(), now())`,
     ...meals.map(
       (name, index) =>

@@ -199,7 +199,7 @@ test.describe("builders", () => {
 
   test("REQ-1 the plan lists the meals, plus supplements and recommendations only when the question names them", async ({ chatContext }) => {
     const plain = await answer(chatContext, "¿Cuál es mi plan?");
-    expect(plainOf(plain.blocks[0].lead)).toBe(`Tu objetivo: ${OBJECTIVE}`);
+    expect(plainOf(plain.blocks[0].lead)).toBe(`Tu plan activo es ${PLAN_NAME}. Tu objetivo: ${OBJECTIVE}`);
     expect(plain.blocks[0].sections.map((section) => section.title)).toEqual(["Comidas"]);
     expect(items(plain, "Comidas")).toEqual(MEALS);
 
@@ -214,7 +214,7 @@ test.describe("builders", () => {
     const body = await answer(chatContext, "¿Qué recomendaciones tengo?");
     expect(items(body, "Recomendaciones")).toEqual(["Tomar agua", "Dormir 8 horas", "Caminar a diario"]);
     expect(body.answer).toBe(
-      [`Tu objetivo: ${OBJECTIVE}`, "Comidas", ...MEALS, "Recomendaciones", "Tomar agua", "Dormir 8 horas", "Caminar a diario"].join("\n")
+      [`Tu plan activo es ${PLAN_NAME}. Tu objetivo: ${OBJECTIVE}`, "Comidas", ...MEALS, "Recomendaciones", "Tomar agua", "Dormir 8 horas", "Caminar a diario"].join("\n")
     );
   });
 
@@ -229,7 +229,7 @@ test.describe("builders", () => {
   test("REQ-1 blank recommendations omit the section and the lead stays", async ({ chatContext }) => {
     seedPlan({ times: "all", recommendations: " \n  " });
     const body = await answer(chatContext, "¿Qué recomendaciones tengo?");
-    expect(plainOf(body.blocks[0].lead)).toBe(`Tu objetivo: ${OBJECTIVE}`);
+    expect(plainOf(body.blocks[0].lead)).toBe(`Tu plan activo es ${PLAN_NAME}. Tu objetivo: ${OBJECTIVE}`);
     expect(body.blocks[0].sections.map((section) => section.title)).toEqual(["Comidas"]);
     expect(body.answer).not.toContain("Recomendaciones");
   });
