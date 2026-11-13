@@ -43,7 +43,7 @@ export const BUTTON_TOPICS: Record<string, { topic: string; lead?: RegExp }> = {
   "¿Cuál es mi segundo desayuno?": { topic: "slotOptions", lead: OPTIONS_LEAD },
   "¿Cuál es mi colación 11?": { topic: "slotOptions", lead: OPTIONS_LEAD },
   ...Object.fromEntries(
-    ["Cena", "Comida", "Segunda colación", "Colación 11"].flatMap((ref) => [
+    ["Desayuno", "Colación", "Primera colación", "Cena", "Comida", "Segunda colación", "Colación 11"].flatMap((ref) => [
       ...[1, 2, 3, 4, 5, 6, 7].map((n) => [`${ref}, opción ${n}`, { topic: "slotOptions", lead: OPTION_LEAD }] as const),
       ...[1, 2, 3].map((page) => [`${ref}, más opciones (página ${page})`, { topic: "slotOptions", lead: OPTIONS_LEAD }] as const)
     ])
