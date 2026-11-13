@@ -3,7 +3,7 @@
 // (the "Pensando…" Loader text variant)
 import { Bot, RotateCcw } from "lucide-react";
 import { STARTERS, type Block, type Button, type ChatAnswer, type Rich } from "@/lib/assistant";
-import { AssistantButton } from "./PromptSuggestion";
+import { AssistantButton } from "./AssistantButton";
 
 /** What a turn sent: the message alone, with no scope, page or history (REQ-4, REQ-5). */
 export type AssistantRequest = { message: string };

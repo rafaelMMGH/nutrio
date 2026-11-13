@@ -79,7 +79,7 @@
 /* A long option label wraps and the button grows: no fixed height, no ellipsis. */
 .assistant-button[data-variant="option"] { width: 100%; white-space: normal; }
 .assistant-button[data-variant="chip"] { border-radius: 22px; }
-.assistant-button.assistant-button[data-variant="link"] svg { flex: none; color: var(--brand-text); }
+.assistant-button[data-variant="link"] svg { flex: none; color: var(--brand-text); }
 .assistant-turn { display: grid; grid-template-columns: minmax(0, 1fr); font-size: 14px; line-height: 1.45; animation: assistant-fade-in 160ms ease-out; }
 @keyframes assistant-fade-in { from { opacity: 0; } }
 /* The turn is the full-width row; the bubble carries the look (REQ-32). */

@@ -1,5 +1,3 @@
-// Adapted from prompt-kit (https://github.com/ibelick/prompt-kit), MIT License
-// Copyright (c) 2025 Julien Thibeaut
 "use client";
 
 import Link from "next/link";
