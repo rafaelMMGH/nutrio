@@ -44,7 +44,7 @@ const TODAY_WATER: ((glasses: string, liters: string, goal: number) => Rich)[] =
  */
 export function waterAnswer(db: AppDb, userId: string, question: string, intent: Intent, today: string): Built {
   const logOf = logLookup(db, userId);
-  const goal = waterGoalGlasses(activeSchedule(db, userId)?.water_goal_liters);
+  const goal = waterGoalGlasses(withSlots(db, userId)?.water_goal_liters);
   const { period, lead } = namedPeriod(intent, today, "hoy");
 
   const todaySentence = () => {
