@@ -94,6 +94,7 @@ test("REQ-17 the water goal is the plan's liters ÷ 0.25, clamped to 4..12 glass
   assert.match(goalLine(undefined), /de tu meta de 8 vasos\.$/);
   assert.match(goalLine(3), /de tu meta de 12 vasos\.$/);
   assert.match(goalLine(2.5), /de tu meta de 10 vasos\.$/);
+  assert.match(goalLine(2.7), /de tu meta de 11 vasos\.$/);
   assert.match(goalLine(0), /de tu meta de 4 vasos\.$/);
   assert.match(goalLine(5), /de tu meta de 12 vasos\.$/);
 });
