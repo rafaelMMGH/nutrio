@@ -241,6 +241,15 @@ test("REQ-24 REQ-27 a slot the plan lacks, with a second topic: its slot buttons
   assert.deepEqual(messages(askIn("cuánta agua llevo y qué puedo cenar", plan)), ["¿Cuál es mi desayuno?", "¿Cuál es mi comida?"]);
 });
 
+test("REQ-24 a button is offered once: an offer that repeats one of the slot buttons of a not-in-plan block is dropped", () => {
+  const plan = { meals: ["Desayuno", "Colación", "Comida"] };
+  for (const question of ["¿Qué puedo cenar y desayunar?", "¿Qué puedo cenar y qué hay de comida?", "¿Qué puedo cenar, desayunar y comer?"]) {
+    const found = messages(askIn(question, plan));
+    assert.deepEqual(found, [...new Set(found)], question);
+  }
+  assert.deepEqual(messages(askIn("¿Qué puedo cenar y desayunar?", plan)), ["¿Cuál es mi desayuno?", "¿Cuál es mi colación?", "¿Cuál es mi comida?"]);
+});
+
 // Two colaciones: "colación" asks which one.
 const TWO_COLACIONES = { meals: ["Desayuno", "Colación", "Comida", "Colación", "Cena"] };
 

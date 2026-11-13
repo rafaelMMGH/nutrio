@@ -238,8 +238,9 @@ export function ragAnswer(db: AppDb, user: AppUser, message: string, today: stri
   const asked = normalizeText(message);
   // Repeat rule (chat-polish REQ-5): a follow-up that repeats the question just asked is not offered. Follow-ups only.
   const followUps = last.built.buttons ? [] : (last.built.followUps ?? TOPICS[last.topic].followUps).filter((text) => normalizeText(text) !== asked);
-  // A button is offered once: an overflow topic can also be one of the follow-ups (REQ-24).
-  const more = asks(first.built) ? [] : [...new Set([...followUps, ...offers.flatMap((offer) => offer ?? [])])].map(questionButton);
+  // A button is offered once: an overflow topic can also be one of the follow-ups, or one of the block's own slot buttons (REQ-24).
+  const ownMessages = new Set(own.flatMap((button) => (button.type === "question" ? [button.message] : [])));
+  const more = asks(first.built) ? [] : [...new Set([...followUps, ...offers.flatMap((offer) => offer ?? [])])].filter((text) => !ownMessages.has(text)).map(questionButton);
   const kind = asks(first.built) ? first.built.kind! : kept.some((part) => part.built.kind === "detail") ? "detail" : "answer";
   return reply(kind, blocks, [...own, ...more], [...new Set(kept.flatMap((part) => part.built.sources ?? []))], trace ? intents : undefined);
 }
