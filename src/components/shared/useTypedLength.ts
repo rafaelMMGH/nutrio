@@ -5,19 +5,21 @@ import { typingDuration, visibleCharacters } from "@/lib/client/text-stream";
 import { useMediaQuery } from "@/lib/client/useMediaQuery";
 
 const REDUCED_MOTION = "(prefers-reduced-motion: reduce)";
+/** Differs from every identity, including `undefined`, so the first completion always fires. */
+const NOT_YET = Symbol("not completed yet");
 
 type Options = {
   /** Show everything now (tap to complete, or an answer that already typed); still fires `onComplete` once. */
   instant?: boolean;
   onComplete?: () => void;
   /** What the text is: `onComplete` fires once per identity. Defaults to the length. */
-  identity?: string | number;
+  identity?: unknown;
 };
 
 /**
  * How many of `length` units (graphemes, see text-stream.ts) are revealed, typing them out once over
  * `typingDuration(length)`. Reduced motion, an empty text and `instant` show all of it from the first render, so
- * there is no frame at 0. `onComplete` fires once per identity: React strict mode re-runs the effect and an `instant`
+ * there is no frame at 0. `onComplete` fires once per identity (the length unless given): React strict mode re-runs the effect and an `instant`
  * switch after completion re-runs it too, and neither may fire it again.
  */
 export function useTypedLength(length: number, { instant = false, onComplete, identity = length }: Options = {}): number {
@@ -25,7 +27,7 @@ export function useTypedLength(length: number, { instant = false, onComplete, id
   const skip = instant || reduced || length === 0;
   const [typed, setTyped] = useState(() => (skip ? length : 0));
   const onCompleteRef = useRef(onComplete);
-  const completedIdentity = useRef<string | number | null>(null);
+  const completedIdentity = useRef<unknown>(NOT_YET);
 
   useEffect(() => {
     onCompleteRef.current = onComplete;

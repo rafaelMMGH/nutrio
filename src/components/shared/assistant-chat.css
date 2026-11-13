@@ -102,6 +102,14 @@
 .assistant-turn-section ul { margin: 0; padding-left: 18px; list-style: disc; }
 .assistant-turn-section li { padding: 1px 0; }
 .assistant-turn strong { font-weight: 700; }
+/* Typing (REQ-33). The real lead is transparent while an aria-hidden layer types over it in the same grid cell, so the box is final-sized from the first frame. */
+.assistant-turn-lead[data-typing] { display: grid; }
+.assistant-turn-lead[data-typing] > * { grid-area: 1 / 1; min-width: 0; }
+.assistant-turn-lead[data-typing] > .assistant-lead-text { opacity: 0; user-select: none; }
+/* What waits for the lead keeps its space (opacity, and visibility for the buttons so they are neither seen nor focusable) and fades in when typing ends. */
+.assistant-turn-later, .assistant-actions, .assistant-chips { transition: opacity 160ms ease-out; }
+.assistant-turn[data-typing] .assistant-turn-later { opacity: 0; }
+.assistant-turn[data-typing] .assistant-actions, .assistant-turn[data-typing] .assistant-chips { opacity: 0; visibility: hidden; }
 .assistant-turn p.assistant-turn-sources { color: var(--text-2); font-size: 12px; }
 .assistant-turn-pending { color: var(--text-2); }
 /* prompt-kit's text loader: the words blink between two theme colors (2 s, as upstream). */
@@ -130,6 +138,7 @@
 @media (prefers-reduced-motion: reduce) { .assistant-scroll, .assistant-scroll.visible { transition: none; } }
 @media (prefers-reduced-motion: reduce) {
   .assistant-turn, .assistant-button { animation: none; }
+  .assistant-turn-later, .assistant-actions, .assistant-chips { transition: none; }
   .assistant-chat-form button { transition: none; }
 }
 /* Forced colors drops the fills that tell the two speakers apart and frame the field: keep an edge on them. */
