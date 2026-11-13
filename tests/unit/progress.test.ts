@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { mealsDoneOn, mondayOf, waterGoalGlasses, weekDays, weekExercise, weekMeals, weekWater, weightStats, type ProgressLog } from "@/lib/progress";
+import { daysBetween, exerciseOver, mealsDoneOn, mondayOf, waterGoalGlasses, weekDays, weekExercise, weekMeals, weekWater, weightStats, type ProgressLog } from "@/lib/progress";
 import { PARITY_EXPECTED as expected, PARITY_LOGS, PARITY_MONDAY, PARITY_SLOTS, PARITY_SUNDAY, PARITY_TODAY, PARITY_WEIGHT_GOAL, parityLogs } from "../shared/progress-fixture";
 
 const byDate = new Map(PARITY_LOGS.map((log) => [log.date, log]));
@@ -62,6 +62,12 @@ describe("progress.ts exercise", () => {
   it("weekExercise counts flagged days of the week only, same result with endDay Sunday or today", () => {
     assert.equal(weekExercise(getLog, PARITY_MONDAY, PARITY_SUNDAY), expected.weekExerciseDays);
     assert.equal(weekExercise(getLog, PARITY_MONDAY, PARITY_TODAY), expected.weekExerciseDays);
+  });
+
+  it("exerciseOver counts flagged days of any range, the one weekExercise is built on", () => {
+    assert.equal(exerciseOver(getLog, daysBetween(PARITY_MONDAY, PARITY_SUNDAY)), expected.weekExerciseDays);
+    assert.equal(exerciseOver(getLog, []), 0);
+    assert.equal(exerciseOver(getLog, daysBetween("2026-01-01", "2026-01-10")), 0);
   });
 });
 

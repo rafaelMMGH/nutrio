@@ -17,6 +17,13 @@ const ask = (message: string, logs: SeedLog[] = []): ChatAnswer => {
 /** The "llevas" and "has tomado" variants (REQ-28) read the same numbers: compare through "llevas". */
 const water = (message: string, logs?: SeedLog[]) => ask(message, logs).answer.replace("Hoy has tomado", "Hoy llevas");
 const lit = (date: string, water_glasses: number): SeedLog => ({ date, water_glasses });
+const ran = (...dates: string[]): SeedLog[] => dates.map((date) => ({ date, exercised: true }));
+const highlights = (reply: ChatAnswer) => reply.blocks[0].lead.filter((span) => span.highlight).map((span) => span.text);
+/** The "has hecho ejercicio" variant (REQ-28) reads the same numbers: compare through "llevas". */
+const exercise = (message: string, logs: SeedLog[] = [], goalDays = 4) => {
+  const { db, user } = memDb({ logs, goals: { days: goalDays } });
+  return ragAnswer(db, user, message, TODAY).answer.replace(/has hecho ejercicio (\d+ de \d+ días?)/, "llevas $1 de ejercicio");
+};
 
 test("REQ-15/17 water with no date: today's glasses and liters against the goal, plus the week line", () => {
   const reply = ask("¿Cuánta agua llevo?", [lit("2026-10-26", 4), lit("2026-10-27", 8), lit("2026-10-28", 6)]);
@@ -89,4 +96,80 @@ test("REQ-17 the water goal is the plan's liters ÷ 0.25, clamped to 4..12 glass
   assert.match(goalLine(2.5), /de tu meta de 10 vasos\.$/);
   assert.match(goalLine(0), /de tu meta de 4 vasos\.$/);
   assert.match(goalLine(5), /de tu meta de 12 vasos\.$/);
+});
+
+// Exercise (REQ-18): today is Wed 2026-10-28, the week started Mon 26.
+
+test("REQ-18 this week: days done against the goal and what is left, singular 'Te falta 1 día'", () => {
+  const two = ask("¿Cuánto ejercicio llevo?", ran("2026-10-26", "2026-10-28"));
+  assert.equal(two.answer, "Esta semana (lun 26 – hoy) llevas 2 de 4 días de ejercicio. Te faltan 2 días.");
+  assert.deepEqual(highlights(two), ["2 de 4 días", "2 días"]);
+  const three = ask("¿Cuánto ejercicio llevo?", ran("2026-10-26", "2026-10-27", "2026-10-28"));
+  assert.equal(three.answer, "Esta semana (lun 26 – hoy) llevas 3 de 4 días de ejercicio. Te falta 1 día.");
+  assert.deepEqual(highlights(three), ["3 de 4 días", "1 día"]);
+  assert.equal(exercise("¿Cuántos días hice ejercicio esta semana?", ran("2026-10-26")), "Esta semana (lun 26 – hoy) llevas 1 de 4 días de ejercicio. Te faltan 3 días.");
+});
+
+test("REQ-18 the met line replaces the remaining line once done reaches the goal", () => {
+  assert.equal(exercise("¿Cuánto ejercicio llevo?", ran("2026-10-26", "2026-10-27", "2026-10-28"), 3), "¡Ya cumpliste tu meta de 3 días de ejercicio esta semana!");
+  assert.equal(exercise("¿Cuánto ejercicio llevo?", ran("2026-10-26", "2026-10-27", "2026-10-28"), 2), "¡Ya cumpliste tu meta de 2 días de ejercicio esta semana!");
+  assert.equal(exercise("¿Cuánto ejercicio llevo?", ran("2026-10-26"), 1), "¡Ya cumpliste tu meta de 1 día de ejercicio esta semana!");
+});
+
+test("REQ-13 REQ-27 a log dated after today is not counted, and an empty week shows 0 of the goal", () => {
+  assert.equal(exercise("¿Cuánto ejercicio llevo?", ran("2026-10-28", "2026-10-29", "2026-11-02")), "Esta semana (lun 26 – hoy) llevas 1 de 4 días de ejercicio. Te faltan 3 días.");
+  assert.equal(exercise("¿Cuánto ejercicio llevo?"), "Esta semana (lun 26 – hoy) llevas 0 de 4 días de ejercicio. Te faltan 4 días.");
+});
+
+test("REQ-18 today and another single day answer yes or no, never '0 días'", () => {
+  assert.equal(exercise("¿Hice ejercicio hoy?", ran("2026-10-28")), "Hoy sí hiciste ejercicio.");
+  assert.equal(exercise("¿Hice ejercicio hoy?", ran("2026-10-27")), "Hoy no has registrado ejercicio.");
+  assert.equal(exercise("¿Hice ejercicio ayer?", ran("2026-10-27")), "Ayer (mar 27 oct): sí hiciste ejercicio.");
+  assert.equal(exercise("¿Hice ejercicio ayer?", ran("2026-10-28")), "Ayer (mar 27 oct): no registraste ejercicio.");
+  assert.equal(exercise("¿Hice ejercicio el lunes?", ran("2026-10-26")), "El lunes (lun 26 oct): sí hiciste ejercicio.");
+  assert.equal(exercise("¿Hice ejercicio antier?"), "Antier (lun 26 oct): no registraste ejercicio.");
+});
+
+test("REQ-18 other ranges: days exercised with the label, singular, and 0 for an empty range", () => {
+  const logs = ran("2026-10-22", "2026-10-24", "2026-10-28", "2026-10-29");
+  const reply = ask("ejercicio de los últimos 7 días", logs);
+  assert.equal(reply.answer, "Últimos 7 días (jue 22 – hoy): hiciste ejercicio 3 días.");
+  assert.deepEqual(highlights(reply), ["3 días"]);
+  assert.equal(exercise("ejercicio de los últimos 7 días", ran("2026-10-24")), "Últimos 7 días (jue 22 – hoy): hiciste ejercicio 1 día.");
+  assert.equal(exercise("ejercicio de los últimos 7 días"), "Últimos 7 días (jue 22 – hoy): hiciste ejercicio 0 días.");
+  assert.equal(exercise("ejercicio desde el 26 de octubre", ran("2026-10-26", "2026-10-28")), "Desde el 26 de octubre (lun 26 – hoy): hiciste ejercicio 2 días.");
+});
+
+test("REQ-18 only a full Mon–Sun week is compared with the goal", () => {
+  const reply = ask("ejercicio la semana pasada", ran("2026-10-19", "2026-10-21", "2026-10-25", "2026-10-26"));
+  assert.equal(reply.answer, "La semana pasada (lun 19 – dom 25): hiciste ejercicio 3 de 4 días.");
+  assert.deepEqual(highlights(reply), ["3 de 4 días"]);
+  assert.equal(exercise("ejercicio la semana pasada", ran("2026-10-19"), 1), "La semana pasada (lun 19 – dom 25): hiciste ejercicio 1 de 1 día.");
+});
+
+test("REQ-14 the remaining labels through exercise answers: month, last month", () => {
+  assert.equal(exercise("¿Cuántos días hice ejercicio en el mes?", ran("2026-10-02")), "Este mes (1 oct – hoy): hiciste ejercicio 1 día.");
+  assert.equal(exercise("ejercicio el mes pasado", ran("2026-09-30", "2026-10-01")), "El mes pasado (1 sep – 30 sep): hiciste ejercicio 1 día.");
+});
+
+test("REQ-14 more than 366 days is clamped, with the clamp line first", () => {
+  assert.equal(exercise("ejercicio de los últimos 400 días"), `${CLAMP_LINE} Últimos 366 días (28 oct 2025 – hoy): hiciste ejercicio 0 días.`);
+});
+
+test("REQ-14 a date cue with no phrase falls back to this week with the fallback line; period nouns alone do not", () => {
+  assert.equal(exercise("¿Cuántos días hice ejercicio hace dos semanas?", ran("2026-10-28")), "No entendí la fecha; te muestro esta semana. Esta semana (lun 26 – hoy) llevas 1 de 4 días de ejercicio. Te faltan 3 días.");
+  for (const message of ["¿Cuántos días hice ejercicio?", "¿Cuántas veces entreno a la semana?"]) assert.doesNotMatch(exercise(message), /No entendí/, message);
+});
+
+test("REQ-28 questions hitting different exercise lead variants show identical numbers, deterministic per question", () => {
+  const logs = ran("2026-10-26");
+  const [llevas, hecho] = [ask("¿Cuánto ejercicio llevo?", logs).answer, ask("ejercicio", logs).answer];
+  assert.equal(llevas, "Esta semana (lun 26 – hoy) llevas 1 de 4 días de ejercicio. Te faltan 3 días.");
+  assert.equal(hecho, "Esta semana (lun 26 – hoy) has hecho ejercicio 1 de 4 días. Te faltan 3 días.");
+  assert.equal(ask("¿Cuánto ejercicio llevo?", logs).answer, llevas);
+  assert.equal(ask("ejercicio", logs).answer, hecho);
+});
+
+test("REQ-18 the exercise goal is the user's setting", () => {
+  assert.match(exercise("¿Cuánto ejercicio llevo?", [], 6), /llevas 0 de 6 días de ejercicio\. Te faltan 6 días\.$/);
 });
