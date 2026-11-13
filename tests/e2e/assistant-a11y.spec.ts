@@ -332,9 +332,11 @@ test.describe("REQ-17: turns and the live region", () => {
     await expect(ui.assistantTurns).toHaveCount(1);
     await expect(ui.panel.getByRole("article", { name: "Tú", exact: true })).toHaveCount(1);
     await expect(ui.panel.getByRole("article", { name: "Asistente", exact: true })).toHaveCount(1);
-    const icon = ui.assistantTurns.locator(".assistant-avatar svg");
-    await expect(icon).toHaveCount(1);
-    await expect(icon).toHaveAttribute("aria-hidden", "true");
+    // The wrapper carries aria-hidden (lucide does not add it to the svg), which hides the icon inside it from assistive tech.
+    const avatar = ui.assistantTurns.locator(".assistant-avatar");
+    await expect(avatar).toHaveCount(1);
+    await expect(avatar).toHaveAttribute("aria-hidden", "true");
+    await expect(avatar.locator("svg.lucide-bot")).toHaveCount(1);
   });
 
   test("the region exists while pending without Pensando…, then holds the lead and every item and nothing else", async ({ chat }) => {
@@ -375,7 +377,8 @@ test.describe("REQ-17: turns and the live region", () => {
       const text = (node: Node): string => {
         if (node instanceof Element && node.getAttribute("aria-hidden") === "true") return "";
         if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
-        return [...node.childNodes].map(text).join("\u2063");
+        // Hidden children contribute nothing, not even a separator, so the typed layer unmounting does not change what is heard.
+        return [...node.childNodes].map(text).filter(Boolean).join("\u2063");
       };
       // The region only exists once the question is sent, so watch the log it will appear in.
       const record = () => announced.push(text(document.querySelector(".assistant-turn-live") ?? document.createTextNode("")));
