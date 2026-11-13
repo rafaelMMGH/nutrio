@@ -303,3 +303,76 @@ test("REQ-28 questions hitting different weight lead variants show identical num
   assert.equal(weightReply("Mi peso", logs).answer, last);
   assert.equal(weightReply("¿Cuál es mi peso?", logs).answer, recent);
 });
+
+// Meals done (REQ-20): the plan has 4 slots (Desayuno, Colación, Comida, Cena); the week starts Mon 26.
+
+const slotId = (position: number) => `chat-e2e-memdb-plan-v1-meal-${position}`;
+const marked = (date: string, ...positions: number[]): SeedLog => ({ date, meals_done: positions.map(slotId) });
+const mealsReply = (message: string, logs: SeedLog[] = [], meals?: string[]) => {
+  const { db, user } = memDb({ logs, meals });
+  return ragAnswer(db, user, message, TODAY);
+};
+/** The "Hoy has hecho" variant (REQ-28) reads the same numbers: compare through "Hoy llevas". */
+const meals = (message: string, logs?: SeedLog[], names?: string[]) => mealsReply(message, logs, names).answer.replace("Hoy has hecho", "Hoy llevas");
+const weekLogs = [marked("2026-10-26", 0, 1), marked("2026-10-27", 0, 1, 2), marked("2026-10-28", 3)];
+
+test("REQ-20 meals with no date: today against the slots, plus the week against slots × 7 with a whole-number %, only the counts bold", () => {
+  const reply = mealsReply("¿Cuántas comidas llevo?", weekLogs);
+  assert.equal(reply.kind, "answer");
+  assert.equal(meals("¿Cuántas comidas llevo?", weekLogs), "Hoy llevas 1 de 4 comidas. Esta semana (lun 26 – hoy): 6 de 28 comidas (21%).");
+  assert.deepEqual(highlights(reply), ["1 de 4 comidas", "6 de 28 comidas"]);
+});
+
+test("REQ-20 5 slots and 3 marked today give 'Hoy llevas 3 de 5 comidas.'; an explicit 'hoy' has no week line", () => {
+  const names = ["Desayuno", "Colación", "Comida", "Merienda", "Cena"];
+  assert.equal(meals("¿Cuántas comidas llevo hoy?", [marked(TODAY, 0, 1, 2)], names), "Hoy llevas 3 de 5 comidas.");
+});
+
+test("REQ-20 singular at exactly one slot: '1 de 1 comida'", () => {
+  assert.equal(meals("¿Cuántas comidas llevo?", [marked(TODAY, 0)], ["Comida"]), "Hoy llevas 1 de 1 comida. Esta semana (lun 26 – hoy): 1 de 7 comidas (14%).");
+});
+
+test("REQ-20 'esta semana' is the dashboard's slots × 7 whatever day it is; a past single day and a range use slots × days", () => {
+  assert.equal(meals("¿Cuántas comidas llevo esta semana?", weekLogs), "Esta semana (lun 26 – hoy): 6 de 28 comidas (21%).");
+  assert.equal(meals("¿Cuántas comidas hice ayer?", weekLogs), "Ayer (mar 27 oct): 3 de 4 comidas (75%).");
+  assert.equal(meals("¿Cuántas comidas hice en los últimos 7 días?", [marked("2026-10-21", 0), ...weekLogs]), "Últimos 7 días (jue 22 – hoy): 6 de 28 comidas (21%).");
+  assert.deepEqual(highlights(mealsReply("¿Cuántas comidas hice ayer?", weekLogs)), ["3 de 4 comidas"]);
+});
+
+test("REQ-20 marks of a slot not in the plan are ignored and a day never counts more than its slots", () => {
+  const crowded: SeedLog = { date: TODAY, meals_done: [slotId(0), slotId(0), slotId(0), slotId(0), slotId(0), "gone"] };
+  assert.equal(meals("¿Cuántas comidas llevo hoy?", [crowded]), "Hoy llevas 4 de 4 comidas.");
+  assert.equal(meals("¿Cuántas comidas llevo hoy?", [{ date: TODAY, meals_done: ["gone"] }]), "Hoy llevas 0 de 4 comidas.");
+});
+
+test("REQ-13 a log dated after today is not counted", () => {
+  assert.match(meals("¿Cuántas comidas llevo?", [marked(TODAY, 0), marked("2026-10-29", 0, 1, 2, 3)]), /Esta semana \(lun 26 – hoy\): 1 de 28 comidas \(4%\)\.$/);
+  assert.match(meals("comidas desde el 26 de octubre", [marked(TODAY, 0), marked("2026-10-29", 0, 1, 2, 3)]), /^Desde el 26 de octubre \(lun 26 – hoy\): 1 de 12 comidas \(8%\)\./);
+});
+
+test("REQ-27 an empty range shows 0 with its label", () => {
+  assert.equal(meals("¿Cuántas comidas hice el lunes?"), "El lunes (lun 26 oct): 0 de 4 comidas (0%).");
+  assert.equal(meals("¿Cuántas comidas llevo?"), "Hoy llevas 0 de 4 comidas. Esta semana (lun 26 – hoy): 0 de 28 comidas (0%).");
+});
+
+test("REQ-14 labels through meals answers: last week, month; the clamp line first; the fallback line naming today", () => {
+  assert.match(meals("¿Cuántas comidas hice la semana pasada?", [marked("2026-10-20", 0, 1, 2, 3)]), /^La semana pasada \(lun 19 – dom 25\): 4 de 28 comidas \(14%\)\.$/);
+  assert.match(meals("¿Cuántas comidas hice este mes?", weekLogs), /^Este mes \(1 oct – hoy\): 6 de 112 comidas \(5%\)\.$/);
+  assert.match(meals("¿Cuántas comidas hice en los últimos 400 días?"), new RegExp(`^${CLAMP_LINE} Últimos 366 días \\(28 oct 2025 – hoy\\): 0 de 1464 comidas \\(0%\\)\\.$`));
+  assert.equal(meals("¿Cuántas comidas llevo hace dos semanas?", weekLogs), "No entendí la fecha; te muestro hoy. Hoy llevas 1 de 4 comidas. Esta semana (lun 26 – hoy): 6 de 28 comidas (21%).");
+});
+
+test("REQ-28 questions hitting different meals lead variants show identical numbers, and the same question twice gives the same variant", () => {
+  const logs = [marked(TODAY, 0, 1)];
+  const [made, held] = [mealsReply("¿Cuántas comidas llevo hoy?", logs).answer, mealsReply("comidas hoy", logs).answer];
+  assert.equal(made, "Hoy llevas 2 de 4 comidas.");
+  assert.equal(held, "Hoy has hecho 2 de 4 comidas.");
+  assert.equal(mealsReply("¿Cuántas comidas llevo hoy?", logs).answer, made);
+  assert.equal(mealsReply("comidas hoy", logs).answer, held);
+});
+
+test("REQ-27 with no active plan the meals answer is left to T052: no counts are invented", () => {
+  const { db, user } = memDb({ logs: [marked(TODAY, 0)] });
+  db.plans = [];
+  assert.doesNotMatch(ragAnswer(db, user, "¿Cuántas comidas llevo?", TODAY).answer, /\d+ de \d+ comidas?/);
+});

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { daysBetween, exerciseOver, mealsDoneOn, mondayOf, waterGoalGlasses, weekDays, weekExercise, weekMeals, weekWater, weightStats, type ProgressLog } from "@/lib/progress";
+import { daysBetween, exerciseOver, mealsDoneOn, mealsOver, mondayOf, waterGoalGlasses, weekDays, weekExercise, weekMeals, weekWater, weightStats, type ProgressLog } from "@/lib/progress";
 import { PARITY_EXPECTED as expected, PARITY_LOGS, PARITY_MONDAY, PARITY_SLOTS, PARITY_SUNDAY, PARITY_TODAY, PARITY_WEIGHT_GOAL, parityLogs } from "../shared/progress-fixture";
 
 const byDate = new Map(PARITY_LOGS.map((log) => [log.date, log]));
@@ -55,6 +55,14 @@ describe("progress.ts meals", () => {
     assert.equal(weekMeals(getLog, PARITY_SLOTS, PARITY_MONDAY, PARITY_SUNDAY), expected.weekMeals);
     assert.equal(weekMeals(getLog, PARITY_SLOTS, PARITY_MONDAY, PARITY_TODAY), expected.weekMeals);
     assert.equal(PARITY_SLOTS.length * 7, expected.weekMealsGoal);
+  });
+});
+
+describe("progress.ts meals over a range", () => {
+  it("mealsOver sums mealsDoneOn over any range, the one weekMeals is built on", () => {
+    assert.equal(mealsOver(getLog, PARITY_SLOTS, daysBetween(PARITY_MONDAY, PARITY_SUNDAY)), expected.weekMeals);
+    assert.equal(mealsOver(getLog, PARITY_SLOTS, []), 0);
+    assert.equal(mealsOver(getLog, PARITY_SLOTS, daysBetween("2026-01-01", "2026-01-10")), 0);
   });
 });
 

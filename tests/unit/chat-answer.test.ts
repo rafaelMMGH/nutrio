@@ -100,12 +100,12 @@ test("REQ-5 the repeat rule drops a follow-up that repeats the message, however 
 });
 
 // Buttons that cannot be swept yet: no builder (goals, weight, weekly, metrics).
-const PENDING = ["¿Cuál es mi meta?", "Mi avance de la semana", "¿Cuántas comidas llevo?"];
+const PENDING = ["¿Cuál es mi meta?", "Mi avance de la semana"];
 
 test("REQ-5 every starter and follow-up with a builder resolves to its Button-column topic and gives the same answer", () => {
   const { db, user } = memDb({ cart: 3 });
   const answers = ["hola", "Mi carrito", "¿Cuál es mi horario?", "¿Cuál es mi plan?", "¿Cuánta agua llevo?", "¿Cuánto ejercicio llevo?"].map((message) => ragAnswer(db, user, message, TODAY));
-  assert.deepEqual(sweep(db, user, answers, TODAY, { skip: PENDING }).sort(), ["Mi carrito", "Mi cena de hoy", "¿Qué suplementos tomo?", "¿Qué recetas hay en mi plan?", "¿Cuánto ejercicio llevo?", "¿Cuánta agua llevo?", "Mi peso"].sort());
+  assert.deepEqual(sweep(db, user, answers, TODAY, { skip: PENDING }).sort(), ["Mi carrito", "Mi cena de hoy", "¿Qué suplementos tomo?", "¿Qué recetas hay en mi plan?", "¿Cuánto ejercicio llevo?", "¿Cuánta agua llevo?", "¿Cuántas comidas llevo?", "Mi peso"].sort());
 });
 
 test("REQ-5 every '¿Qué lleva <receta>?' of a non-generic fixture recipe resolves to that recipe and gives the same detail", () => {
