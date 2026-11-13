@@ -48,7 +48,7 @@ export const TOPICS: Record<TopicId, { title: string | null; button: string | nu
   cart: { title: "Carrito", button: "Mi carrito", followUps: ["¿Qué recetas hay en mi plan?", "Mi cena de hoy"] },
   recipes: { title: "Recetas", button: "¿Qué recetas hay en mi plan?", followUps: ["Mi carrito", "Mi cena de hoy"] },
   plan: { title: "Plan", button: "¿Cuál es mi plan?", followUps: ["¿Cuál es mi meta?", "¿Qué suplementos tomo?", "¿Qué recetas hay en mi plan?"] },
-  identity: { title: null, button: null, followUps: ["¿Cuál es mi plan?", "Mi avance de la semana"] }
+  identity: { title: "Nombre / Plan", button: null, followUps: ["¿Cuál es mi plan?", "Mi avance de la semana"] }
 };
 
 const PHRASES = new Map(VOCABULARY.flatMap(({ topic, phrases }) => phrases.map((phrase) => [phrase, topic] as const)));

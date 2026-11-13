@@ -63,6 +63,20 @@ function mealTimes(db: AppDb, userId: string, question: string, intent: Intent):
   return { lead: textLead(lead), sections: section("Comidas", items), sources };
 }
 
+/** The plan's name as shown: a trailing ".pdf", in any case, is removed (REQ-31). */
+const planTitle = (name: string) => name.trim().replace(/\.pdf$/i, "").trim();
+
+/** REQ-30, REQ-31: the user's name, or the active plan's name; a plan question with no active plan is the REQ-27 reply. */
+function identity(db: AppDb, userId: string, user: AppUser, intent: Intent): Built {
+  if (intent.of === "plan") {
+    const plan = activePlan(db, userId);
+    if (!plan || !planSlots(db, userId)) return noActivePlan();
+    return { lead: [{ text: "Tu plan activo se llama " }, { text: planTitle(plan.name), highlight: true }, { text: "." }], sources: [`Plan activo: ${plan.name}`] };
+  }
+  const name = user.name.trim();
+  return { lead: name ? [{ text: "Te llamas " }, { text: name, highlight: true }, { text: "." }] : textLead("Aún no tengo tu nombre registrado.") };
+}
+
 function planSummary(db: AppDb, userId: string, q: string): Built {
   const plan = activePlan(db, userId);
   if (!plan?.current_version || !planSlots(db, userId)) return noActivePlan();
@@ -73,7 +87,10 @@ function planSummary(db: AppDb, userId: string, q: string): Built {
     sections.push(...section("Suplementos", names.length ? names : [[{ text: "Sin suplementos registrados" }]]));
   }
   if (q.includes("recomend")) sections.push(...section("Recomendaciones", lineItems(data.recommendations || "")));
-  return { lead: textLead(`Tu objetivo: ${data.objective}`), sections, sources: [`Plan activo: ${plan.name}`] };
+  // A blank objective is left out, as in the goals answer.
+  const objective = data.objective?.trim();
+  const lead: Rich = [{ text: "Tu plan activo es " }, { text: planTitle(plan.name), highlight: true }, { text: objective ? `. Tu objetivo: ${objective}` : "." }];
+  return { lead, sections, sources: [`Plan activo: ${plan.name}`] };
 }
 
 function cartSummary(db: AppDb, userId: string): Built {
@@ -106,7 +123,8 @@ export function recipeList(db: AppDb, userId: string, question: string): Built {
   };
 }
 
-const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: string, intent: Intent, today: string) => Built>> = {
+// Total over TopicId: a topic without a builder is a compile error, so no reply is ever an interim placeholder.
+const BUILDERS: Record<TopicId, (db: AppDb, userId: string, question: string, intent: Intent, today: string, user: AppUser) => Built> = {
   mealTimes: (db, userId, question, intent) => mealTimes(db, userId, question, intent),
   slotOptions: (db, userId, question, intent) => slotOptions(db, userId, intent, question),
   // REQ-26: a dish found by name opens its detail; otherwise the candidates are offered, or the phrase is not found.
@@ -128,11 +146,9 @@ const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: st
   weekly: (db, userId, _question, _intent, today) => weeklyAnswer(db, userId, today),
   cart: (db, userId) => cartSummary(db, userId),
   recipes: recipeList,
-  plan: (db, userId, question) => planSummary(db, userId, normalizeText(question))
+  plan: (db, userId, question) => planSummary(db, userId, normalizeText(question)),
+  identity: (db, userId, _question, intent, _today, user) => identity(db, userId, user, intent)
 };
-
-/** The interim answer of a topic whose builder has not landed (plan D3). Never asserted by a test; T063 requires none left. */
-const pending = (topic: TopicId): Built => ({ lead: textLead(`Pronto podré responder sobre ${TOPICS[topic].title ?? "esta pregunta"}.`) });
 
 /** REQ-3: only the user's own, live, non-generic recipes can be named; the array is already in seq order. */
 const namedRecipes = (db: AppDb, userId: string) => db.recipes.filter((recipe) => recipe.user_id === userId && !recipe.deleted_at && !isGeneric(recipe.name));
@@ -212,7 +228,7 @@ export function ragAnswer(db: AppDb, user: AppUser, message: string, today: stri
   // The resolver only returns topics of the table.
   const parts = intents.map((intent) => {
     const topic = intent.topic as TopicId;
-    return { topic, intent, built: BUILDERS[topic]?.(db, user.id, message, intent, today) ?? pending(topic) };
+    return { topic, intent, built: BUILDERS[topic](db, user.id, message, intent, today, user) };
   });
 
   // REQ-24: a clarification stands alone (a later one is omitted), and only one block holds buttons: a second block that
