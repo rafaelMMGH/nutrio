@@ -46,6 +46,14 @@ export type Button =
   | { type: "question"; label: string; message: string; layout?: "option" }
   | { type: "link"; label: string; href: string };
 
+/** How a button looks and behaves (spec REQ-34): `option` is a vertical block choice, `chip` any other question, `link` an in-app anchor. */
+export type ButtonVariant = "option" | "chip" | "link";
+
+export function variantOf(button: Button): ButtonVariant {
+  if (button.type === "link") return "link";
+  return button.layout === "option" ? "option" : "chip";
+}
+
 /** One titled part of an answer: options, paging and navigation buttons belong to the block. */
 export type Block = { title: string | null; lead: Rich; sections: Section[]; buttons: Button[] };
 

@@ -107,11 +107,11 @@ export function useAssistantState() {
   }, []);
 
   /** Opens the assistant and asks (used by the dashboard search bar). */
-  const askInScope = useCallback(async (message: string) => {
+  const ask = useCallback(async (message: string) => {
     setOpen(true);
     setFocusRequest((count) => count + 1);
     await send(message);
   }, [send]);
 
-  return { turns, busy, open, setOpen, focusRequest, context, setPage, send, retry, clear, askInScope };
+  return { turns, busy, open, setOpen, focusRequest, context, setPage, send, retry, clear, ask };
 }

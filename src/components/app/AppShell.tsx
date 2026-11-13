@@ -44,7 +44,7 @@ export function AppShell({ user, children }: Props) {
   const router = useRouter();
   const [wizard, setWizard] = useState<{ step: number; data: any } | null>(null);
   const assistant = useAssistantState();
-  const { setOpen: setAssistantOpen, askInScope, busy: assistantBusy } = assistant;
+  const { setOpen: setAssistantOpen, ask, busy: assistantBusy } = assistant;
 
   // At ≤640 px the open panel is a modal sheet (REQ-22): the page behind is inert and cannot scroll. Tab wrapping and
   // focus live in AssistantChat; inert alone would let Tab escape to the browser.
@@ -65,7 +65,7 @@ export function AppShell({ user, children }: Props) {
 
   const openDrawer = useCallback(() => setAssistantOpen(true), [setAssistantOpen]);
 
-  const askAssistant = useCallback((message: string) => askInScope(message), [askInScope]);
+  const askAssistant = useCallback((message: string) => ask(message), [ask]);
 
   const shell = useMemo<Shell>(() => ({ refresh, openDrawer, assistantBusy, askAssistant, openUpload: () => setWizard({ step: 0, data: null }) }), [refresh, openDrawer, assistantBusy, askAssistant]);
 
