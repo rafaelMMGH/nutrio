@@ -29,7 +29,7 @@ test("an empty text is complete at once", () => {
 
 // The reveal is linear in time: pinning the midpoints kills a sqrt, a ceil, a round or a changed rate.
 test("visible characters are linear in elapsed time", () => {
-  assert.equal(visibleCharacters(400, 450), 200);
+  assert.equal(visibleCharacters(400, 400), 200);
   assert.equal(visibleCharacters(10, 90), 5);
   assert.equal(visibleCharacters(10, 100), 5); // 5.55: floor, not round
   assert.equal(visibleCharacters(400, 1), 0);

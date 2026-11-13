@@ -465,7 +465,7 @@ test.describe("REQ-33: typing the first lead", () => {
     await traceTyping(chat, { tap: true });
     await ask(chat, QUESTION);
     const trace = await waitForTyping(chat);
-    // The tap lands on the first typing frame, so the typing is over a frame or two later, far short of the 900 ms.
+    // The tap lands on the first typing frame, so the typing is over a frame or two later, far short of the 800 ms.
     expect(trace.end - trace.arrival).toBeLessThan(300);
     expect(trace.frames.at(-1)?.shown).toBe(LONG_LEAD.length);
     await expect(ui.options).toHaveCount(3);
@@ -515,7 +515,7 @@ test.describe("REQ-33: typing the first lead", () => {
     await ui.navLinks.first().click();
     await expect(chat).toHaveURL(new RegExp(`${LINK_HREF}$`));
     await expect(ui.assistantTurns).toHaveCount(1);
-    // Longer than the 900 ms a replay would take.
+    // Longer than the 800 ms a replay would take.
     await chat.waitForTimeout(1200);
     expect(await chat.evaluate(() => (window as unknown as { __replays: { count: number } }).__replays.count), "typing events after the first").toBe(0);
     await expect(ui.typing).toHaveCount(0);

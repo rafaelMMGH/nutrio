@@ -1,7 +1,7 @@
 import type { Rich } from "@/lib/assistant";
 
 /** Pure timing for the typewriter (REQ-33): a long lead must finish within the budget, a short one types at a natural pace. */
-export const TYPE_BUDGET_MS = 900;
+export const TYPE_BUDGET_MS = 800;
 const MS_PER_CHARACTER = 18;
 
 /** Total typing time for `length` characters: natural pace, capped so a long lead completes within the budget. */
