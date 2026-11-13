@@ -63,3 +63,8 @@ test("REQ-14 a date cue with no phrase gives the fallback line and the default a
   assert.equal(reply, "No entendí la fecha; te muestro hoy. Hoy llevas 2 vasos de agua (0.5 litros) de tu meta de 8 vasos. Esta semana (lun 26 – hoy): 0.5 litros.");
   assert.doesNotMatch(water("¿Cuánta agua tomé en la semana?"), /No entendí/);
 });
+
+test("REQ-17 a range bolds only the number and unit of the total and the average, not 'en total' or 'por día en promedio'", () => {
+  const reply = ask("agua de esta semana", [lit("2026-10-26", 8), lit("2026-10-28", 8)]);
+  assert.deepEqual(reply.blocks[0].lead.filter((span) => span.highlight).map((span) => span.text), ["4 litros", "1.3 litros", "2 de 3 días"]);
+});
