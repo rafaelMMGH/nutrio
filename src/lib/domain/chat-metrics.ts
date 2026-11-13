@@ -68,6 +68,12 @@ export function waterAnswer(db: AppDb, userId: string, question: string, intent:
   return { lead: joinSentences([...lead, summary]) };
 }
 
+/** The active plan's schedule, or null when there is none or it has no meal slots: such a plan counts as no plan (REQ-27). */
+const withSlots = (db: AppDb, userId: string) => {
+  const schedule = activeSchedule(db, userId);
+  return schedule?.meals.length ? schedule : null;
+};
+
 /** Exercise days per week the user aims for. */
 const exerciseGoalDays = (db: AppDb, userId: string) => db.users.find((user) => user.id === userId)?.activity_goal_days ?? 4;
 
@@ -201,7 +207,8 @@ export function mealsDoneAnswer(db: AppDb, userId: string, question: string, int
 export function goalsAnswer(db: AppDb, userId: string, intent: Intent): Built {
   const weightGoal = db.users.find((user) => user.id === userId)?.weight_goal_kg ?? null;
   const days = plural(exerciseGoalDays(db, userId), "día", "días");
-  const planLiters = activeSchedule(db, userId)?.water_goal_liters ?? WATER_GOAL_LITERS;
+  const schedule = withSlots(db, userId);
+  const planLiters = schedule?.water_goal_liters ?? WATER_GOAL_LITERS;
   const glasses = plural(waterGoalGlasses(planLiters), "vaso", "vasos");
   const waterTail = ` (${liters(planLiters)}) al día`;
 
@@ -213,14 +220,14 @@ export function goalsAnswer(db: AppDb, userId: string, intent: Intent): Built {
   if (intent.metric === "exercise") return { lead: [plain("Tu meta de ejercicio es "), bold(days), plain(" por semana.")] };
   if (intent.metric === "water") return { lead: [plain("Tu meta de agua es "), bold(glasses), plain(`${waterTail}.`)] };
 
-  const objective = activePlan(db, userId)?.current_version?.structured_data.objective?.trim();
+  const objective = schedule && activePlan(db, userId)?.current_version?.structured_data.objective?.trim();
   const items: Rich[] = [
     ...(objective ? [[plain(`Objetivo del plan: ${objective}`)]] : []),
     weightGoal === null ? [plain("Peso: sin meta")] : [plain("Peso: "), bold(kg(weightGoal))],
     [plain("Ejercicio: "), bold(days), plain(" por semana")],
     [plain("Agua: "), bold(glasses), plain(waterTail)]
   ];
-  const hasPlan = activeSchedule(db, userId) !== null;
+  const hasPlan = schedule !== null;
   if (!hasPlan) items.push([plain(NO_PLAN_LINE)]);
   return { lead: [plain("Estas son tus metas:")], sections: [{ title: "Metas", items }], blockButtons: hasPlan ? [] : [PLAN_LINK] };
 }
@@ -233,7 +240,7 @@ export function goalsAnswer(db: AppDb, userId: string, intent: Intent): Built {
 export function weeklyAnswer(db: AppDb, userId: string, today: string): Built {
   const logOf = logLookup(db, userId);
   const monday = mondayOf(today);
-  const schedule = activeSchedule(db, userId);
+  const schedule = withSlots(db, userId);
   const slotIds = schedule?.meals.map((meal) => meal.id) ?? [];
   const label = periodLabel({ kind: "thisWeek", from: monday, to: today }, today);
   const goal = plural(exerciseGoalDays(db, userId), "día", "días");
