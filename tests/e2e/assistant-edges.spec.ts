@@ -1,9 +1,10 @@
 import type { Button } from "../../src/lib/assistant";
 import { GREETINGS, NO_MATCH_LEADS, THANKS, slotTime } from "../shared/assistant-copy";
-import { ask, createChatUser, deleteChatUser, expect, resendSweep, seedPlan, test } from "./assistant-helpers";
+import { ask, clearPlan, createChatUser, deleteChatUser, expect, resendSweep, seedPlan, test } from "./assistant-helpers";
 
 // Chat-like edge cases through POST /api/rag/chat (spec assistant-data-scope US4): REQ-23 greeting and thanks, the
-// REQ-28 variants, the plain no-match reply and the dish answers (REQ-26, REQ-29). Written, not run, until Batch E.
+// REQ-28 variants, the plain no-match reply, the dish answers (REQ-26, REQ-29), the multi-topic answers (REQ-24), the
+// clarifications (REQ-25) and the no-plan reply (REQ-27). Written, not run, until Batch E.
 
 const STARTERS = ["Mi cena de hoy", "Mi avance de la semana", "Mi peso", "Mi carrito"];
 
@@ -62,4 +63,66 @@ test("REQ-29 a question with recipe words and no cue is a did-you-mean in rank o
   expect(body.answer).toBe("¿Quisiste decir…?");
   expect(quoted(body.buttons)).toEqual(sends("Ensalada de pollo", "Pollo asado", "Sándwich de atún"));
   await resendSweep(chatContext.request, [body]);
+});
+
+const titles = (blocks: { title: string | null }[]) => blocks.map((block) => block.title);
+const links = (blocks: { buttons: Button[] }[]) => blocks.flatMap((block) => block.buttons).filter((button) => button.type === "link");
+
+test("REQ-24 three topics answer two titled blocks and offer the third as a button", async ({ chatContext }) => {
+  const { body } = await ask(chatContext.request, "agua, ejercicio y peso");
+  expect(titles(body.blocks)).toEqual(["Agua", "Ejercicio"]);
+  expect(messages(body.buttons)).toContain("Mi peso");
+  await resendSweep(chatContext.request, [body]);
+});
+
+test("REQ-24 two slot topics list the first one's options and offer the second as its button", async ({ chatContext }) => {
+  seedPlan({ times: "all", fixture: true });
+  const { body } = await ask(chatContext.request, "¿Qué puedo desayunar y cenar?");
+  expect(body.blocks).toHaveLength(1);
+  expect(messages(body.buttons)).toContain("¿Cuál es mi cena?");
+  await resendSweep(chatContext.request, [body]);
+});
+
+test("REQ-25 '¿Cuánto llevo?' asks which metric with three buttons that resolve", async ({ chatContext }) => {
+  seedPlan({ times: "all" });
+  const { body } = await ask(chatContext.request, "¿Cuánto llevo?");
+  expect(body.kind).toBe("clarify");
+  expect(body.answer).toBe("¿Te refieres a agua, ejercicio o comidas?");
+  expect(quoted(body.buttons)).toEqual([["Agua", "¿Cuánta agua llevo?"], ["Ejercicio", "¿Cuánto ejercicio llevo?"], ["Comidas", "¿Cuántas comidas llevo?"]]);
+  await resendSweep(chatContext.request, [body]);
+});
+
+test("REQ-25 a dish cue with no dish asks '¿De qué platillo?' with the first recipes as buttons", async ({ chatContext }) => {
+  seedPlan({ times: "all", fixture: true });
+  const { body } = await ask(chatContext.request, "¿Qué lleva?");
+  expect(body.kind).toBe("clarify");
+  expect(body.answer).toBe("¿De qué platillo?");
+  expect(quoted(body.buttons)).toEqual(sends("Pollo asado", "Ensalada de pollo", "Sándwich de atún"));
+  await resendSweep(chatContext.request, [body]);
+});
+
+test("REQ-9 an option's detail offers its slot's time beside 'Ver receta completa'", async ({ chatContext }) => {
+  seedPlan({ times: "all", fixture: true });
+  const { body } = await ask(chatContext.request, "Comida, opción 6");
+  expect(body.kind).toBe("detail");
+  expect(messages(body.buttons)).toEqual(["¿A qué hora es mi comida?"]);
+  expect(links(body.blocks)).toEqual([{ type: "link", label: "Ver receta completa", href: expect.stringMatching(/^\/recipes\/.+/) }]);
+  await resendSweep(chatContext.request, [body]);
+});
+
+test("REQ-27 with no active plan a slot question says so, with 'Subir mi plan' and the time as a follow-up", async ({ chatContext }) => {
+  clearPlan();
+  const { body } = await ask(chatContext.request, "¿Qué puedo cenar?");
+  expect(body.kind).toBe("answer");
+  expect(body.answer).toBe("Aún no tienes un plan activo.");
+  expect(links(body.blocks)).toEqual([{ type: "link", label: "Subir mi plan", href: "/plans" }]);
+  expect(messages(body.buttons)).toEqual(["¿A qué hora es mi cena?"]);
+  expect(body.sources).toEqual([]);
+});
+
+test("REQ-22 REQ-27 with no active plan a goal-and-progress answer shows 'Subir mi plan' once", async ({ chatContext }) => {
+  clearPlan();
+  const { body } = await ask(chatContext.request, "mi meta y mi avance de la semana");
+  expect(titles(body.blocks)).toEqual(["Metas", "Avance"]);
+  expect(links(body.blocks)).toEqual([{ type: "link", label: "Subir mi plan", href: "/plans" }]);
 });

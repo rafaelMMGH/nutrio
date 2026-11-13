@@ -116,7 +116,8 @@ test.describe("builders", () => {
   test("REQ-1 no active plan: the lead says so, with no sections and no sources", async ({ chatContext }) => {
     clearPlan();
     const body = await answer(chatContext, "¿Cuál es el objetivo de mi plan?");
-    expect(plainOf(body.blocks[0].lead)).toBe("No tienes un plan activo.");
+    expect(plainOf(body.blocks[0].lead)).toBe("Aún no tienes un plan activo.");
+    expect(body.blocks[0].buttons).toEqual([{ type: "link", label: "Subir mi plan", href: "/plans" }]);
     expect(body.blocks[0].sections).toEqual([]);
     expect(body.sources).toEqual([]);
   });
@@ -322,7 +323,8 @@ test.describe("builders", () => {
   test("REQ-18 without an active plan the lead says so, and there are no sections", async ({ chatContext }) => {
     clearPlan();
     const body = await answer(chatContext, "¿Cuál es mi horario?");
-    expect(plainOf(body.blocks[0].lead)).toBe("No tienes un plan activo.");
+    expect(plainOf(body.blocks[0].lead)).toBe("Aún no tienes un plan activo.");
+    expect(body.blocks[0].buttons).toEqual([{ type: "link", label: "Subir mi plan", href: "/plans" }]);
     expect(body.blocks[0].sections).toEqual([]);
   });
 });
