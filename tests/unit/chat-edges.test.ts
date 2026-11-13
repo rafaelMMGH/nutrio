@@ -276,6 +276,27 @@ test("REQ-24 a later topic that needs a clarification is omitted: the first answ
   assert.deepEqual(messages(reply), ["¿Cuánto ejercicio llevo?", "¿Cuántas comidas llevo?"]);
 });
 
+test("REQ-24 the times question of three slots offers the third slot's time, not its options", () => {
+  assert.deepEqual(messages(ask("¿A qué hora es mi desayuno, mi cena y mi comida?")).slice(-1), ["¿A qué hora es mi comida?"]);
+});
+
+test("REQ-24 the sources of a block left out do not reach the answer", () => {
+  // The omitted clarification would cite the plan; the water block cites nothing.
+  assert.deepEqual(askIn("agua y colación", TWO_COLACIONES).sources, []);
+});
+
+test("REQ-24 a single-option slot answered as a detail keeps its slot-ref title beside another block", () => {
+  const oneDesayuno = (db: AppDb) => {
+    for (const recipe of db.recipes) recipe.description = "Uno. Dos. Tres.";
+    let kept = false;
+    db.mealOptions = db.mealOptions.filter((option) => option.meal_type_id !== "chat-e2e-memdb-plan-v1-meal-0" || (!kept && (kept = true)));
+  };
+  const reply = askIn("¿Qué puedo desayunar y mi peso?", undefined, oneDesayuno);
+  assert.equal(reply.kind, "detail");
+  assert.deepEqual(titles(reply), ["Desayuno", "Peso"]);
+  assert.deepEqual(askIn("mi peso y qué puedo desayunar", undefined, oneDesayuno).blocks.map((block) => block.title), ["Peso", "Desayuno"]);
+});
+
 test("REQ-24 'Subir mi plan' shows once in a no-plan answer of two blocks, in the first", () => {
   const reply = askIn("mi meta y mi avance de la semana", undefined, (db) => {
     db.plans = [];

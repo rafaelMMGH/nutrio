@@ -111,8 +111,8 @@ const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: st
   mealTimes: (db, userId, question, intent) => mealTimes(db, userId, question, intent),
   slotOptions: (db, userId, question, intent) => slotOptions(db, userId, intent, question),
   // REQ-26: a dish found by name opens its detail; otherwise the candidates are offered, or the phrase is not found.
-  // The resolver (given the recipes) always names live recipes of this user, so found and didYouMean have them; an
-  // empty phrase is the clarify outcome (REQ-25).
+  // The resolver (given the recipes) always names live recipes of this user, so found has one (it throws otherwise);
+  // didYouMean without any would be a reply with no buttons, and an empty phrase is the clarify outcome (REQ-25).
   dish: (db, userId, _question, intent) => {
     const recipes = (intent.recipeIds ?? []).flatMap((id) => db.recipes.find((item) => item.id === id && item.user_id === userId && !item.deleted_at) ?? []);
     if (intent.outcome === "found") return recipeDetail(db, userId, recipes[0]);
