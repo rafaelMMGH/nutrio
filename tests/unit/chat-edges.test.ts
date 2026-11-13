@@ -48,6 +48,12 @@ test('REQ-23 "hoal" (4 letters, exact only) stays no_match, and a greeting befor
   assert.deepEqual(reply.resolved?.map((intent) => intent.topic), ["weight"]);
 });
 
+test("REQ-23 thanks before a real question is ignored: the question is answered", () => {
+  const reply = ask("gracias, ¿qué cenaré hoy?");
+  assert.ok(!["greeting", "thanks"].includes(reply.kind), reply.kind);
+  assert.deepEqual(reply.resolved?.map((intent) => intent.topic), ["slotOptions"]);
+});
+
 test("REQ-28 each greeting variant is reached by a raw question, the same one twice and with other punctuation", () => {
   assert.deepEqual(["qué tal", "hola", "buenos días"].map((message) => ask(message).answer), GREETINGS);
   assert.equal(ask("¡HOLA!").answer, ask("hola").answer);
