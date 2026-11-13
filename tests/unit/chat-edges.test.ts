@@ -19,7 +19,7 @@ const starters = (reply: ChatAnswer) => reply.buttons.flatMap((button) => (butto
 
 // Raw texts, each reaching one variant through the question hash (REQ-28). The fuzzy rows are the 1c2 review (M4).
 const HELLOS = ["hola", "¡Hola!", "buenos días", "Buenas tardes", "buenas noches", "qué tal", "buenso dias", "buenas tarde", "buenos dia", "hola, buenos días"];
-const THANKS_ROWS = ["gracias", "grasias", "gracia", "gracias hola"];
+const THANKS_ROWS = ["gracias", "grasias", "gracia", "gracias hola", "gracais", "gracas", "gracis"];
 
 for (const message of HELLOS) {
   test(`REQ-23 "${message}" is a greeting: a lead and the four starters`, () => {
@@ -53,6 +53,11 @@ test("REQ-23 thanks before a real question is ignored: the question is answered"
   assert.ok(!["greeting", "thanks"].includes(reply.kind), reply.kind);
   assert.deepEqual(reply.resolved?.map((intent) => intent.topic), ["slotOptions"]);
 });
+
+// Names one swap or edit away from "gracias" are not thanks.
+for (const message of ["garcia", "Grecia"]) {
+  test(`REQ-23 "${message}" is not thanks`, () => assert.equal(ask(message).kind, "no_match"));
+}
 
 test("REQ-28 each greeting variant is reached by a raw question, the same one twice and with other punctuation", () => {
   assert.deepEqual(["qué tal", "hola", "buenos días"].map((message) => ask(message).answer), GREETINGS);

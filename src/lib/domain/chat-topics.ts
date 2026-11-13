@@ -57,9 +57,10 @@ for (const { topic, words: entries } of VOCABULARY) for (const entry of entries)
 // Words of phrases are entries too, so an exact "lleva" never fuzzy-matches the entry "llevo" (REQ-2), but they trigger nothing alone.
 const WORD_ENTRIES = [...new Set([...ENTRY_TOPICS.keys(), ...[...PHRASES.keys()].flatMap((phrase) => phrase.split(" "))])];
 
-// Entries are singular, as the matcher expects (REQ-2): "gracias" and "buenos dias" match through their plural forms.
+// Vocabulary entries are singular, as the matcher expects (REQ-2), and the greeting phrases match "buenos dias" through
+// their plural forms. The thanks word stays "gracias": its singular "gracia" is one edit from "garcia" and "Grecia".
 const GREETING_WORDS = ["hola"];
-const THANKS_WORD = "gracia";
+const THANKS_WORD = "gracias";
 const GREETING_PHRASES = ["bueno dia", "buena tarde", "buena noche", "que tal"];
 
 /** "hello" or "thanks" when the message is made only of greeting or thanks words, else null (a greeting before a question is ignored by the matcher). */
