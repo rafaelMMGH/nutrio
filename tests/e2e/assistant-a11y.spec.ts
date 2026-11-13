@@ -1,8 +1,9 @@
 import type { Locator, Page } from "@playwright/test";
+import type { Button } from "@/lib/assistant";
 import { expectIssues } from "./fixtures";
 import { auditNow, visit } from "./theme-audit";
 import { canvasColor, contrast, effectiveBackground, toRgb, type Rgba, type Theme } from "./theme-helpers";
-import { assistantUi, cartAnswer, createChatUser, deleteChatUser, expect, focusWalk, CHIP_LABEL, LINK_HREF, LINK_LABEL, LONG_LEAD, longLeadAnswer, mockChat, openAssistant, OPTION_LABELS, optionsAnswer, test } from "./assistant-helpers";
+import { assistantUi, buildAnswer, cartAnswer, createChatUser, deleteChatUser, expect, focusWalk, CHIP_LABEL, LINK_HREF, LINK_LABEL, LONG_LEAD, longLeadAnswer, mockChat, openAssistant, OPTION_LABELS, optionsAnswer, test } from "./assistant-helpers";
 
 // The assistant as a phone sheet. Spec assistant-chat-polish, US5: REQ-15 (geometry, touch targets, safe areas, the
 // on-screen keyboard, long tokens), REQ-14 at 360 px (backdrop, focus rings), REQ-17 (turn names, live region) and REQ-22
@@ -939,3 +940,153 @@ for (const theme of ["light", "dark"] as Theme[]) {
     });
   });
 }
+
+// Keyboard and focus after a button, and navigation links (REQ-34, REQ-35). The destinations are real routes: "/" is the
+// dashboard the tests start on (the same destination), "/plans" and "/recipes" are other pages with a main heading.
+
+const link = (label: string, href: string): Button => ({ type: "link", label, href });
+
+/** One answer whose block carries the given navigation links, plus the answer-level chip. */
+function linksAnswer(...links: Button[]) {
+  const answer = buildAnswer({ lead: [{ text: "Aquí tienes el siguiente paso." }], buttons: [{ type: "question", label: CHIP_LABEL, message: CHIP_LABEL }] });
+  answer.blocks[0].buttons = links;
+  return answer;
+}
+
+test.describe("REQ-35: Enter and Space on buttons and links", () => {
+  test("Enter and Space ask with an option button; Enter follows a link and Space does not", async ({ chat }) => {
+    const mock = await mockChat(chat, optionsAnswer());
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    const option = ui.options.first();
+    await option.focus();
+    await chat.keyboard.press("Enter");
+    await expect(ui.assistantTurns).toHaveCount(2);
+    await ui.options.last().focus();
+    await chat.keyboard.press("Space");
+    await expect(ui.assistantTurns).toHaveCount(3);
+    expect(mock.requests.map((request) => request.message)).toEqual([QUESTION, OPTION_LABELS[0], OPTION_LABELS[2]]);
+
+    const nav = ui.navLinks.last();
+    await nav.focus();
+    // A native anchor ignores Space (it scrolls the page), so only Enter navigates.
+    await chat.keyboard.press("Space");
+    await expect(chat).toHaveURL(/\/$/);
+    await chat.keyboard.press("Enter");
+    await expect(chat).toHaveURL(new RegExp(`${LINK_HREF}$`));
+  });
+});
+
+for (const [name, viewport] of [["360 px", PHONE], ["desktop", { width: 1280, height: 800 }]] as const) {
+  test.describe(`REQ-35: focus after an option button at ${name}`, () => {
+    test.use({ viewport });
+
+    // Paging, slot, clarification and did-you-mean buttons are the same question button with another message.
+    test("while pending and after the answer, focus is on the " + (viewport === PHONE ? "log, then the new turn" : "input"), async ({ chat }) => {
+      await mockChat(chat, optionsAnswer());
+      await chat.goto("/");
+      const ui = await openAssistant(chat);
+      await ask(chat, QUESTION);
+      await expect(ui.assistantTurns).toHaveCount(1);
+      const second = await mockChat(chat, optionsAnswer(), { hold: true });
+      await ui.options.first().click();
+      await expect(ui.pending).toHaveCount(1);
+      await expect(viewport === PHONE ? ui.log : ui.input).toBeFocused();
+      second.release();
+      await expect(ui.assistantTurns).toHaveCount(2);
+      await expect(viewport === PHONE ? ui.assistantTurns.last() : ui.input).toBeFocused();
+    });
+  });
+}
+
+test.describe("REQ-34: navigation links at 360 px", () => {
+  test.use({ viewport: PHONE });
+
+  for (const [label, href] of [["Registrar mi peso", "/"], ["Fijar mi meta", "/"], ["Subir mi plan", "/plans"]] as const) {
+    test(`"${label}" closes the sheet and the thread survives`, async ({ chat }) => {
+      await mockChat(chat, linksAnswer(link(label, href)));
+      await chat.goto("/");
+      const ui = await openSheet(chat);
+      await ask(chat, QUESTION);
+      await expect(ui.assistantTurns).toHaveCount(1);
+      await ui.navLinks.first().click();
+      await expect(ui.panel).toBeHidden();
+      await expect(ui.fab).toBeVisible();
+      await expect(chat).toHaveURL(new RegExp(`${href}$`));
+      if (href === "/") await expect(ui.fab).toBeFocused();
+      else await expect(chat.locator("main h1")).toBeFocused();
+      await ui.fab.click();
+      await expect(ui.assistantTurns).toHaveCount(1);
+      await expect(ui.navLinks).toHaveCount(1);
+    });
+  }
+
+  test("a link on an old answer navigates, closes the sheet and the old answer stays", async ({ chat }) => {
+    await mockChat(chat, linksAnswer(link("Ver recetario", "/recipes")));
+    await chat.goto("/");
+    const ui = await openSheet(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(2);
+    await ui.assistantTurns.first().getByRole("link", { name: "Ver recetario" }).click();
+    await expect(ui.panel).toBeHidden();
+    await expect(chat).toHaveURL(/\/recipes$/);
+    await ui.fab.click();
+    await expect(ui.assistantTurns).toHaveCount(2);
+  });
+
+  test("a modified click leaves the sheet open", async ({ chat }) => {
+    await mockChat(chat, linksAnswer(link("Ver recetario", "/recipes")));
+    await chat.goto("/");
+    const ui = await openSheet(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    // Ctrl-click opens a new tab; the new page is not under test, so it is closed again.
+    const opened = chat.context().waitForEvent("page");
+    await ui.navLinks.first().click({ modifiers: ["Control"] });
+    await (await opened).close();
+    await expect(ui.panel).toBeVisible();
+    await expect(chat).toHaveURL(/\/$/);
+  });
+
+  test("with the keyboard: Enter on a link closes the sheet and focus reaches the destination heading", async ({ chat }) => {
+    await mockChat(chat, linksAnswer(link("Ver recetario", "/recipes")));
+    await chat.goto("/");
+    const ui = await openSheet(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    await ui.navLinks.first().focus();
+    await chat.keyboard.press("Enter");
+    await expect(ui.panel).toBeHidden();
+    await expect(chat.locator("main h1")).toBeFocused();
+  });
+});
+
+test.describe("REQ-35: navigation links on desktop", () => {
+  test("the panel stays open and focus moves to the destination's main heading", async ({ chat }) => {
+    await mockChat(chat, linksAnswer(link("Ver recetario", "/recipes")));
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    await ui.navLinks.first().click();
+    await expect(chat).toHaveURL(/\/recipes$/);
+    await expect(ui.panel).toBeVisible();
+    await expect(chat.locator("main h1")).toBeFocused();
+    await expect(ui.assistantTurns).toHaveCount(1);
+  });
+
+  test("a link to the page already open changes nothing", async ({ chat }) => {
+    await mockChat(chat, linksAnswer(link("Registrar mi peso", "/")));
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    await ui.navLinks.first().click();
+    await expect(ui.panel).toBeVisible();
+    await expect(chat).toHaveURL(/\/$/);
+  });
+});
