@@ -53,7 +53,7 @@ export function waterAnswer(db: AppDb, userId: string, question: string, intent:
   const days = daysBetween(period.from, period.to);
   const { liters: total, daysMet } = waterOver(logOf, days, goal);
   const summary = [
-    plain(`${periodLabel(period, today)}: `), bold(`${liters(total)} en total`), plain(", "), bold(`${liters(total / days.length)} por día en promedio`),
+    plain(`${periodLabel(period, today)}: `), bold(liters(total)), plain(" en total, "), bold(liters(total / days.length)), plain(" por día en promedio"),
     plain(". Cumpliste tu meta "), bold(`${daysMet} de ${plural(days.length, "día", "días")}`), plain(".")
   ];
   return { lead: joinSentences([...lead, summary]) };
