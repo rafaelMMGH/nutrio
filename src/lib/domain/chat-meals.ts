@@ -13,7 +13,7 @@ import { recipeSteps } from "@/lib/recipe-steps";
  * What a builder returns; `ragAnswer` adds the kind and the follow-ups. `buttons` (a choice) replace the follow-ups;
  * `blockButtons` (navigation) stay on the answer's block.
  */
-export type Built = { lead: Rich; sections?: Section[]; sources?: string[]; buttons?: Button[]; blockButtons?: Button[]; kind?: "clarify" | "detail" };
+export type Built = { lead: Rich; sections?: Section[]; sources?: string[]; buttons?: Button[]; blockButtons?: Button[]; kind?: "clarify" | "detail" | "did_you_mean" };
 
 /** A meal type of the active plan. `ref` is its name, or with duplicate names its ordinal form ("Segunda colación"). */
 export type Slot = { id: string; name: string; time: string; ref: string };

@@ -1,7 +1,7 @@
 import type { AppDb, AppUser } from "@/lib/types";
 import { type Block, type Button, type ChatAnswer, type Intent, type ReplyKind, type Rich, type Section, normalizeText, STARTERS, words } from "@/lib/assistant";
 import { consolidateCart } from "@/lib/domain/cart";
-import { isGeneric } from "@/lib/domain/chat-dish";
+import { isGeneric, rankDish } from "@/lib/domain/chat-dish";
 import { type Built, chooseSlot, pickVariant, planSlots, recipeDetail, slotOptions, slotTimeLead } from "@/lib/domain/chat-meals";
 import { exerciseAnswer, goalsAnswer, mealsDoneAnswer, waterAnswer, weeklyAnswer, weightAnswer } from "@/lib/domain/chat-metrics";
 import { resolve } from "@/lib/domain/chat-intent";
@@ -110,10 +110,13 @@ export function recipeList(db: AppDb, userId: string, question: string): Built {
 const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: string, intent: Intent, today: string) => Built>> = {
   mealTimes: (db, userId, question, intent) => mealTimes(db, userId, question, intent),
   slotOptions: (db, userId, question, intent) => slotOptions(db, userId, intent, question),
-  // A dish found by name opens its detail; did-you-mean and not-found keep the interim answer until T048.
+  // REQ-26: a dish found by name opens its detail; otherwise the candidates are offered, or the phrase is not found.
   dish: (db, userId, _question, intent) => {
-    const recipe = intent.outcome === "found" ? db.recipes.find((item) => item.id === intent.recipeIds?.[0] && item.user_id === userId && !item.deleted_at) : undefined;
-    return recipe ? recipeDetail(db, userId, recipe) : pending("dish");
+    const recipes = (intent.recipeIds ?? []).flatMap((id) => db.recipes.find((item) => item.id === id && item.user_id === userId && !item.deleted_at) ?? []);
+    if (intent.outcome === "found" && recipes[0]) return recipeDetail(db, userId, recipes[0]);
+    if (intent.outcome === "didYouMean" && recipes.length) return { lead: textLead(`No encontré exactamente '${intent.phrase}'. ${DID_YOU_MEAN}`), kind: "did_you_mean", buttons: dishButtons(recipes) };
+    if (intent.outcome === "notFound") return { lead: textLead(`No encontré '${intent.phrase}' en tu plan ni en tus recetas.`) };
+    return pending("dish");
   },
   water: (db, userId, question, intent, today) => waterAnswer(db, userId, question, intent, today),
   exercise: (db, userId, question, intent, today) => exerciseAnswer(db, userId, question, intent, today),
@@ -129,6 +132,11 @@ const BUILDERS: Partial<Record<TopicId, (db: AppDb, userId: string, question: st
 
 /** The interim answer of a topic whose builder has not landed (plan D3). Never asserted by a test; T063 requires none left. */
 const pending = (topic: TopicId): Built => ({ lead: textLead(`Pronto podré responder sobre ${TOPICS[topic].title ?? "esta pregunta"}.`) });
+
+const DID_YOU_MEAN = "¿Quisiste decir…?";
+
+/** One button per candidate recipe, sending the exact name so that REQ-3 rule 1 opens it. */
+const dishButtons = (recipes: { name: string }[]): Button[] => recipes.map(({ name }) => ({ type: "question", label: name, message: `¿Qué lleva ${name}?` }));
 
 // REQ-28: the lead of a greeting, of thanks and of the no-match reply, one per variant of the spec Copy, in its order.
 const GREETINGS = ["¡Hola! ¿En qué te ayudo?", "¡Hola! ¿Qué quieres saber?", "¡Hola! Pregúntame por tu plan, tu avance o tu carrito."];
@@ -152,7 +160,12 @@ export function ragAnswer(db: AppDb, user: AppUser, message: string, today: stri
   // REQ-3: only the user's own, live, non-generic recipes can be named; the array is already in seq order.
   const recipes = db.recipes.filter((recipe) => recipe.user_id === user.id && !recipe.deleted_at && !isGeneric(recipe.name));
   const { intents, overflow: further } = resolve(message, recipes, today);
-  if (!intents.length) return reply("no_match", standalone(pickVariant(NO_MATCH_LEADS, message)), starters, [], trace ? [] : undefined);
+  if (!intents.length) {
+    // REQ-29 (step 8): recipe words in a question with nothing else resolved are offered, never opened.
+    const candidates = rankDish(message, recipes);
+    if (candidates.length) return reply("did_you_mean", standalone(DID_YOU_MEAN), dishButtons(candidates), [], trace ? [] : undefined);
+    return reply("no_match", standalone(pickVariant(NO_MATCH_LEADS, message)), starters, [], trace ? [] : undefined);
+  }
 
   // The resolver only returns topics of the table.
   const answered = intents.map((intent) => intent.topic as TopicId);
