@@ -385,8 +385,13 @@ export function assistantUi(page: Page) {
     send: panel.getByRole("button", { name: "Enviar" }),
     log: page.locator(".assistant-chat-log"),
     userTurns: page.locator(".assistant-turn.user"),
-    /** Finished assistant turns (answers and errors), not the pending one. */
-    assistantTurns: page.locator(".assistant-turn.assistant:not(.is-pending)"),
+    /**
+     * Finished assistant turns (answers and errors) whose first lead has finished typing (REQ-33), not the pending one: a
+     * count assertion on it therefore also waits out the typing, so a test never reads or audits a half-revealed answer.
+     */
+    assistantTurns: page.locator(".assistant-turn.assistant:not(.is-pending):not([data-typing])"),
+    /** An answer whose first lead is still typing: its sections and buttons are not shown yet. */
+    typing: page.locator(".assistant-turn.assistant[data-typing]"),
     pending: page.locator(".assistant-turn.assistant.is-pending"),
     labels: page.locator(".assistant-turn-label"),
     live: page.locator(".assistant-turn-live"),
@@ -466,6 +471,71 @@ export function optionsAnswer(): ChatAnswer {
   const options: Button[] = OPTION_LABELS.map((label) => ({ type: "question", label, message: label, layout: "option" }));
   base.blocks[0].buttons = [...options, { type: "link", label: LINK_LABEL, href: LINK_HREF }];
   return base;
+}
+
+/** An options answer whose lead is long enough to hit the typing budget (REQ-33). */
+export const LONG_LEAD = "Estas son las opciones que tu plan tiene para ese momento del día, con ingredientes y porciones pensadas para que tu semana sea sencilla y variada. ".repeat(3).trim();
+
+export function longLeadAnswer(): ChatAnswer {
+  const answer = optionsAnswer();
+  answer.blocks[0].lead = [{ text: LONG_LEAD }];
+  answer.blocks[0].sections = [{ title: "Detalle", items: [[{ text: "Una porción de cada uno" }]] }];
+  answer.sources = ["Plan activo"];
+  return answer;
+}
+
+/** What `traceTyping` saw in one animation frame. `shown` counts the characters on screen (the typed layer while typing, the lead after). */
+export type TypingFrame = { at: number; typing: boolean; shown: number; overlays: number; actions: string; sectionOpacity: string; height: number };
+export type TypingTrace = { arrival: number; end: number; frames: TypingFrame[] };
+
+/**
+ * Starts sampling every animation frame in the page, from the frame the finished assistant turn first exists until its
+ * `data-typing` is gone; call it before sending the question and read the trace with `waitForTyping`. With `tap`, the
+ * bubble is clicked on the first frame that is still typing (tap to complete). Samples are taken in the page because
+ * the typing lasts under a second, too short to poll reliably from the test.
+ */
+export async function traceTyping(page: Page, options: { tap?: boolean } = {}) {
+  await page.evaluate((tap) => {
+    const trace: TypingTrace = { arrival: -1, end: -1, frames: [] };
+    (window as unknown as { __typingTrace: TypingTrace }).__typingTrace = trace;
+    let tapped = false;
+    const sample = (now: number) => {
+      const turn = document.querySelector(".assistant-turn.assistant:not(.is-pending)");
+      if (turn) {
+        if (trace.arrival < 0) trace.arrival = now;
+        const typing = turn.hasAttribute("data-typing");
+        const lead = turn.querySelector(".assistant-turn-lead");
+        const typed = turn.querySelector(".assistant-lead-typed");
+        const log = document.querySelector(".assistant-chat-log") as HTMLElement;
+        const section = turn.querySelector(".assistant-turn-section");
+        trace.frames.push({
+          at: now,
+          typing,
+          shown: (typing ? typed?.textContent : lead?.textContent)?.length ?? 0,
+          overlays: turn.querySelectorAll(".assistant-lead-typed").length,
+          actions: getComputedStyle(turn.querySelector(".assistant-actions") ?? turn).visibility,
+          sectionOpacity: section ? getComputedStyle(section).opacity : "",
+          height: log.scrollHeight
+        });
+        if (tap && typing && !tapped) {
+          tapped = true;
+          (turn.querySelector(".assistant-bubble") as HTMLElement).click();
+        }
+        if (!typing) {
+          trace.end = now;
+          return;
+        }
+      }
+      requestAnimationFrame(sample);
+    };
+    requestAnimationFrame(sample);
+  }, options.tap ?? false);
+}
+
+/** The trace of `traceTyping`, once the typing has ended. */
+export async function waitForTyping(page: Page): Promise<TypingTrace> {
+  await page.waitForFunction(() => (window as unknown as { __typingTrace: TypingTrace }).__typingTrace.end >= 0);
+  return page.evaluate(() => (window as unknown as { __typingTrace: TypingTrace }).__typingTrace);
 }
 
 export type MockOptions = {

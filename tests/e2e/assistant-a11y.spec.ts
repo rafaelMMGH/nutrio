@@ -2,7 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expectIssues } from "./fixtures";
 import { auditNow, visit } from "./theme-audit";
 import { canvasColor, contrast, effectiveBackground, toRgb, type Rgba, type Theme } from "./theme-helpers";
-import { assistantUi, cartAnswer, createChatUser, deleteChatUser, expect, focusWalk, CHIP_LABEL, LINK_HREF, LINK_LABEL, mockChat, openAssistant, OPTION_LABELS, optionsAnswer, test } from "./assistant-helpers";
+import { assistantUi, cartAnswer, createChatUser, deleteChatUser, expect, focusWalk, CHIP_LABEL, LINK_HREF, LINK_LABEL, LONG_LEAD, longLeadAnswer, mockChat, openAssistant, OPTION_LABELS, optionsAnswer, test } from "./assistant-helpers";
 
 // The assistant as a phone sheet. Spec assistant-chat-polish, US5: REQ-15 (geometry, touch targets, safe areas, the
 // on-screen keyboard, long tokens), REQ-14 at 360 px (backdrop, focus rings), REQ-17 (turn names, live region) and REQ-22
@@ -361,6 +361,43 @@ test.describe("REQ-17: turns and the live region", () => {
       expect(await inLiveRegion(locator.first()), `${name} is outside the region`).toBe(false);
     }
     expect(region).not.toContain((await ui.chips.first().textContent()) ?? "unreachable");
+  });
+
+  test("an options answer is announced once, with its count and labels as text, and no button or link is in the region", async ({ chat }) => {
+    await mockChat(chat, longLeadAnswer());
+    await chat.goto("/");
+    const ui = await openSheet(chat);
+    // What a screen reader gets: the region's text without anything aria-hidden (the typed layer), recorded after every change.
+    await chat.evaluate(() => {
+      const announced: string[] = [];
+      (window as unknown as { __announced: string[] }).__announced = announced;
+      const text = (node: Node): string => {
+        if (node instanceof Element && node.getAttribute("aria-hidden") === "true") return "";
+        if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
+        return [...node.childNodes].map(text).join("\u2063");
+      };
+      // The region only exists once the question is sent, so watch the log it will appear in.
+      const record = () => announced.push(text(document.querySelector(".assistant-turn-live") ?? document.createTextNode("")));
+      new MutationObserver(record).observe(document.querySelector(".assistant-chat-log") as HTMLElement, { subtree: true, childList: true, characterData: true, attributes: true });
+    });
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    // Past the typing and the fades, so a late change would be recorded.
+    await chat.waitForTimeout(500);
+
+    const expected = `${OPTION_LABELS.length} opciones: ${OPTION_LABELS.join("; ")}`;
+    await expect(ui.live).toContainText(expected);
+    const heard = await chat.evaluate(() => (window as unknown as { __announced: string[] }).__announced);
+    const distinct = [...new Set(heard.filter((entry) => entry !== ""))];
+    expect(distinct, "the announced text changes once, from empty to the full answer").toHaveLength(1);
+    expect(distinct[0]).toContain(LONG_LEAD);
+    expect(distinct[0]).toContain(expected);
+    expect(distinct[0].split(expected), "the count is announced once").toHaveLength(2);
+    // Buttons and links stay outside the region (chat-polish REQ-17), and the typed layer is hidden from it.
+    await expect(ui.live.locator("a, button")).toHaveCount(0);
+    expect(await inLiveRegion(ui.assistantTurns.last().getByRole("link", { name: LINK_LABEL }))).toBe(false);
+    for (const label of OPTION_LABELS) expect(await inLiveRegion(ui.assistantTurns.last().getByRole("button", { name: label, exact: true })), label).toBe(false);
+    await expect(ui.live.locator(".assistant-lead-typed")).toHaveCount(0);
   });
 
   test.describe("an error", () => {
@@ -870,7 +907,7 @@ test.describe("REQ-35: names, bubbles and focus order", () => {
       const stop = await chat.evaluate(() => {
         const active = document.activeElement as HTMLElement;
         const inside = Boolean(active.closest(".assistant-turn"));
-        return { inside, tag: active.tagName, variant: active.getAttribute("data-variant"), top: active.getBoundingClientRect().top, bubble: active.classList.contains("assistant-bubble") || active.classList.contains("assistant-turn") || active.classList.contains("assistant-avatar") };
+        return { inside, tag: active.tagName, variant: active.getAttribute("data-variant"), top: active.getBoundingClientRect().top - (document.querySelector(".assistant-chat-log") as HTMLElement).getBoundingClientRect().top + (document.querySelector(".assistant-chat-log") as HTMLElement).scrollTop, bubble: active.classList.contains("assistant-bubble") || active.classList.contains("assistant-turn") || active.classList.contains("assistant-avatar") };
       });
       expect(stop.bubble, "a bubble, turn or avatar took focus").toBe(false);
       if (stop.inside) order.push(stop);

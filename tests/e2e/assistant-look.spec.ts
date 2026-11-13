@@ -3,7 +3,7 @@ import { MAX_MESSAGE } from "../../src/lib/assistant";
 import { expectIssues } from "./fixtures";
 import { auditNow, visit } from "./theme-audit";
 import { contrast, effectiveBackground, toRgb, type Theme } from "./theme-helpers";
-import { assistantUi, focusWalk, buildAnswer, cartAnswer, createChatUser, deleteChatUser, expect, mockChat, openAssistant, optionsAnswer, test } from "./assistant-helpers";
+import { assistantUi, focusWalk, buildAnswer, cartAnswer, createChatUser, deleteChatUser, expect, LINK_HREF, LINK_LABEL, LONG_LEAD, longLeadAnswer, mockChat, openAssistant, optionsAnswer, test, traceTyping, waitForTyping } from "./assistant-helpers";
 
 // How the assistant looks and moves. Spec assistant-chat-polish, US5: REQ-14 (contrast in both themes, forced colors),
 // REQ-16 (motion) and the "Look" details (bubble width, long tokens, no horizontal overflow at 360 px).
@@ -142,9 +142,11 @@ test.describe("REQ-14: forced colors", () => {
     const ui = await openAssistant(chat);
     await ask(chat, QUESTION);
     await expect(ui.assistantTurns).toHaveCount(1);
-    // The bubble sits inside the full-width turn row, so the edge is the bubble's.
+    // The bubble sits inside the full-width turn row, so the edge is the bubble's. The base border is 1px transparent, so
+    // the width alone proves nothing: the edge must be painted, i.e. opaque (forced colors swaps it for a system color).
     for (const turn of [ui.userTurns.first().locator(".assistant-bubble"), ui.assistantTurns.first().locator(".assistant-bubble")]) {
       expect(await turn.evaluate((node) => parseFloat(getComputedStyle(node).borderTopWidth))).toBeGreaterThan(0);
+      expect((await colorOf(chat, turn, "borderTopColor"))[3], "the edge is painted").toBe(1);
     }
   });
 });
@@ -383,11 +385,140 @@ test.describe("REQ-32: 360 px wrapping", () => {
       };
     });
     expect(overflow.count).toBe(2);
-    // REQ-32: the user bubble is at most 80% of the log width; only meaningful with a message this long Measured against the log's content box (clientWidth minus padding).
+    // REQ-32: the user bubble is at most 80% of the log width; only meaningful with a message this long. Measured against the log's content box (clientWidth minus padding).
     expect(overflow.user).toBeLessThanOrEqual(overflow.content * 0.8 + 0.5);
     expect(overflow.log).toBeLessThanOrEqual(0);
     expect(overflow.page).toBeLessThanOrEqual(0);
     expect(overflow.outside).toBe(0);
     expect(overflow.bubbleScroll.every((value) => value <= 0)).toBe(true);
+  });
+});
+
+// assistant-data-scope US6 (REQ-33): typing, fades, tap to complete, no replay. Written in T059; first run in Batch E.
+test.describe("REQ-33: typing the first lead", () => {
+  const FADE_MS = 200;
+  const fadeOf = (locator: Locator) =>
+    locator.first().evaluate((node) => {
+      const list = getComputedStyle(node).transitionDuration.split(",");
+      return Math.max(...list.map((part) => parseFloat(part) * (part.trim().endsWith("ms") ? 1 : 1000)));
+    });
+
+  test("a long lead is fully shown within 1 s, the layout is final from the first frame, and the buttons wait for it", async ({ chat }) => {
+    await mockChat(chat, longLeadAnswer());
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await traceTyping(chat);
+    await ask(chat, QUESTION);
+    const trace = await waitForTyping(chat);
+
+    expect(trace.end - trace.arrival, "typing duration").toBeLessThanOrEqual(1000);
+    const typing = trace.frames.filter((frame) => frame.typing);
+    expect(typing.length, "frames while typing").toBeGreaterThan(1);
+    // It really types: some frame shows part of the lead, and the count never goes back.
+    expect(typing.some((frame) => frame.shown > 0 && frame.shown < LONG_LEAD.length)).toBe(true);
+    for (let index = 1; index < typing.length; index++) expect(typing[index].shown).toBeGreaterThanOrEqual(typing[index - 1].shown);
+    // Only the first lead types, and what waits for it keeps its space but is neither shown nor focusable.
+    expect(Math.max(...trace.frames.map((frame) => frame.overlays))).toBe(1);
+    for (const frame of typing) {
+      expect(frame.actions, "buttons hidden while typing").toBe("hidden");
+      expect(frame.sectionOpacity, "sections wait").toBe("0");
+    }
+    // The scroll decisions (REQ-11) read the final height: it is the same in every frame, from the first.
+    expect(new Set(trace.frames.map((frame) => frame.height)).size, "scrollHeight is final from the first frame").toBe(1);
+
+    await expect(ui.options).toHaveCount(3);
+    await expect(ui.options.first()).toBeVisible();
+    await expect(ui.assistantTurns.last().locator(".assistant-turn-section")).toHaveCSS("opacity", "1");
+    expect(trace.frames.at(-1)?.shown).toBe(LONG_LEAD.length);
+  });
+
+  test("a second block and the sources never type; only the first lead does", async ({ chat }) => {
+    const answer = longLeadAnswer();
+    answer.blocks.push({ title: "Otra cosa", lead: [{ text: "Segundo bloque con su propio texto." }], sections: [], buttons: [] });
+    await mockChat(chat, answer);
+    await chat.goto("/");
+    await openAssistant(chat);
+    await traceTyping(chat);
+    await ask(chat, QUESTION);
+    const trace = await waitForTyping(chat);
+    expect(Math.max(...trace.frames.map((frame) => frame.overlays))).toBe(1);
+  });
+
+  test("fades are at most 200 ms", async ({ chat }) => {
+    await mockChat(chat, longLeadAnswer());
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    const turn = ui.assistantTurns.last();
+    for (const [name, locator] of Object.entries({ section: turn.locator(".assistant-turn-section"), sources: turn.locator(".assistant-turn-sources"), buttons: turn.locator(".assistant-actions") })) {
+      const ms = await fadeOf(locator);
+      expect(ms, `${name} fades`).toBeGreaterThan(0);
+      expect(ms, `${name} fade`).toBeLessThanOrEqual(FADE_MS);
+    }
+  });
+
+  test("tapping the answer completes it at once", async ({ chat }) => {
+    await mockChat(chat, longLeadAnswer());
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await traceTyping(chat, { tap: true });
+    await ask(chat, QUESTION);
+    const trace = await waitForTyping(chat);
+    // The tap lands on the first typing frame, so the typing is over a frame or two later, far short of the 900 ms.
+    expect(trace.end - trace.arrival).toBeLessThan(300);
+    expect(trace.frames.at(-1)?.shown).toBe(LONG_LEAD.length);
+    await expect(ui.options).toHaveCount(3);
+  });
+
+  test.describe("reduced motion", () => {
+    test.use({ reducedMotion: "reduce" });
+
+    test("the whole answer is there at once: no typing, buttons and sections shown, no fade", async ({ chat }) => {
+      await mockChat(chat, longLeadAnswer());
+      await chat.goto("/");
+      const ui = await openAssistant(chat);
+      await traceTyping(chat);
+      await ask(chat, QUESTION);
+      const trace = await waitForTyping(chat);
+      expect(trace.frames.filter((frame) => frame.typing), "no typing frame").toHaveLength(0);
+      expect(trace.frames[0].shown, "the full lead on the first frame").toBe(LONG_LEAD.length);
+      expect(trace.frames[0].actions).toBe("visible");
+      expect(trace.frames[0].sectionOpacity).toBe("1");
+      expect(await fadeOf(ui.assistantTurns.last().locator(".assistant-turn-section"))).toBe(0);
+      await expect(ui.options).toHaveCount(3);
+    });
+  });
+
+  test("closing and reopening the panel, and navigating, never type a lead again", async ({ chat }) => {
+    await mockChat(chat, longLeadAnswer());
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    // From here on, count every typed layer or typing flag that shows up anywhere.
+    await chat.evaluate(() => {
+      const seen = { count: 0 };
+      (window as unknown as { __replays: typeof seen }).__replays = seen;
+      new MutationObserver((records) => {
+        for (const record of records) {
+          const target = record.target as Element;
+          if (record.type === "attributes" && target.hasAttribute("data-typing")) seen.count++;
+          if (record.type === "childList" && [...record.addedNodes].some((node) => node instanceof Element && (node.matches(".assistant-lead-typed") || node.querySelector(".assistant-lead-typed")))) seen.count++;
+        }
+      }).observe(document.body, { subtree: true, childList: true, attributes: true, attributeFilter: ["data-typing"] });
+    });
+
+    await ui.close.click();
+    await expect(ui.fab).toHaveAttribute("aria-expanded", "false");
+    await openAssistant(chat);
+    await ui.navLinks.first().click();
+    await expect(chat).toHaveURL(new RegExp(`${LINK_HREF}$`));
+    await expect(ui.assistantTurns).toHaveCount(1);
+    // Longer than the 900 ms a replay would take.
+    await chat.waitForTimeout(1200);
+    expect(await chat.evaluate(() => (window as unknown as { __replays: { count: number } }).__replays.count), "typing events after the first").toBe(0);
+    await expect(ui.typing).toHaveCount(0);
+    await expect(ui.navLinks.first()).toHaveText(LINK_LABEL);
   });
 });
