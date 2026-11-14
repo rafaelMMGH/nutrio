@@ -1,6 +1,6 @@
 # Contract note: `POST /api/rag/chat` (assistant-data-scope)
 
-**Spec:** [../spec.md](../spec.md) (v1.8) · **Base contract:** [assistant-chat-polish/contracts/chat-api.md](../../assistant-chat-polish/contracts/chat-api.md) (v1.9)
+**Spec:** [../spec.md](../spec.md) (v1.9) · **Base contract:** [assistant-chat-polish/contracts/chat-api.md](../../assistant-chat-polish/contracts/chat-api.md) (v1.9)
 
 This note describes the change at the behavior level only. Exact field names and types belong to plan.md. "chat-polish REQ-n" means assistant-chat-polish's REQ-n; a bare "REQ-n" is this spec's.
 
