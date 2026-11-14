@@ -214,7 +214,7 @@ test.describe("shopping", () => {
   });
 });
 
-type CartData = { sources: { id: string; source_id: string }[]; ingredients: { name: string; unit: string; quantity: number; sources: { source_name: string }[] }[] };
+type CartData = { sources: { id: string; source_id: string; period_days: number }[]; ingredients: { name: string; unit: string; quantity: number; sources: { source_name: string }[] }[] };
 type Usage = { name: string; unit: string; quantity: number };
 
 const apiCall = (page: Page, method: string, url: string, body?: unknown) =>
@@ -361,6 +361,44 @@ test.describe("cart and deleted recipes", () => {
     } finally {
       for (const itemId of itemIds) await apiCall(page, "DELETE", `/api/cart/items/${itemId}`);
     }
+  });
+});
+
+test.describe("planner", () => {
+  const openPlanner = async (page: Page) => {
+    await page.goto("/groceries");
+    await expect(page.getByRole("group", { name: "Recetas" }).getByRole("button").nth(2)).toBeVisible();
+  };
+  const submit = (page: Page) => page.locator("form.planner button[type=submit]");
+
+  test("two recipes over 7 days are split 4 + 3, not 4 + 4", async ({ page }) => {
+    await openPlanner(page);
+    const before = new Set((await readCart(page)).sources.map((source) => source.id));
+    const names = page.getByRole("group", { name: "Recetas" }).getByRole("button");
+    await page.getByRole("button", { name: "7 días" }).click();
+    await names.nth(0).click();
+    await names.nth(1).click();
+    await Promise.all([page.waitForResponse((r) => r.url().includes("/api/cart/items") && r.request().method() === "POST" && r.status() < 400), submit(page).click()]);
+    await expect(page.getByText("Recetas agregadas al carrito")).toBeVisible();
+    const added = (await readCart(page)).sources.filter((source) => !before.has(source.id));
+    try {
+      expect(added.map((source) => source.period_days)).toEqual([4, 3]);
+      expect(added.reduce((sum, source) => sum + source.period_days, 0)).toBe(7);
+    } finally {
+      for (const source of added) await apiCall(page, "DELETE", `/api/cart/items/${source.id}`);
+    }
+  });
+
+  test("more recipes than days blocks the submit and shows the hint", async ({ page }) => {
+    await openPlanner(page);
+    const names = page.getByRole("group", { name: "Recetas" }).getByRole("button");
+    await page.getByRole("spinbutton", { name: "Días" }).fill("2");
+    for (const index of [0, 1, 2]) await names.nth(index).click();
+    await expect(submit(page)).toBeDisabled();
+    await expect(page.getByText("Elige máximo tantas recetas como días del periodo.")).toBeVisible();
+    await page.getByRole("spinbutton", { name: "Días" }).fill("3");
+    await expect(submit(page)).toBeEnabled();
+    await expect(page.getByText("Elige máximo tantas recetas como días del periodo.")).toHaveCount(0);
   });
 });
 

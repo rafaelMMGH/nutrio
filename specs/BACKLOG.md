@@ -2,15 +2,15 @@
 
 Open work for future sessions. The orchestrator should read this at session start and offer the top open item. Tick items when done; move finished items to "Done" with the date.
 
-_Last updated: 2026-11-14 (assistant-data-scope merged as PR #7; e2e run guard pushed, PR pending)_
+_Last updated: 2026-11-14 (guard merged as PR #8; Escape PR #9 open; period planner fixed on its branch)_
 
 ## In progress
 
-- [ ] **E2E run guard: implemented, PR pending (the user opens it).** Branch `fix/e2e-run-guard` (pushed 2026-11-14, commit ec2ec63; the PR also carries the post-merge status closure of assistant-data-scope and assistant-chat-polish). Review round 3 PASS, unit 833/833, full e2e 401/401. Bug note: `specs/bugs/e2e-run-guard.md`. **`stash@{0}` still holds the user's own unrelated changes (the `src/server.js` deletion and `package.json` dropping `legacy:dev`): never pop or drop it without the user.** Known limits are in the bug note.
+_Nothing in progress._
 
 ## Needs the user
 
-- [ ] **REMIND THE USER after the assistant-data-scope push/PR (her request, 2026-11-14):** the remaining open items stay in this backlog and she wants to be asked about them again at the very end: (1) merge the `fix/e2e-run-guard` PR (stash@{0} holds her unrelated changes, never pop without her); (2) manual phone check of the assistant (T041, 13 items); (3) Escape in app popups closes the assistant panel; (4) the period planner overcounts days (needs her decision, 4+3 or 7 each).
+- [ ] **Merge the open PRs:** #9 (Escape in popups) and the period-planner PR once opened (the user's).
 
 - [ ] **Manual phone check** for the assistant (13 items, `specs/assistant-chat-polish/tasks.md` T041): iPhone Safari + VoiceOver, Android Chrome + TalkBack.
 
@@ -23,7 +23,6 @@ _Last updated: 2026-11-14 (assistant-data-scope merged as PR #7; e2e run guard p
 ## Assistant chat (follow-ups)
 
 - [ ] **Optional spec-change:** combined questions on a recipe page ("¿Qué lleva y cómo se hace?") currently show only Preparación (today's narrowing rule, kept by spec v1.4). Decide whether they should show both sections.
-- [ ] **Escape in app popups (pre-existing):** `src/components/useDismiss.ts:13` (UserMenu) and `src/components/groceries/ManualAddForm.tsx:65` don't `preventDefault` on Escape, so one Escape also closes the open assistant panel. Small bug fix.
 - [ ] **Safe areas:** the app sets no `viewport-fit=cover`, so `env(safe-area-inset-*)` is 0; the REQ-15 safe-area check is weak.
 
 ## Shopping list
@@ -33,7 +32,6 @@ Findings, with file:line references: `specs/bugs/shopping-list-findings.md`.
 - [ ] **Pre-existing e2e failures on main** (found 2026-10-24 reviewing #2, fail without the fix too). Serial mode skips every later test when they fail:
   - `dashboard.spec.ts:213` "the newest shopping list can be checked off": the newest list in the cloned data has 0 items, so `.home-shop .home-count` never appears. The test depends on the data.
   - `dashboard.spec.ts:91` "intake rings count the equivalents of meals marked done": gets 7, expects > 7. Probably depends on the time of day. Not stash-checked.
-- [ ] **Bug fix:** the period planner overcounts days (#1). **Decision needed:** for 7 days with 2 recipes, split 4+3 or 7 each?
 - [ ] **Spec-change:** the unit policy (#3, #4), and the meaning of "Entrenamiento", supplements and alternatives (#8, #9).
 - [ ] **Spec-change: deleted lists vs templates (#11).** Filtering deleted lists alone would make a template load empty after its backing list is deleted. Options: A) read `reference_snapshot.items` at read time (no migration); B) copy the snapshot into the cart at load; C) store the snapshot on the cart item (migration). Also decide whether a template in the Papelera still counts.
 - [ ] **Refactor:** make the "Ingredientes" catalog use the same totals as the cart (#6), and remove the dead `practical_*` code and the misleading template "snapshot" wording (#10, #11).
@@ -47,6 +45,10 @@ Findings, with file:line references: `specs/bugs/shopping-list-findings.md`.
 - [ ] Optional: in `src/lib/client/theme.ts`, after a real reveal-update failure, call `applyTheme(next)` as a fallback so the stored choice and the page agree.
 
 ## Done
+
+- 2026-11-14: **E2E run guard** merged as PR #8 (`tests/e2e/run-lock.ts`, lock at config load, 10 unit tests; known limits in `specs/bugs/e2e-run-guard.md`). `stash@{0}` still holds the user's own unrelated changes (the `src/server.js` deletion and `package.json` dropping `legacy:dev`): never pop or drop it without the user.
+- 2026-11-14: **Escape in popups** (`fix/escape-popups`, PR #9 open): an open popup takes Escape first. Note: `specs/bugs/escape-popups.md`.
+- 2026-11-14: **Period planner** (`fix/period-planner-days`): exact split (7 days x 2 recipes = 4+3), blocked when recipes > days, `period_days` min 1 on the server. Note: `specs/bugs/period-planner-days.md`; full e2e 403/403.
 
 - 2026-11-14: **Assistant data scope** merged as PR #7 (`feature/assistant-data-scope`, spec v1.9.1, 91 of 91 task ids, unit 823/823, full e2e 399/399 at the T088 run). Status `implemented`; `assistant-chat-polish` closed with it (REQ-23 delivered). Future, not in this feature: conversation memory so "¿y la cena?" works (the design is stateless, so it can be added).
 
