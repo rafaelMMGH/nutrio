@@ -11,8 +11,10 @@ import {
   seedCart,
   seedPlan,
   seedRecipes,
+  seedVolume,
   softDeleteRecipe,
-  test
+  test,
+  VOLUME_TODAY
 } from "./assistant-helpers";
 
 // API tests of POST /api/rag/chat against a seeded, isolated user (plan D2). Spec assistant-chat-polish: REQ-1, REQ-3,
@@ -321,5 +323,60 @@ test.describe("builders", () => {
     expect(plainOf(body.blocks[0].lead)).toBe("Aún no tienes un plan activo.");
     expect(body.blocks[0].buttons).toEqual([{ type: "link", label: "Subir mi plan", href: "/plans" }]);
     expect(body.blocks[0].sections).toEqual([]);
+  });
+});
+
+// NFR performance (spec): the real dataset has 32 recipes, 69 meals and a year of logs. The 1 s bound on that data is a
+// manual check by the user; this run seeds the same volume with synthetic content and bounds each answer at 5 s.
+test.describe("synthetic volume (NFR)", () => {
+  const QUESTIONS: { message: string; kind: ChatAnswer["kind"] }[] = [
+    { message: "hola", kind: "greeting" },
+    { message: "¿Qué hay en mi carrito?", kind: "answer" },
+    { message: "¿Qué recetas hay en mi plan?", kind: "answer" },
+    { message: "¿Cuál es mi horario?", kind: "answer" },
+    { message: "¿Cuál es mi comida?", kind: "answer" },
+    { message: "¿Qué lleva el Pollo asado?", kind: "detail" },
+    { message: "Mi peso", kind: "answer" },
+    { message: "¿Cuánto ejercicio llevo?", kind: "answer" },
+    { message: "¿Cuánta agua llevo?", kind: "answer" },
+    { message: "¿Cuántas comidas llevo?", kind: "answer" },
+    { message: "Mi avance de la semana", kind: "answer" },
+    { message: "¿Cuál es mi meta?", kind: "answer" },
+    { message: "¿Cuál es mi plan?", kind: "answer" },
+    { message: "¿Cómo me llamo?", kind: "answer" },
+    { message: "¿Cuánto llevo?", kind: "clarify" },
+    { message: "¿Cuál es la capital de Francia?", kind: "no_match" }
+  ];
+  const ROUNDS = 20;
+  const BOUND_MS = 5000;
+
+  test("every topic answers on a year of logs, 32 recipes and 69 options: no 500, each under 5 s", async ({ chatContext }) => {
+    seedVolume();
+    for (const { message } of QUESTIONS) await ask(chatContext.request, message, { today: VOLUME_TODAY });
+    // The seed really has the volume: all 32 recipes are in the plan and the 40 cart items are there.
+    expect(items((await ask(chatContext.request, "¿Qué recetas hay en mi plan?", { today: VOLUME_TODAY })).body, "Recetas").at(-1)).toBe("y 24 más");
+    expect(items((await ask(chatContext.request, "¿Qué hay en mi carrito?", { today: VOLUME_TODAY })).body, "Ingredientes").at(-1)).toBe("y 32 más");
+    const timings: string[] = [];
+    const all: number[] = [];
+    for (const { message, kind } of QUESTIONS) {
+      const samples: number[] = [];
+      for (let round = 0; round < ROUNDS; round++) {
+        const started = performance.now();
+        const { status, body } = await ask(chatContext.request, message, { today: VOLUME_TODAY });
+        samples.push(performance.now() - started);
+        expect(status, message).toBe(200);
+        expect(body.kind, message).toBe(kind);
+        expect(body.answer, message).not.toBe("");
+      }
+      all.push(...samples);
+      const slowest = Math.max(...samples);
+      expect(slowest, `${message} took ${Math.round(slowest)} ms`).toBeLessThan(BOUND_MS);
+      timings.push(`${message}: median ${Math.round([...samples].sort((a, b) => a - b)[ROUNDS >> 1])} ms, max ${Math.round(slowest)} ms`);
+    }
+    const sorted = all.sort((a, b) => a - b);
+    const at = (fraction: number) => Math.round(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * fraction))]);
+    timings.push(`all ${sorted.length} requests: p50 ${at(0.5)} ms, p95 ${at(0.95)} ms, max ${at(1)} ms`);
+    test.info().annotations.push({ type: "timings", description: timings.join("\n") });
+    console.log(`Chat timings on the synthetic volume (${ROUNDS} rounds each):\n${timings.join("\n")}`);
   });
 });

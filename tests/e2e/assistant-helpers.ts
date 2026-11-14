@@ -237,6 +237,57 @@ export function seedPlan({ times, meals = DEFAULT_MEALS, planName = PLAN_NAME, s
   sql(statements.join(";"));
 }
 
+const VOLUME_MEALS = ["Desayuno", "Colación", "Comida", "Colación", "Cena"];
+const VOLUME_PROTEINS = ["Pollo", "Atún", "Res", "Cerdo", "Pavo", "Huevo", "Tofu", "Salmón"];
+const VOLUME_STYLES = ["asado", "guisado", "a la plancha", "en salsa"];
+/** The recipe names of `seedVolume`, "Pollo asado" first. */
+export const VOLUME_RECIPES = VOLUME_PROTEINS.flatMap((protein) => VOLUME_STYLES.map((style) => `${protein} ${style}`));
+/** The day `seedVolume`'s year of logs ends on; ask with it as `today`. */
+export const VOLUME_TODAY = "2026-06-21";
+
+/**
+ * The size of the real dataset (spec NFR: 32 recipes, 69 meal options, one year of logs) with synthetic content: 32 recipes
+ * of 6 ingredients and 3 preparation steps, a plan of 5 slots (two "Colación") holding 69 options cycled over the
+ * recipes, add-ons, goals, a name, a 40-item cart and 365 daily logs ending on `VOLUME_TODAY`. Replaces the user's recipes, plan, cart and logs.
+ */
+export function seedVolume() {
+  const recipes: SeedRecipe[] = VOLUME_RECIPES.map((name, index) => ({
+    name,
+    description: "Preparar los ingredientes.\nCocinar a fuego medio.\nServir caliente.",
+    ingredients: Array.from({ length: 6 }, (_, position) => ({ name: `Ingrediente ${index}-${position}`, quantity: 10 + position, unit: position % 2 ? "g" : "pza" }))
+  }));
+  const recipeIds = seedRecipes(recipes);
+  seedPlan({ times: "all", meals: VOLUME_MEALS });
+  const userId = currentUser().id;
+  const versionId = `${userId}-plan-v1`;
+  const perSlot = VOLUME_MEALS.map(() => 0);
+  const statements: string[] = [];
+  for (let option = 0; option < 69; option++) {
+    const slot = option % VOLUME_MEALS.length;
+    const recipeId = recipeIds[VOLUME_RECIPES[option % VOLUME_RECIPES.length]];
+    const number = ++perSlot[slot];
+    statements.push(
+      `insert into meal_options (id, plan_version_id, meal_type_id, recipe_id, option_number, is_unique_option, created_at) values (${lit(`${versionId}-opt-${option}`)}, ${lit(versionId)}, ${lit(`${versionId}-meal-${slot}`)}, ${lit(recipeId)}, ${number}, false, now())`,
+      `insert into plan_version_recipes (id, plan_version_id, recipe_id, meal_type_id, option_number, created_at) values (${lit(`${versionId}-pvr-${option}`)}, ${lit(versionId)}, ${lit(recipeId)}, ${lit(`${versionId}-meal-${slot}`)}, ${number}, now())`
+    );
+  }
+  statements.push(...addOnStatements(versionId, VOLUME_MEALS));
+  sql(statements.join(";"));
+  const end = Date.parse(`${VOLUME_TODAY}T00:00:00Z`);
+  seedLogs(
+    Array.from({ length: 365 }, (_, back) => ({
+      date: new Date(end - back * 86_400_000).toISOString().slice(0, 10),
+      meals_done: VOLUME_MEALS.slice(0, back % (VOLUME_MEALS.length + 1)),
+      water_glasses: back % 9,
+      weight_kg: back % 7 === 0 ? 80 - back / 40 : null,
+      exercised: back % 3 === 0
+    }))
+  );
+  setGoals({ weight: 72, days: 4 });
+  setName("Rafael de prueba");
+  seedCart(40);
+}
+
 /** Removes the plan and everything hanging off it, for the "no active plan" cases. */
 export function clearPlan() {
   sql(planRowDeletes(lit(currentUser().id)).join(";"));
