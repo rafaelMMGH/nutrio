@@ -950,7 +950,7 @@ Decisions accepted by the reviewer (record in spec.md at the next spec-change): 
 - Commits: f0f56df red row (water on a zero-slot plan with a 3 L goal; clean extract 787 tests, 786 pass / 1 fail). a53c105 fix: `waterAnswer` reads `withSlots(db, userId)?.water_goal_liters` (closes 4b3 MEDIUM-1). 1a83f81 T053 unit rows red (clean extract 798 tests, 783 pass / 15 fail: 11 in tests/unit/chat-identity.test.ts, 3 plan-lead regexes in chat-answer.test.ts, 1 `SPEC_TOPICS` pin in chat-topics.test.ts). 3ae48b7 T054 code (chat.ts +23/-7, chat-topics.ts +1/-1): `BUILDERS` is a total `Record<TopicId, …>`, so a topic without a builder is a compile error; `pending()` and the `?.`/`??` fallback deleted; `grep "pending(" src` empty; `BUILDERS` entries take a trailing `user: AppUser` (`users` is always loaded by `loadDb` as `[user]` and is not in `needs.chat`). 5d7370e e2e rows written, not run: new tests/e2e/assistant-identity.spec.ts (4 tests); `seedPlan` gains `planName` (writes `plans.name` and `structured_data.name`) in assistant-helpers.ts; the three "Tu objetivo: …" lead assertions in assistant-api.spec.ts now expect "Tu plan activo es ${PLAN_NAME}. Tu objetivo: …".
 - What landed, REQ-30: "Te llamas **Rafael**." (name trimmed, highlighted); a blank name gives "Aún no tengo tu nombre registrado." with nothing highlighted; no sources; buttons are the two identity follow-ups "¿Cuál es mi plan?" and "Mi avance de la semana".
 - What landed, REQ-31: plan-name answer with a trailing ".pdf" stripped case-insensitively (`name.trim().replace(/\.pdf$/i,"").trim()`, one suffix only); sources `Plan activo: <raw plan.name>`. No active plan, zero slots, deleted or archived plan: "Aún no tienes un plan activo." with only the "Subir mi plan" block link, `buttons: []`, `sources: []` (rulings A/B of 2026-11-13). Plan-summary lead "Tu plan activo es **<plan>**. Tu objetivo: …" (".pdf" stripped there too; a blank objective omits the objective sentence). Title "Nombre / Plan" in single and 2-block answers (4b1 LOW-2 / 4b3 LOW-2 closed).
-- Placeholders: none left (`grep "pending(" src` empty). T063 merge precondition 1 (`grep -rn "Pronto podré" src`) is expected to pass. The `PLACEHOLDER` regexes in tests/unit/chat-answer.test.ts:15, tests/unit/memdb.ts:185 and tests/e2e/assistant-helpers.ts:318 are kept; T063 decides whether to retire them.
+- Placeholders: none left (`grep "pending(" src` empty). T063 merge precondition 1 (`grep -rn "Pronto podré" src`) is expected to pass. The `PLACEHOLDER` regexes in tests/unit/chat-answer.test.ts:15, tests/unit/memdb.ts:185 and tests/e2e/assistant-helpers.ts:372 (was :318) are kept; T063 decides whether to retire them.
 - Reviewer probes: "¿cómo me llamo?", "mi nombre", "¿cuál es mi nombre?", "dime mi nombre", "mis nombres", "¿cómo se llama mi plan?", "¿cómo se llama mi plan activo?" → identity; "nombre del plan" and "¿cómo se llama el plan?" → plan summary; "komo me llamo" and "como me yamo" → did_you_mean; "¿quién soy?" → no_match; a recipe named like the user never steals identity questions (REQ-6 step 3 runs before the dish match); "cómo me llamo y cómo se llama mi plan" gives two blocks both titled "Nombre / Plan" (spec-literal REQ-24); a repeated identical question is de-duplicated.
 - REQ-5 sweep: 13,575 answers over 5 configs (default, no plan, zero slots, two colaciones, blank name) × singles/pairs/triples with identity first, with and without "¿?", every question button re-sent to depth 2 (77 distinct messages): 0 duplicate buttons, 0 buttons equal to the question asked, 0 resolving to clarify/did_you_mean/no_match, 0 multi-topic, 0 placeholders.
 - Proof: red extracts above (786/1, 783/15); 33 mutants on the full suite, 29 killed. Survivors: m15 (final `.trim()` after the strip dropped: " Plan .pdf" would show "Plan " with a trailing space), m17 (identity source label built from the stripped name; the raw-name choice is pinned only for the plan lead), m21 (raw `data.objective` instead of the trimmed one in the lead; no row with a padded non-blank objective), m28 (equivalent: any plan vs `activePlan` in identity).
@@ -1266,9 +1266,10 @@ UI-only: e2e tests are written here and proven in Batch E (T076 run, T077 breaka
 
 ## Phase 10: Final verification
 
-**Batch Final**, about 200 lines with tests. **PAUSED before the Final batch (user, 2026-11-13): do not launch it until the user says to continue.**
+**Batch Final**, about 200 lines with tests. **Done (2026-11-13; tests only, plus the THIRD_PARTY_NOTICES file at the repo root): fb0476a, 10726f1, 59303fd, a4dd9b8, 85f4f2a on top of daeda5b; `git diff 027e90e HEAD -- src` is empty. See Batch note Final.**
 
-- [ ] T063 [setup] Coverage audit and merge preconditions (tests/unit/chat-answer.test.ts, tests/e2e/assistant-api.spec.ts, tests/e2e/assistant-a11y.spec.ts)
+- [x] T063 [setup] Coverage audit and merge preconditions (tests/unit/chat-answer.test.ts, tests/e2e/assistant-api.spec.ts, tests/e2e/assistant-a11y.spec.ts)
+  - **Done (2026-11-13):** fb0476a (F3: the Space row waits 3500 ms; re-proof b15 RED at a11y:1002, `calls.push` Expected 0, Received 1, `/` → `/plans`, history 2 → 3; restored byte-for-byte; green), 10726f1 (noscope `MESSAGES` asserts kind and traced `resolved` per message; closes 1c2 M6), a4dd9b8 (THIRD_PARTY_NOTICES, user's yes 2026-11-13), 85f4f2a (F3 hardening: no `_rsc=` request after Space; red alone with the b15 break, even at 500 ms). Coverage audit, T077 verdicts and merge preconditions: Batch note Final (all PASS). `PLACEHOLDER` regexes kept as negative guards; `ReplyKind` "options"/"empty" go in spec v1.8 (user decision 2026-11-13); recipe-detail destination accepted (REQ-12 covered at meals:133); optional LOWs not done.
   - **FIRST, T077 F3 (Batch note E):** fix the Space-does-not-navigate row (assistant-a11y.spec.ts ~996): replace the 500 ms `setTimeout` window with ≥ ~3 s, or poll for stable absence across the navigation timeout. Re-prove: apply the b15 break temporarily (AssistantChat.tsx log `onKeyDown`: Space over `a[data-variant="link"]` → `preventDefault()` + `anchor.click()`), run only a11y:960 → red on `calls.push`; restore byte-for-byte (`git diff src` empty) → green. Commit the test change alone (tests only), citing T063/T077 F3 and REQ-35.
   - T077 F1 (Batch note E): record in the coverage table that look:360 covers wrapping through three redundant layers (red only when all three go, b4c); optional later CSS cleanup of the redundant declarations, no user ruling needed.
   - T077 F2 (Batch note E): record the `typedAnswers` WeakSet (AssistantTurn.tsx:126) as unproven/defensive (no e2e path remounts a turn; no unit or component test; a component test would need a new dependency).
@@ -1276,7 +1277,7 @@ UI-only: e2e tests are written here and proven in Batch E (T076 run, T077 breaka
   - Every REQ-1 to REQ-35 and chat-polish REQ-23 maps to a passing unit and/or e2e test that asserts answer text, kind or buttons; no REQ is covered by `resolved` alone (table below).
   - Final REQ-5 sweep over one answer of every reply kind and every button type: `sweep()` (unit) and `resendSweep` (e2e).
   - Merge precondition 1: `grep -rn "Pronto podré" src` returns nothing (no D3 placeholder).
-  - Batch 5 review: `pending()` is gone (`grep "pending(" src` empty since 3ae48b7). Decide whether to retire the `PLACEHOLDER` regexes in tests/unit/chat-answer.test.ts:15, tests/unit/memdb.ts:185 and tests/e2e/assistant-helpers.ts:318. Optional (Batch note 5, here or a later cleanup): LOW-1 empty highlighted plan name for a blank/".pdf" name (chat.ts:67-79, :92); LOW-2 rows for mutants m15, m17, m21; LOW-3 the trivially true last assertion in "REQ-5 every question button of an identity answer…" (tests/unit/chat-identity.test.ts).
+  - Batch 5 review: `pending()` is gone (`grep "pending(" src` empty since 3ae48b7). Decide whether to retire the `PLACEHOLDER` regexes in tests/unit/chat-answer.test.ts:15, tests/unit/memdb.ts:185 and tests/e2e/assistant-helpers.ts:372 (kept as negative guards). Optional (Batch note 5, here or a later cleanup): LOW-1 empty highlighted plan name for a blank/".pdf" name (chat.ts:67-79, :92); LOW-2 rows for mutants m15, m17, m21; LOW-3 the trivially true last assertion in "REQ-5 every question button of an identity answer…" (tests/unit/chat-identity.test.ts).
   - 6b1 review (LOW 5, optional, not blocking): the four prompt-kit headers (AssistantTurn.tsx, PromptInput.tsx, ScrollButton.tsx, and useTypedLength.ts, which takes over the header of ResponseStream.tsx, deleted in 4817e60, in 6c fix round 1) reference the MIT License but the permission notice is never included and there is no LICENSE/THIRD_PARTY file; optionally add one THIRD_PARTY_NOTICES file with the MIT text (ask the user; it touches the repo root, not src/).
   - 6c (desktop row reconciliation): no T061 row navigates to a recipe detail (`/recipes/<id>`) via "Ver receta completa"; the desktop heading-focus row uses "Ver recetario" → `/recipes`. Record it in the coverage table as accepted (same delegated handler) or add a row.
   - 4b1 review (LOW-2 note): `ReplyKind` includes "options", never emitted (pre-existing); drop it or record why it stays (contract check against contracts/chat-api.md).
@@ -1285,16 +1286,70 @@ UI-only: e2e tests are written here and proven in Batch E (T076 run, T077 breaka
   - 1c2 review (M6): the assistant-noscope.spec.ts `MESSAGES` test is vacuous (it compares the plain call with the legacy-field call, so any answer passes). Give each message an expected kind or lead text, or record it as a pure "fields ignored" check with that limit stated; check it in T076 run 1 triage too. **T076 run 1:** it passes (assistant-noscope.spec.ts:63) and is still vacuous; the expected kinds are owed here.
   - Batch E note (cart-snapshot fragility, not assistant-related): the a-theme-visual cart snapshot depends on the real cart's item count (cloned DB) and shows today's date in an unmasked `<p>` (CartView.tsx:64); it goes red whenever the real cart changes by more than the 1% ratio. Record in the final report and ask the user later: seed deterministic cart data, or mask the header (test-side). Not a merge blocker for this feature.
   - No `ScopeKey`/`scope` remains in chat code: `grep -rEnw "ScopeKey|SCOPE_LABEL|scope" src/lib/assistant.ts src/lib/domain src/app/api/rag/chat src/components/app src/components/shared` returns nothing (src only; tests excluded, they hold the negative assertions per Global rules).
-- [ ] T064 [setup] Synthetic smoke and NFR (tests/e2e/assistant-helpers.ts, tests/e2e/assistant-api.spec.ts)
+- [x] T064 [setup] Synthetic smoke and NFR (tests/e2e/assistant-helpers.ts, tests/e2e/assistant-api.spec.ts)
+  - **Done (2026-11-13):** 59303fd (`seedVolume()`; "synthetic volume (NFR)" describe at assistant-api.spec.ts ~353), evidence ordering hardened in 85f4f2a (L2). No 500, no `src/` change. Numbers and red proof: Batch note Final.
   - Harness `seedVolume()`: 32 recipes, 69 meals, 365 daily_logs rows, goals, name, add-ons, on the chat user.
   - One question per topic: no 500 (no Proxy misses). A 500 here (e.g. a collection missing from `needs.chat`) triggers a `src/` fix after Batch E, and therefore the full rerun in T065. After a warm-up request, each answer under 5 s; timings logged per topic.
   - Nothing committed depends on the real dataset or machine speed.
-- [ ] T065 [setup] `npx tsc --noEmit`, `npm run test:unit`, and one run of the spec files changed in this batch (assistant-api, plus assistant-a11y for the F3 fix); a full `npm run test:e2e` only if this batch changed `src/` (e.g. a T064 500 fixed in `queries.ts` `needs.chat`). Report to the orchestrator for the spec Progress and the chat-polish REQ-23 status.
+- [x] T065 [setup] `npx tsc --noEmit`, `npm run test:unit`, and one run of the spec files changed in this batch (assistant-api, plus assistant-a11y for the F3 fix); a full `npm run test:e2e` only if this batch changed `src/` (e.g. a T064 500 fixed in `queries.ts` `needs.chat`). Report to the orchestrator for the spec Progress and the chat-polish REQ-23 status.
   - Merge precondition 3: the user runs the manual ≤1 s check on the real data (one question per topic on :3000) before merge; the result is recorded in the batch report. The agent does not run it.
+  - **Done (2026-11-13):** tsc clean; unit 810/810; e2e targeted: assistant-api, assistant-a11y, assistant-noscope 95 passed (2.7 min) plus the F3, noscope and NFR re-proof runs; no `src/` change since 027e90e, so no full rerun: the last full suite is Batch E run 2, 398/398 at 027e90e, and the user chose no further full run ("No, basta lo corrido", 2026-11-13). chat-polish REQ-23 delivered (route rows errors:43, :59, :64, :74 plus test-hooks.test). Merge precondition 3 (manual ≤1 s on real data) is **pending, the user's**.
+
+**Review checkpoint Final:** tsc + unit + the targeted e2e runs above; F3 re-proved red then green; merge preconditions all PASS. **Status: reached 2026-11-13.** What remains is the user's (HANDOFF.md section 2).
+
+**Batch note Final (T063, T064, T065 done; commits fb0476a, 10726f1, 59303fd, a4dd9b8, 85f4f2a on top of daeda5b; tests and THIRD_PARTY_NOTICES only, `git diff 027e90e HEAD -- src` empty; tsc clean, unit 810/810; 78 of 78 active tasks ticked):**
+- **F3 (T077, REQ-35):** fb0476a raises the Space row's window to 3500 ms; 85f4f2a adds a `chat.on("request")` listener registered before Space and asserts no `_rsc=` request fired (checked first). Re-proofs with the b15 break: RED at a11y:1002 (`calls.push` Expected 0, Received 1; `/` → `/plans`; history 2 → 3); after 85f4f2a RED on the `_rsc` assertion (`…/plans?_rsc=…`), still RED with the wait cut to 500 ms (the new assertion suffices alone); restored byte-for-byte, green.
+- **1c2 M6 closed (10726f1):** the noscope `MESSAGES` test (assistant-noscope.spec.ts:39) asserts per message kind and traced `resolved`: carrito → answer/cart; recetas en mi plan → answer/recipes (possessor rule); hora de mi comida → answer/mealTimes; objetivo → answer/goals; ¿Cómo se prepara? → clarify/dish; capital de Francia → no_match/[]. Can fail: a first guess `["recipes","plan"]` went red.
+- **NFR (T064, 59303fd):** `seedVolume()` seeds 32 recipes (8 proteins × 4 styles, 6 ingredients and 3 steps each), 5 slots (two "Colación"), 69 options, add-ons, goals (72 kg, 4 days), a name, a 40-item cart and 365 daily logs ending 2026-06-21; the seed is asserted real (recipes answer ends "y 24 más", cart "y 32 más"). 16 questions (one per topic plus greeting, clarify, no-match; the single-slot times question is omitted), each with one warm-up and 20 timed requests, `x-e2e-today` pinned; asserts 200, the expected kind, a non-empty answer and per-question max < 5000 ms (`BOUND_MS`, the spec's bound, user decision 2026-10-28). Measured: 320 requests on the dev server at load ~4, p50 16 ms, p95 21-22 ms, max under 150 ms; after 85f4f2a per-topic max 16-38 ms. Red proof: route.ts temporarily `loadFor(auth.user, "cart")` → 500 at api.spec.ts:367; restored. The timing annotation and `console.log` run before the expects (85f4f2a, L2), so the evidence survives a failing assert. Reviewer: a tighter bound (max < 1000 ms or p95 < 1000 ms) would still leave ~7x-45x margin; stays 5 s unless the user asks a spec-change.
+- **Coverage audit (T063):** every REQ-1..35 and chat-polish REQ-23 has an executed test that asserts answer text, kind or buttons; none rests on `resolved` alone; none lacks an executed test. Evidence (unit | e2e; lines as of 59303fd, a11y and api may have shifted a few lines after 85f4f2a):
+
+| REQ | Unit | e2e |
+|---|---|---|
+| 1 | chat-answer:168, :175 | api:109, :118, :127 |
+| 2 | chat-answer:204, :211 | match:20, :26 |
+| 3 | chat-answer:185, :193 | api:193, :257 |
+| 4 | schemas.test, starters.test | noscope:39, :52, :93 (UI also :103, :115, :129, :151) |
+| 5 | chat-answer:93, :107 | noscope:69, next-step:44, :329 |
+| 6 | chat-answer:281, :305 | api:70, match:33, :41 |
+| 7 | chat-meals:60, :64 | meals:15 |
+| 8 | chat-meals:28, chat-edges:478 | api:279, :306 |
+| 9 | chat-edges:309, chat-intent:242 | meals:74, edges:104 |
+| 10 | chat-intent:227, chat-answer:323 | meals:74, api:76 |
+| 11 | chat-meals:95, :106 | meals |
+| 12 | chat-meals:421, :437 | meals:104, :120, :133 |
+| 13 | chat-metrics:53, :120, test-hooks.test | progress:10, :17, noscope trace row |
+| 14 | chat-dates:64, :70 | progress:25 |
+| 15 | chat-metrics:28, :35 | progress:25 |
+| 16 | chat-metrics:380, progress.test | parity:36 |
+| 17 | chat-metrics:43, :47 | progress |
+| 18 | chat-metrics:104, :114 | api:286, :299 |
+| 19 | chat-metrics:189, :196 | progress:50 |
+| 20 | chat-metrics:319, :326 | progress:72 |
+| 21, 22 | chat-metrics:393, :406, :461, :473 | progress:84 |
+| 23 | chat-edges:26, :37 | edges:16 |
+| 24 | chat-answer:220, :226 | edges:71, :78, identity:40 |
+| 25 | chat-edges:329, :338 | edges:86, :95 |
+| 26 | chat-edges:127, :134 | edges:46 |
+| 27 | chat-edges:235, :363 | api:185, :240, identity:47 |
+| 28 | chat-edges:63, :68 | edges:30 |
+| 29 | chat-dish:177, chat-edges:72 | edges:59, next-step:110 |
+| 30 | chat-identity:27, :38 | identity:12 |
+| 31 | chat-identity:56, :66 | identity:27 |
+| 32 | none (UI only, as planned) | look:275, :326, :357 |
+| 33 | text-stream.test | look:398 |
+| 34 | assistant-variant.test | a11y:786, :820, :1031 |
+| 35 | focus-upgrade.test | a11y:880, :927, :959 |
+| chat-polish 23 | test-hooks.test | errors:43 (500 + log), :59 (200), :64 (400), :74 (malformed JSON) |
+
+  The composer rows (composer:381, :442, :455) and some a11y/look rows carry chat-polish REQ numbers; they are not counted as data-scope evidence.
+- **T077 verdicts:** *proven by green runs plus unit rows:* chat-polish REQ-23 route, REQ-4 UI, REQ-9/10 paging, REQ-16 parity (rows above). *Proven by green runs only (no unit rows, no earlier red proof beyond Batch note E):* T035 RecipeDetail display (meals:104, :133), REQ-13 pin header (progress:10, :17), button sizes (a11y:786, :820, :1031 at 360 px; REQ-34 also has assistant-variant.test), question buttons only on the last answer (next-step:44, :329), tap to complete (look:398 plus text-stream.test), FAB focus (a11y rows), the assistant-look snapshot (refreshed in T057, green in run 2 and since). *Unproven:* F2 only, the defensive `typedAnswers` WeakSet (AssistantTurn.tsx:126; removing it leaves look:493 green because the panel never unmounts; a component test would need an unapproved React test dependency). *Accepted:* F1, three redundant wrap layers (no CSS cleanup); the recipe-detail destination via "Ver receta completa" is not exercised by an a11y row (same delegated handler as "Ver recetario"; REQ-12 navigation covered at meals:133).
+- **Merge preconditions (all PASS):** `grep -rn "Pronto podré" src` and `grep -rn "pending(" src` empty; route.ts reads headers only through `testHooks(request.headers, process.env)` (route.ts:24) and sets `resolved` only under `trace`; no `ScopeKey`/`SCOPE_LABEL`/`scope` in chat src (comments only); no TODO/FIXME/`console.log`/`debugger` added vs main except the deliberate NFR timing log in assistant-api.spec.ts (precedent theme-audit.ts:469; `src/server.js:669` is pre-existing and unchanged); `git diff main -- package.json` only the `test:unit` script, no lockfile diff, no dependency; prisma and `src/generated` untouched; `.env*` untouched; other diffs vs main outside src/tests/specs: `.gitignore` (`tests/e2e/.server.log`), `playwright.config.ts` (server log tee, `E2E_HOOKS`) and the new THIRD_PARTY_NOTICES; ScopeSwitcher.tsx and PromptSuggestion.tsx deleted; no scratch files.
+- **Findings and notes left open (none blocks the merge):** `ReplyKind` still lists "options" and "empty" (never emitted; src/lib/assistant.ts:41, contracts/chat-api.md:24): removed in spec v1.8 (user decision 2026-11-13); optional LOWs not done (blank/".pdf" plan name gives an empty highlight, chat.ts:67-79, :92; survivors m15, m17, m21; the trivially true last assertion in chat-identity); `PLACEHOLDER` regexes kept as negative guards (tests/unit/chat-answer.test.ts:15, tests/unit/memdb.ts:185, tests/e2e/assistant-helpers.ts:372); cart-snapshot fragility (Batch note E; the user has not decided); THIRD_PARTY_NOTICES' copyright line comes from the repo's existing headers and should be checked against the upstream LICENSE; `specs/bugs/e2e-run-guard.md` is unrelated and still open (a second concurrent e2e run can still break the first).
+- **Pending, the user's:** the manual ≤1 s check on real data at :3000 (merge precondition 3); see HANDOFF.md section 2.
 
 ## Coverage
 
-Unit = fail-first proof for logic (run every batch). e2e = written with the task, run in Batch E; e2e-only rows get their red proof in T077. Never `resolved` alone.
+Unit = fail-first proof for logic (run every batch). e2e = written with the task, run in Batch E; e2e-only rows get their red proof in T077. Never `resolved` alone. **T063 audit (2026-11-13): every row below has an executed test asserting answer text, kind or buttons; file:line evidence in Batch note Final.**
 
 | Requirement | Unit | e2e | Code |
 |---|---|---|---|
@@ -1320,9 +1375,9 @@ Unit = fail-first proof for logic (run every batch). e2e = written with the task
 | REQ-24, REQ-25 | T050 | T050 | T051, T052, T079 (empty dish phrase → step 7) |
 | REQ-27 | T042, T044, T046, T050, T053 | T044, T050 | T043, T045, T047, T052, T054 |
 | REQ-30, REQ-31 | T053 | T053 | T054 |
-| REQ-32, REQ-34 | — (UI only) | T055, T061 | T056, T062 |
-| REQ-33 | — (UI only) | T059 | T058, T060 |
-| REQ-35 | — (UI only) | T055, T061 | T056, T062 |
-| NFR performance | — | T064 (synthetic, 5 s, timings); manual ≤1 s by the user (T065) | — |
+| REQ-32, REQ-34 | — (UI only; REQ-34's `variantOf` helper also has assistant-variant.test, T056) | T055, T061 | T056, T062 |
+| REQ-33 | — (UI only; the typing helper has text-stream.test, T058) | T059 | T058, T060 |
+| REQ-35 | — (UI only; the heading-focus helper has focus-upgrade.test, T062) | T055, T061, T063 (F3 Space row, re-proved) | T056, T062 |
+| NFR performance | — | T064 (synthetic, 5 s, timings; done: p95 21-22 ms, max under 150 ms); manual ≤1 s by the user (T065, pending) | — |
 
 Snapshots (not code): one refresh, T057 (end of Batch E), after the user's yes. T071 removed.

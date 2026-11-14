@@ -2,15 +2,15 @@
 
 Open work for future sessions. The orchestrator should read this at session start and offer the top open item. Tick items when done; move finished items to "Done" with the date.
 
-_Last updated: 2026-10-29 (session handoff)_
+_Last updated: 2026-11-13 (assistant-data-scope implementation complete)_
 
 ## In progress
 
-- [ ] **Assistant data scope**, branch `feature/assistant-data-scope` (local, never pushed), tip `1308a50`. **Start here: `specs/assistant-data-scope/HANDOFF.md`** (state, next steps in order, rules the user set, traps). Spec v1.6 (`planned`), plan and tasks in the same folder; 25 of 76 tasks done. Next: re-run the reviewer for batch 1c2 (it died on a rate limit), then cherry-pick batch 3a2 from worktree branch `worktree-agent-a4fb1720775853511` and run the single allowed targeted e2e (`npx playwright test assistant-parity.spec.ts -g "dashboard"`), then continue with 1d1. Also delivers chat-polish REQ-23 (HTTP 500, already implemented in F1b), which keeps `assistant-chat-polish` in `partial` until the feature is done.
-  - Asks the user for a yes at: T025 (install fuse.js 7.5.0 exactly), T057 (the one snapshot refresh), T065 (manual 1 s check on real data before merge), deleting the agent branches/worktrees, push and PR.
+- [ ] **Assistant data scope: implementation COMPLETE, awaiting the user's merge decision.** Branch `feature/assistant-data-scope` (local, never pushed; see `git log` for the tip; no `src/` change since 027e90e). **Start here: `specs/assistant-data-scope/HANDOFF.md`** (state, what remains, rules, traps). Spec v1.7 (`planned`), plan revision 10; 78 of 78 active tasks done, 45 of 45 batches. Gates: tsc clean, unit 810/810, last full e2e 398/398 (at 027e90e; the user chose no further full run), targeted runs green. Also delivers chat-polish REQ-23 (HTTP 500), which keeps `assistant-chat-polish` in `partial` until this merges.
+  - What remains (all the user's, HANDOFF.md section 2): (1) the manual ≤1 s check on real data at :3000, one question per topic; (2) spec v1.8 via the spec-change route (accepted choices v1.7 does not record, incl. removing `ReplyKind` "options"/"empty") or an explicit deferral; (3) the Constitution principle 1 reminder (below); (4) optional cart-snapshot decision; (5) push and PR, with the user's yes; (6) cleanup of six prunable agent worktrees and their branches, with the user's yes.
   - Future (not in this feature): conversation memory so "¿y la cena?" works; the design is stateless so it can be added.
 
-- [ ] **E2E run guard**, branch `fix/e2e-run-guard` (no commits of its own yet; its base, `feature/theme-switcher`, is merged into `main`, so the PR can target `main`). The bug note is `specs/bugs/e2e-run-guard.md`.
+- [ ] **E2E run guard**, branch `fix/e2e-run-guard` (no commits of its own yet; its base, `feature/theme-switcher`, is merged into `main`, so the PR can target `main`). The bug note is `specs/bugs/e2e-run-guard.md`. **Still open (2026-11-13):** a second concurrent e2e run can still break the first; assistant-data-scope does not depend on it (it ran e2e one at a time).
   - **⚠️ The code is in `stash@{0}`, not in the working tree.** On 2026-10-24 at 18:27 another Claude session stashed it ("fix/e2e-run-guard WIP: run guard + local server.js/package.json changes") and switched to `fix/shopping-list-quick`.
   - **The stash also holds the user's own unrelated changes:** the `src/server.js` deletion and `package.json` dropping `legacy:dev`. To resume:
     1. Wait until no other session is working in this folder.
