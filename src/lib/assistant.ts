@@ -74,7 +74,7 @@ export function optionAnnouncement(answer: Pick<ChatAnswer, "blocks" | "buttons"
   return `${options.length} ${options.length === 1 ? "opción" : "opciones"}: ${options.map((button) => button.label).join("; ")}`;
 }
 
-/** One titled part of an answer: options, paging and navigation buttons belong to the block. */
+/** One titled part of an answer. Its `buttons` are navigation links only: the option buttons are answer-level, in the answer's `buttons`. */
 export type Block = { title: string | null; lead: Rich; sections: Section[]; buttons: Button[] };
 
 /** What the resolver found in a question; only the test trace (`resolved`) exposes it. Fields are filled as the resolver learns them. */
