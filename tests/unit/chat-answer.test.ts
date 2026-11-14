@@ -10,7 +10,7 @@ import { memDb, sweep } from "./memdb";
 // Builders that do not exist yet (weight, slots, ...) are covered by the batches that add them.
 
 const TODAY = "2026-10-28";
-const KINDS = ["answer", "options", "detail", "clarify", "did_you_mean", "greeting", "no_match", "empty"];
+const KINDS = ["answer", "detail", "clarify", "did_you_mean", "greeting", "no_match"];
 const STARTERS = ["Mi cena de hoy", "Mi avance de la semana", "Mi peso", "Mi carrito"];
 const PLACEHOLDER = /Pronto podré responder sobre/;
 

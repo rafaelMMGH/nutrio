@@ -38,7 +38,7 @@ export function messageLength(value: string): number {
 // Response of POST /api/rag/chat (contracts/chat-api.md). `answer`, `context_used` and `sources` are the original fields.
 export type Span = { text: string; highlight?: true };
 export type Rich = Span[];
-export type ReplyKind = "answer" | "options" | "detail" | "clarify" | "did_you_mean" | "greeting" | "no_match" | "empty";
+export type ReplyKind = "answer" | "detail" | "clarify" | "did_you_mean" | "greeting" | "no_match";
 export type Section = { title: string; items: Rich[] };
 
 /** A button the server sends (the client derives none): a question that is sent as a user turn, or an in-app link ("/", "/plans", "/recipes/<id>"). */
