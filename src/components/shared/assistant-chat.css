@@ -62,7 +62,8 @@
 .assistant-chat-new { display: inline-flex; align-items: center; flex: none; gap: 4px; padding: 7px 10px; border: 1px solid var(--hairline); border-radius: 999px; background: var(--surface-raised); color: var(--text-1); font-size: 13px; font-weight: 600; cursor: pointer; }
 .assistant-chat-new:hover { border-color: var(--brand-200); background: var(--brand-50); }
 .assistant-chat-new:focus-visible { outline: 2px solid var(--assistant-focus); outline-offset: 2px; }
-.assistant-chat h2 { margin: 0; font-size: 20px; font-weight: 700; }
+/* Guard: a wider fallback font truncates the title instead of spilling under the new-chat pill. */
+.assistant-chat h2 { margin: 0; overflow: hidden; font-size: 20px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .assistant-chat header p { margin: 0; overflow: hidden; color: var(--text-muted); font-size: 13.5px; text-overflow: ellipsis; white-space: nowrap; }
 /* The log's frame, so the scroll button can sit over its bottom edge. */
 .assistant-chat-body { position: relative; display: flex; flex: 1; flex-direction: column; min-height: 0; }
