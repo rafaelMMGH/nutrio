@@ -504,3 +504,12 @@ test("REQ-27 REQ-5 a duplicated slot with no options offers its time by ref, and
   assert.match(followUp.answer, /segunda colación/i);
   assert.ok(sweep(db, user, [reply], TODAY).includes("¿A qué hora es mi segunda colación?"));
 });
+
+test("BUG-B8 a generic recipe of a custom plan slot ('Postre opcion 1') can neither be opened nor offered by name", () => {
+  const { db, user } = memDb({ meals: ["Desayuno", "Postre", "Cena"] });
+  assert.ok(db.recipes.some((recipe) => recipe.name === "Postre opcion 1"), "the fixture has a generic recipe of the custom slot");
+  const reply = ragAnswer(db, user, "¿Qué lleva el postre opcion 1?", TODAY, { trace: true });
+  assert.deepEqual(reply.resolved, [{ topic: "dish", outcome: "notFound", phrase: "postre opcion 1" }]);
+  assert.doesNotMatch(reply.answer, /Ingredientes/);
+  assert.ok(!reply.buttons.some((button) => button.type === "question" && /postre opcion/i.test(button.label)));
+});

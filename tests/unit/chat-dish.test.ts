@@ -189,3 +189,23 @@ test("rankDish keeps the not-a-dish-name rule and ranks an exact name like any o
   assert.deepEqual(rankDish("sandwich de atun", BASE).map((recipe) => recipe.name), ["Sándwich de atún"]);
   assert.equal(rankDish("taco", adHoc("Taco uno", "Taco dos", "Taco tres", "Taco cuatro")).length, 3);
 });
+
+// Terms "generic name": a slot word or the plan's own slot name, then "opcion" and a number (BUG-B8).
+test("isGeneric: a custom slot name of the plan counts as a slot word", () => {
+  assert.equal(isGeneric("Postre opcion 1"), false, "unknown without the plan's slot names");
+  assert.equal(isGeneric("Postre opción 1", ["Postre"]), true);
+  assert.equal(isGeneric("postre opcion 12", ["Postre", "Cena"]), true);
+  assert.equal(isGeneric("Colación pre-entreno opcion 2", ["Colación pre-entreno"]), true, "a multi-word slot name");
+  assert.equal(isGeneric("Postre de fresa", ["Postre"]), false);
+  assert.equal(isGeneric("Postre opcion", ["Postre"]), false);
+  assert.equal(isGeneric("Postre opcion 2 con fresa", ["Postre"]), false);
+  assert.equal(isGeneric("Opcion 1", ["Postre"]), false);
+});
+
+test("a generic name of a custom slot is never a candidate once the plan's slot names are known", () => {
+  const recipes = adHoc("Postre opcion 1", "Pollo asado");
+  assert.deepEqual(shape("postre opcion 1", recipes), ["found", "Postre opcion 1"], "without the slot names it is still a plain recipe name");
+  const result = matchDish("postre opcion 1", recipes, ["Postre"]);
+  assert.deepEqual(result, { kind: "none", dishName: true });
+  assert.deepEqual(rankDish("postre opcion 1", recipes, ["Postre"]), []);
+});

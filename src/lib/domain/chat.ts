@@ -150,8 +150,11 @@ const BUILDERS: Record<TopicId, (db: AppDb, userId: string, question: string, in
   identity: (db, userId, _question, intent, _today, user) => identity(db, userId, user, intent)
 };
 
-/** REQ-3: only the user's own, live, non-generic recipes can be named; the array is already in seq order. */
-const namedRecipes = (db: AppDb, userId: string) => db.recipes.filter((recipe) => recipe.user_id === userId && !recipe.deleted_at && !isGeneric(recipe.name));
+/** REQ-3: only the user's own, live, non-generic recipes can be named (a generic name may use the plan's own slot names); the array is already in seq order. */
+const namedRecipes = (db: AppDb, userId: string) => {
+  const slotNames = planSlots(db, userId)?.slots.map((slot) => slot.name) ?? [];
+  return db.recipes.filter((recipe) => recipe.user_id === userId && !recipe.deleted_at && !isGeneric(recipe.name, slotNames));
+};
 
 const DISH_CHOICES = 3;
 

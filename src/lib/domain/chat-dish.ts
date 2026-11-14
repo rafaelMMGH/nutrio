@@ -1,4 +1,4 @@
-import { words } from "@/lib/assistant";
+import { normalizeText, words } from "@/lib/assistant";
 import { DATE_CUES } from "@/lib/domain/chat-dates";
 import { isExact, matchWord } from "@/lib/domain/chat-match";
 import { VOCABULARY } from "@/lib/domain/chat-topics";
@@ -30,10 +30,16 @@ export type DishMatch<R extends Named> =
   /** `dishName` false: the phrase is not a dish name, so REQ-6 step 4 falls through to the remaining steps. */
   | { kind: "none"; dishName: boolean };
 
-/** A generic option name: a slot word, "opcion" and a number ("Desayuno opcion 1"); never a dish. */
-export function isGeneric(name: string): boolean {
-  const [slot, option, number, ...rest] = words(name);
-  return !rest.length && SLOT_WORDS.includes(slot) && option === "opcion" && /^\d+$/.test(number ?? "");
+/**
+ * A generic option name: a slot word or one of the plan's own slot names, "opcion" and a number ("Desayuno opcion 1",
+ * "Postre opcion 1" in a plan with a slot "Postre"); never a dish.
+ */
+export function isGeneric(name: string, slotNames: readonly string[] = []): boolean {
+  const parts = words(name);
+  const number = parts.pop();
+  if (parts.pop() !== "opcion" || !/^\d+$/.test(number ?? "") || !parts.length) return false;
+  const slot = parts.join(" ");
+  return (parts.length === 1 && SLOT_WORDS.includes(slot)) || slotNames.some((slotName) => normalizeText(slotName) === slot);
 }
 
 const contentWords = (text: string) => words(text).filter((word) => !STOP_WORDS.has(word));
@@ -54,11 +60,11 @@ function matchedWords(word: string, nameWords: string[]): number[] {
 
 type Ranked<R> = { recipe: R; recall: number; precision: number };
 
-function rank<R extends Named>(content: string[], recipes: readonly R[]): Ranked<R>[] {
+function rank<R extends Named>(content: string[], recipes: readonly R[], slotNames: readonly string[]): Ranked<R>[] {
   const ranked: Ranked<R>[] = [];
   for (const recipe of recipes) {
     const nameWords = contentWords(recipe.name);
-    if (recipe.deleted_at || isGeneric(recipe.name) || !nameWords.length) continue;
+    if (recipe.deleted_at || isGeneric(recipe.name, slotNames) || !nameWords.length) continue;
     const perWord = content.map((word) => matchedWords(word, nameWords));
     const hit = perWord.filter((indexes) => indexes.length).length;
     if (!hit) continue;
@@ -74,13 +80,13 @@ function rank<R extends Named>(content: string[], recipes: readonly R[]): Ranked
  * recall 1 and no second candidate, or the second is strictly worse on (recall, precision): found. Rule 3: otherwise
  * did-you-mean (up to 3, best first). Rule 4: no candidate: none with `dishName` true.
  */
-export function matchDish<R extends Named>(phrase: string, recipes: readonly R[]): DishMatch<R> {
+export function matchDish<R extends Named>(phrase: string, recipes: readonly R[], slotNames: readonly string[] = []): DishMatch<R> {
   const content = contentWords(phrase);
   const text = content.join(" ");
-  const exact = text && recipes.find((recipe) => !recipe.deleted_at && !isGeneric(recipe.name) && contentWords(recipe.name).join(" ") === text);
+  const exact = text && recipes.find((recipe) => !recipe.deleted_at && !isGeneric(recipe.name, slotNames) && contentWords(recipe.name).join(" ") === text);
   if (exact) return { kind: "found", recipe: exact };
   if (isNotDishName(content)) return { kind: "none", dishName: false };
-  const ranked = rank(content, recipes);
+  const ranked = rank(content, recipes, slotNames);
   const [first, second] = ranked;
   if (!first) return { kind: "none", dishName: true };
   const ahead = !second || second.recall < first.recall || (second.recall === first.recall && second.precision < first.precision);
@@ -89,7 +95,7 @@ export function matchDish<R extends Named>(phrase: string, recipes: readonly R[]
 }
 
 /** REQ-29: the candidates for a whole question, best first, up to 3; never a found (rules 1 and 2 do not apply). */
-export function rankDish<R extends Named>(question: string, recipes: readonly R[]): R[] {
+export function rankDish<R extends Named>(question: string, recipes: readonly R[], slotNames: readonly string[] = []): R[] {
   const content = contentWords(question);
-  return isNotDishName(content) ? [] : rank(content, recipes).slice(0, MAX_OFFERED).map(({ recipe }) => recipe);
+  return isNotDishName(content) ? [] : rank(content, recipes, slotNames).slice(0, MAX_OFFERED).map(({ recipe }) => recipe);
 }
