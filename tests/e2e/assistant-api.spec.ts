@@ -358,6 +358,7 @@ test.describe("synthetic volume (NFR)", () => {
     expect(items((await ask(chatContext.request, "¿Qué hay en mi carrito?", { today: VOLUME_TODAY })).body, "Ingredientes").at(-1)).toBe("y 32 más");
     const timings: string[] = [];
     const all: number[] = [];
+    const slowestByTopic: { message: string; slowest: number }[] = [];
     for (const { message, kind } of QUESTIONS) {
       const samples: number[] = [];
       for (let round = 0; round < ROUNDS; round++) {
@@ -370,7 +371,7 @@ test.describe("synthetic volume (NFR)", () => {
       }
       all.push(...samples);
       const slowest = Math.max(...samples);
-      expect(slowest, `${message} took ${Math.round(slowest)} ms`).toBeLessThan(BOUND_MS);
+      slowestByTopic.push({ message, slowest });
       timings.push(`${message}: median ${Math.round([...samples].sort((a, b) => a - b)[ROUNDS >> 1])} ms, max ${Math.round(slowest)} ms`);
     }
     const sorted = all.sort((a, b) => a - b);
@@ -378,5 +379,7 @@ test.describe("synthetic volume (NFR)", () => {
     timings.push(`all ${sorted.length} requests: p50 ${at(0.5)} ms, p95 ${at(0.95)} ms, max ${at(1)} ms`);
     test.info().annotations.push({ type: "timings", description: timings.join("\n") });
     console.log(`Chat timings on the synthetic volume (${ROUNDS} rounds each):\n${timings.join("\n")}`);
+    // Asserted after the evidence is recorded, so a failing bound still leaves the timings behind.
+    for (const { message, slowest } of slowestByTopic) expect(slowest, `${message} took ${Math.round(slowest)} ms`).toBeLessThan(BOUND_MS);
   });
 });

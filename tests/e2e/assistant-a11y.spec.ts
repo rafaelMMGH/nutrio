@@ -992,8 +992,15 @@ test.describe("REQ-35: Enter and Space on buttons and links", () => {
       (window as unknown as { __historyCalls: typeof counts }).__historyCalls = counts;
       return { pathname: location.pathname, length: history.length };
     });
+    // The RSC fetch of a Link navigation starts at the click, long before pushState: a slow cold compile of the
+    // target cannot hide a broken Space handler from this check.
+    const rscRequests: string[] = [];
+    chat.on("request", (request) => {
+      if (request.url().includes("_rsc=")) rscRequests.push(request.url());
+    });
     await chat.keyboard.press("Space");
     await chat.evaluate(() => new Promise((resolve) => setTimeout(resolve, 3500)));
+    expect(rscRequests).toEqual([]);
     const after = await chat.evaluate(() => ({
       calls: (window as unknown as { __historyCalls: { push: number; replace: number } }).__historyCalls,
       pathname: location.pathname,
