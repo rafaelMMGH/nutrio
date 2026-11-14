@@ -513,3 +513,10 @@ test("BUG-B8 a generic recipe of a custom plan slot ('Postre opcion 1') can neit
   assert.doesNotMatch(reply.answer, /Ingredientes/);
   assert.ok(!reply.buttons.some((button) => button.type === "question" && /postre opcion/i.test(button.label)));
 });
+
+test("BUG-B4 REQ-6 step 3 before step 4: a dish cue beside an identity phrase answers the identity, not a did-you-mean", () => {
+  const { db, user } = memDb({ name: "Ana" });
+  const reply = ragAnswer(db, user, "¿Qué lleva el pollo asado y cómo me llamo?", TODAY, { trace: true });
+  assert.deepEqual(reply.resolved, [{ topic: "identity", of: "name" }]);
+  assert.equal(reply.answer, "Te llamas Ana.");
+});

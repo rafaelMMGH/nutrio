@@ -110,8 +110,12 @@ export function resolve(question: string, recipes?: readonly Recipe[], today?: s
     }
   }
 
+  // Step 3: an identity phrase comes before the dish step, so a dish cue beside one is not matched as a dish (the
+  // identity is answered below, with the other topics).
+  const identified = hits.some((hit) => hit.topic === "identity");
+
   // Step 4: a dish cue plus a dish name ends the answer with the matcher's outcome.
-  const dishHit = recipes && hits.find((hit) => hit.topic === "dish");
+  const dishHit = recipes && !identified ? hits.find((hit) => hit.topic === "dish") : undefined;
   const dish = dishHit ? dishPhrase(question, tokens, dishHit) : undefined;
   if (recipes && dish) {
     const match = matchDish(dish.text, recipes);

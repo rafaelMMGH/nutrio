@@ -164,6 +164,14 @@ test("REQ-3 rule 1: an exact recipe name made of a slot word beats the slot read
   assert.deepEqual(withRecipes("¿Qué lleva la cena?", recipes).map(label), ["slotOptions:cena"]);
 });
 
+test("REQ-6 step 3 runs before step 4: an identity phrase beside a dish cue is the identity answer, not a dish outcome (BUG-B4)", () => {
+  assert.deepEqual(withRecipes("¿Qué lleva el pollo asado y cómo me llamo?").map(label), ["identity:name"]);
+  assert.deepEqual(withRecipes("¿Qué lleva la pizza y cómo se llama mi plan?").map(label), ["identity:plan"]);
+  assert.deepEqual(withRecipes("¿Cómo me llamo y qué lleva el pollo?").map(label), ["identity:name"]);
+  // Without an identity phrase step 4 is unchanged.
+  assert.deepEqual(withRecipes("¿Qué lleva el pollo asado?").map(label), ["dish"]);
+});
+
 test("resolve(question) without recipes keeps the plain dish intent", () => {
   assert.deepEqual(resolve("¿Qué lleva el pollo asado?").intents, [{ topic: "dish" }]);
 });
