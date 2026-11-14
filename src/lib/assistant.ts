@@ -69,6 +69,7 @@ export function optionAnnouncement(answer: Pick<ChatAnswer, "blocks" | "buttons"
   const options = optionButtons(answer);
   if (options.length === 0) return null;
   const first = options[0];
+  // options are Button[] and only the `question` variant has `message`; the narrowing is required for tsc (TS2339 without it).
   const titled = answer.blocks.findIndex((block) => block.title !== null && first.type === "question" && first.message.startsWith(`${block.title},`));
   if (blockIndex !== Math.max(0, titled)) return null;
   return `${options.length} ${options.length === 1 ? "opción" : "opciones"}: ${options.map((button) => button.label).join("; ")}`;
