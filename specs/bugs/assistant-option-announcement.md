@@ -1,6 +1,6 @@
 # Bug: assistant options are never announced and render outside the bubble (B1)
 
-**Status:** fixed on feature/assistant-data-scope (the code exists only on this branch); pending the full e2e run and merge · **Branch:** feature/assistant-data-scope
+**Status:** fixed on feature/assistant-data-scope (the code exists only on this branch); verified (full e2e 399/399, 360 px check passed), pending merge · **Branch:** feature/assistant-data-scope
 
 Source: read-only drift check of spec v1.7 against the code, with probes (2026-11-13). Spec: REQ-33 (option announcement), T056 DOM contract; REQ-34 (360 px) and REQ-35 (focus order) affected by the placement. Recorded in spec v1.8.
 
@@ -37,10 +37,13 @@ Commit 3316cd6 (61fea0c is a separate `ReplyKind` cleanup). Pure functions `opti
 
 ## Verification
 
-Ran: 8 e2e files in one run (answers, a11y, next-step, composer, errors, meals, look, noscope): 158 passed; unit 819/819; reviewer verdict PASS (conditional). Not run after the fix: the six API-only e2e specs (api, edges, identity, match, parity, progress) and the full suite; one full e2e run is still due.
+Ran: 8 e2e files in one run (answers, a11y, next-step, composer, errors, meals, look, noscope): 158 passed; unit 819/819; reviewer verdict PASS (conditional). Later (2026-11-14): full e2e 399/399 at 2f86a4b (T088, includes the six API-only specs); unit 823/823; 360 px visual check passed (T089).
 
 ## Open
 
-- MEDIUM-3: thin tests for the 2-block heuristic (duplicated-slot ref, a first block not in the plan, the block-0 fallback).
-- LOW-1: stale comment at `src/lib/assistant.ts:76`. LOW-2: redundant type narrowing.
-- LOW-3: visual check at 360 px of the split (options in the bubble, paging chips outside) in the browser.
+Nothing open; pending merge.
+
+- MEDIUM-3: closed by T085 (unit rows for the 2-block heuristic: duplicated-slot ref, a first block not in the plan, the block-0 fallback).
+- LOW-1: closed by c78af89 (stale `Block` comment refreshed).
+- LOW-2: closed by the comment commit 6ccfcb4 (T091): the `first.type === "question"` narrowing is kept, since options are `Button[]` and only the `question` variant has `message` (TS2339 without it).
+- LOW-3: closed by T089 (360 px visual check passed).
