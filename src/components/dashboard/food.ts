@@ -129,9 +129,14 @@ export function mealTime(meal: Meal, meals: Meal[]) {
   return lunch && meal.display_order > lunch.display_order ? "17:30" : "11:00";
 }
 
+// Hand-rolled instead of toLocaleTimeString: Node and each browser ship different CLDR data for es-MX
+// ("8:30 a.m." vs "8:30 am"), which breaks hydration. Unparsable input stays "Invalid Date" as before.
 export function formatTime(value: string) {
   const [hours, minutes] = value.split(":").map(Number);
-  return new Date(2000, 0, 1, hours, minutes).toLocaleTimeString("es-MX", { hour: "numeric", minute: "2-digit" });
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return "Invalid Date";
+  const dayMinutes = (((Math.trunc(hours) * 60 + Math.trunc(minutes)) % 1440) + 1440) % 1440;
+  const hour = Math.floor(dayMinutes / 60);
+  return `${hour % 12 || 12}:${String(dayMinutes % 60).padStart(2, "0")} ${hour < 12 ? "a.m." : "p.m."}`;
 }
 
 // The option's dish title from the PDF ("Molletes con jamón y pollo"), else a name built from its ingredients.
