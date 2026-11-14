@@ -7,7 +7,7 @@ _Last updated: 2026-11-14 (assistant-data-scope T091 closed; merge pending)_
 ## In progress
 
 - [ ] **Assistant data scope: spec v1.9 implemented on the branch, merge pending (the user's push/PR).** Branch `feature/assistant-data-scope` (local, never pushed; tip = 6ccfcb4, the T087 LOW-2 comment commit, plus the docs commit after it). **Start here: `specs/assistant-data-scope/HANDOFF.md`**. Gate 2 approved 2026-11-14 (58dce85); Phase 11 T081-T090 done and T091 closed 2026-11-14: 91 of 91 ids (T025 dropped and T071 removed are not ticks; all ticked). Gates: tsc clean, unit 823/823, full e2e 399/399 (12.4 min), 360 px visual check passed (T089), NFR check <= 120 ms per question on a clone of real data (T090). Bug notes: `specs/bugs/assistant-option-announcement.md` (fixed, verified), `assistant-identity-before-dish.md`, `assistant-generic-custom-slot.md`. Also delivers chat-polish REQ-23 (HTTP 500), which keeps `assistant-chat-polish` in `partial` until this merges.
-  - What remains (the user's only): (1) the Constitution principle 1 reminder (says "a Playwright e2e test"; this feature uses unit tests as fail-first proof; she decided 2026-10-29 not to amend and asked to be reminded: ask once, a change needs a team PR); (2) optional cart-snapshot decision; (3) optional v1.9.x spec-change to refresh the spec's Progress line (still "78 of 78"); (4) push and PR, only with her yes. Status `implemented` only after the merge.
+  - What remains (the user's only): (1) push and PR (the Constitution principle 1 amendment, the cart-snapshot fixture and the spec v1.9.1 Progress refresh are DONE and committed 2026-11-14; full e2e 401/401); (2) push and PR, only with her yes. Status `implemented` only after the merge.
   - Future (not in this feature): conversation memory so "¿y la cena?" works; the design is stateless so it can be added.
 
 - [ ] **E2E run guard** (no branch now: `fix/e2e-run-guard` had no commits of its own and was DELETED on 2026-11-13 during the branch cleanup; restart from `main`, and the PR targets `main`). The bug note is `specs/bugs/e2e-run-guard.md`. **Still open (2026-11-13):** a second concurrent e2e run can still break the first; assistant-data-scope does not depend on it (it ran e2e one at a time).
@@ -27,7 +27,8 @@ _Last updated: 2026-11-14 (assistant-data-scope T091 closed; merge pending)_
 
 ## Needs the user
 
-- [ ] **REMIND THE USER when assistant-data-scope finishes:** CONSTITUTION principle 1 still says tests are "today ... a Playwright e2e test", but this feature treats `node:test` unit tests as the fail-first proof for logic (spec v1.6). The user decided on 2026-10-29 NOT to amend the Constitution. Ask once more at the end whether to leave it or propose a one-line amendment (a Constitution change needs a team PR).
+- [ ] **REMIND THE USER after the assistant-data-scope push/PR (her request, 2026-11-14):** the remaining open items stay in this backlog and she wants to be asked about them again at the very end: (1) restart `fix/e2e-run-guard` from `main` (code in `stash@{0}`, never pop without her); (2) manual phone check of the assistant (T041, 13 items); (3) Escape in app popups closes the assistant panel; (4) the period planner overcounts days (needs her decision, 4+3 or 7 each).
+
 - [ ] **Manual phone check** for the assistant (13 items, `specs/assistant-chat-polish/tasks.md` T041): iPhone Safari + VoiceOver, Android Chrome + TalkBack.
 
 - [ ] **Push `fix/e2e-run-guard` and open its PR** after the branch is recreated from `main` and the guard is committed (the old branch was deleted 2026-11-13), with base `main`.
@@ -39,7 +40,6 @@ _Last updated: 2026-11-14 (assistant-data-scope T091 closed; merge pending)_
 ## Assistant chat (follow-ups)
 
 - [ ] **Optional spec-change:** combined questions on a recipe page ("¿Qué lleva y cómo se hace?") currently show only Preparación (today's narrowing rule, kept by spec v1.4). Decide whether they should show both sections.
-- [ ] **Fragile snapshot:** `a-theme-visual` "signed in, light › cart looks as it did" failed on main because local cart data grew (1882 px vs 900). Refreshed on 2026-11-13 (assistant-data-scope T057, cart only, the user's yes); it stays fragile: it depends on the real cart's item count (cloned DB) and shows today's date in an unmasked `<p>` (CartView.tsx:64). Options: seed deterministic cart data or mask the header (test-side); the user has not decided.
 - [ ] **Escape in app popups (pre-existing):** `src/components/useDismiss.ts:13` (UserMenu) and `src/components/groceries/ManualAddForm.tsx:65` don't `preventDefault` on Escape, so one Escape also closes the open assistant panel. Small bug fix.
 - [ ] **Safe areas:** the app sets no `viewport-fit=cover`, so `env(safe-area-inset-*)` is 0; the REQ-15 safe-area check is weak.
 
@@ -64,6 +64,8 @@ Findings, with file:line references: `specs/bugs/shopping-list-findings.md`.
 - [ ] Optional: in `src/lib/client/theme.ts`, after a real reveal-update failure, call `applyTheme(next)` as a fallback so the stored choice and the page agree.
 
 ## Done
+
+- 2026-11-14: **Constitution principle 1 amended** (unit tests are the fail-first proof, a Playwright e2e test at the end; the user's decision). **Spec v1.9.1** Progress refresh (91 of 91). **Cart snapshot made deterministic** (`specs/bugs/cart-snapshot-fixture.md`: seeded fixed cart, masked date and nav counts; baselines regenerated locally; full e2e 401/401).
 
 - 2026-11-13: **Delete local branch `backup/assistant-9a-before-split`**: closed, nothing to delete (the branch no longer existed when checked).
 
