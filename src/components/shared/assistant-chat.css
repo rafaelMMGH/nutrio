@@ -56,10 +56,10 @@
   .assistant-chat, .assistant-chat.open, .assistant-fab { transition: none; }
   .assistant-chat-form .assistant-mic.listening { animation: none; }
 }
-.assistant-chat header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 20px 20px 14px; border-bottom: 1px solid var(--hairline); }
+.assistant-chat header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 16px 16px 12px; border-bottom: 1px solid var(--hairline); }
 .assistant-chat-icon { display: grid; place-items: center; flex: none; width: 42px; height: 42px; border-radius: 50%; background: var(--brand-50); color: var(--brand-text); }
 .assistant-chat-heading { flex: 1; min-width: 0; }
-.assistant-chat-new { display: inline-flex; align-items: center; flex: none; gap: 6px; padding: 7px 12px; border: 1px solid var(--hairline); border-radius: 999px; background: var(--surface-raised); color: var(--text-1); font-size: 13px; font-weight: 600; cursor: pointer; }
+.assistant-chat-new { display: inline-flex; align-items: center; flex: none; gap: 4px; padding: 7px 10px; border: 1px solid var(--hairline); border-radius: 999px; background: var(--surface-raised); color: var(--text-1); font-size: 13px; font-weight: 600; cursor: pointer; }
 .assistant-chat-new:hover { border-color: var(--brand-200); background: var(--brand-50); }
 .assistant-chat-new:focus-visible { outline: 2px solid var(--assistant-focus); outline-offset: 2px; }
 .assistant-chat h2 { margin: 0; font-size: 20px; font-weight: 700; }

@@ -314,6 +314,27 @@ test.describe("REQ-15: the narrow header", () => {
       await expect(fresh.locator("span")).toHaveText("Nueva conversación");
     });
   });
+
+  // BUG-B9: with the pill showing, the 400 px panel left the title column 73 px and "Asistente" (93 px) ran under the pill.
+  for (const width of [1280, 641]) {
+    test.describe(`at ${width}x800`, () => {
+      test.use({ viewport: { width, height: 800 } });
+      test(`the title fits its box and ends clear of Nueva conversación`, async ({ chat }) => {
+        await startThread(chat);
+        const title = assistantUi(chat).panel.locator("header h2");
+        const fresh = assistantUi(chat).panel.getByRole("button", { name: "Nueva conversación", exact: true });
+        await expect(fresh.locator("span")).toBeVisible();
+        const fits = await title.evaluate((node) => node.scrollWidth <= node.clientWidth);
+        expect(fits, "the title text overflows its box").toBe(true);
+        const textRight = await title.evaluate((node) => {
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          return range.getBoundingClientRect().right;
+        });
+        expect((await boxOf(fresh)).x - textRight).toBeGreaterThanOrEqual(4);
+      });
+    });
+  }
 });
 
 
