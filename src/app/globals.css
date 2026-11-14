@@ -902,6 +902,7 @@ html.theme-vt::view-transition-new(root) {
 .planner-recipe.on { border-color: var(--brand-fill); background: var(--brand-fill); color: var(--on-brand); }
 .planner-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
 .planner-foot .check { gap: 8px; color: var(--text-2); font-size: 14px; }
+.planner-hint { margin: 0; color: var(--text-2); font-size: 13px; }
 
 .source-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .source-list li { display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 8px 0 16px; border-radius: 16px; background: var(--canvas); }

@@ -7,6 +7,7 @@ import { useShell } from "@/components/app/AppShell";
 import { foodIcon, isReadableName, qty } from "@/components/dashboard/food";
 import { useRecipeActions } from "@/components/recipes/useRecipeActions";
 import { api, getErrorMessage } from "@/lib/client/api";
+import { splitDays } from "@/lib/domain/period";
 import type { listGroceries } from "@/lib/domain/queries";
 import { AddToCartButton } from "./AddToCartButton";
 
@@ -81,6 +82,9 @@ function PeriodPlanner({ recipes, activePlan }: Pick<Props, "recipes" | "activeP
   const [days, setDays] = useState(7);
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
+  const wholeDays = Number.isInteger(days) && days >= 1;
+  const tooManyRecipes = wholeDays && selected.length > days;
+  const validPeriod = wholeDays && !tooManyRecipes;
 
   function toggle(id: string) {
     setSelected((current) => (current.includes(id) ? current.filter((item) => item !== id) : [...current, id]));
@@ -92,16 +96,18 @@ function PeriodPlanner({ recipes, activePlan }: Pick<Props, "recipes" | "activeP
       toast.warning("Selecciona al menos una receta");
       return;
     }
+    if (!validPeriod) return;
     const form = event.currentTarget;
     const trainingDays = Number((form.elements.namedItem("training_days") as HTMLInputElement).value || 0);
     const includeAddOns = (form.elements.namedItem("include_add_ons") as HTMLInputElement).checked;
     setBusy(true);
     try {
-      // One recipe repeats for the whole period; several rotate, so each covers its share of the days.
-      for (const recipeId of selected) {
+      // One recipe repeats for the whole period; several rotate, so each covers its share and the shares add up to the days.
+      const shares = splitDays(days, selected.length);
+      for (const [index, recipeId] of selected.entries()) {
         await api("/api/cart/items", {
           method: "POST",
-          body: JSON.stringify({ source_type: "recipe", source_id: recipeId, period_days: Math.ceil(days / selected.length), training_days: trainingDays, include_add_ons: includeAddOns })
+          body: JSON.stringify({ source_type: "recipe", source_id: recipeId, period_days: shares[index], training_days: trainingDays, include_add_ons: includeAddOns })
         });
       }
       toast.success("Recetas agregadas al carrito", { description: `${selected.length} ${selected.length === 1 ? "receta" : "recetas"} para ${days} días` });
@@ -143,9 +149,11 @@ function PeriodPlanner({ recipes, activePlan }: Pick<Props, "recipes" | "activeP
           );
         })}
       </div>
+      {!wholeDays && <p className="planner-hint" role="status">Los días del periodo deben ser un número entero.</p>}
+      {tooManyRecipes && <p className="planner-hint" role="status">Elige máximo tantas recetas como días del periodo.</p>}
       <footer className="planner-foot">
         <label className="check"><input name="include_add_ons" type="checkbox" defaultChecked /> Incluir complementos obligatorios</label>
-        <button type="submit" className="order-cta" disabled={busy || !selected.length}>
+        <button type="submit" className="order-cta" disabled={busy || !selected.length || !validPeriod}>
           Agregar {selected.length ? `${selected.length} ${selected.length === 1 ? "receta" : "recetas"}` : "recetas"} al carrito
         </button>
       </footer>

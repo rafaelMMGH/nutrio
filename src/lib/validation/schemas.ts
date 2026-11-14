@@ -22,7 +22,7 @@ export const cartItemSchema = z.discriminatedUnion("source_type", [
     source_type: z.literal("recipe"),
     source_id: z.string().min(1),
     quantity_multiplier: z.coerce.number().positive().optional(),
-    period_days: z.coerce.number().min(0).optional(),
+    period_days: z.coerce.number().min(1).optional(),
     training_days: z.coerce.number().min(0).optional(),
     include_add_ons: z.boolean().optional(),
     include_supplements: z.boolean().optional(),
