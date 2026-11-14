@@ -26,13 +26,23 @@ async function post(chatContext: BrowserContext, data: Record<string, unknown>) 
   return (await response.json()) as ChatAnswer;
 }
 
-const MESSAGES = ["¿Qué hay en mi carrito?", "¿Qué recetas hay en mi plan?", "¿A qué hora es mi comida?", "¿Cuál es mi objetivo?", "¿Cómo se prepara?", "¿Cuál es la capital de Francia?"];
+// Each message has the kind and topics the unscoped router must give it, so a vacuous "same wrong answer" cannot pass.
+const MESSAGES: { message: string; kind: ChatAnswer["kind"]; topics: string[] }[] = [
+  { message: "¿Qué hay en mi carrito?", kind: "answer", topics: ["cart"] },
+  { message: "¿Qué recetas hay en mi plan?", kind: "answer", topics: ["recipes"] },
+  { message: "¿A qué hora es mi comida?", kind: "answer", topics: ["mealTimes"] },
+  { message: "¿Cuál es mi objetivo?", kind: "answer", topics: ["goals"] },
+  { message: "¿Cómo se prepara?", kind: "clarify", topics: ["dish"] },
+  { message: "¿Cuál es la capital de Francia?", kind: "no_match", topics: [] }
+];
 
 test("REQ-4 scope and recipe_id change nothing: the same answer, kind, blocks and buttons", async ({ chatContext }) => {
   const recipeId = Object.values(recipeIds)[0];
-  for (const message of MESSAGES) {
+  for (const { message, kind, topics } of MESSAGES) {
     const plain = await post(chatContext, { message });
     expect(plain.context_used, message).toBe("Todo el sistema");
+    expect(plain.kind, message).toBe(kind);
+    expect((await ask(chatContext.request, message, { trace: true })).body.resolved?.map((intent) => intent.topic), message).toEqual(topics);
     for (const legacy of [{ scope: "Carrito" }, { scope: "Plan activo" }, { scope: "Receta", recipe_id: recipeId }, { scope: "Recetario", recipe_id: "no-such-recipe" }]) {
       expect(await post(chatContext, { message, ...legacy }), `${message} ${JSON.stringify(legacy)}`).toEqual(plain);
     }
