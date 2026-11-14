@@ -132,8 +132,8 @@ export function pickVariant<T>(variants: T[], question: string): T {
 const countOptions = (count: number) => `${count} ${count === 1 ? "opción" : "opciones"}`;
 
 /** REQ-9: the recipe name, or for a generic name "Opción <n>: <first 3 ingredients>" ("…" only above 3). */
-function optionLabel(db: AppDb, recipe: Recipe, position: number, slotNames: readonly string[]): string {
-  if (!isGeneric(recipe.name, slotNames)) return recipe.name;
+function optionLabel(db: AppDb, recipe: Recipe, position: number): string {
+  if (!isGeneric(recipe.name)) return recipe.name;
   const names = recipeDetails(db, recipe).ingredients.map((item) => item.name);
   if (!names.length) return `Opción ${position}`;
   return `Opción ${position}: ${names.slice(0, 3).join(", ")}${names.length > 3 ? "…" : ""}`;
@@ -168,7 +168,7 @@ function complements(db: AppDb, slotId: string): Rich[] {
  */
 export function recipeDetail(db: AppDb, userId: string, recipe: Recipe, spot?: { slot: Slot; position: number }): Built {
   const planned = planSlots(db, userId)?.slots ?? [];
-  const name = isGeneric(recipe.name, planned.map((slot) => slot.name)) && spot ? `${spot.slot.ref}, opción ${spot.position}` : recipe.name;
+  const name = isGeneric(recipe.name) && spot ? `${spot.slot.ref}, opción ${spot.position}` : recipe.name;
   const ingredients = recipeDetails(db, recipe).ingredients.map((item) => withAmount(item.name, item.quantity, item.unit));
   const steps = recipeSteps(recipe.description);
   const holding = spot ? [spot.slot] : planned.filter((slot) => db.mealOptions.some((option) => option.meal_type_id === slot.id && option.recipe_id === recipe.id && !option.deleted_at));
@@ -226,7 +226,7 @@ export function slotOptions(db: AppDb, userId: string, intent: Intent, question:
   const first = (current - 1) * PAGE_SIZE;
   const buttons: Button[] = recipes.slice(first, first + PAGE_SIZE).map((recipe, index) => ({
     type: "question",
-    label: optionLabel(db, recipe, first + index + 1, plan.slots.map((item) => item.name)),
+    label: optionLabel(db, recipe, first + index + 1),
     message: `${slot.ref}, opción ${first + index + 1}`,
     layout: "option"
   }));
