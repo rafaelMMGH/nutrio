@@ -519,11 +519,14 @@ export const LINK_LABEL = "Ver receta completa";
 export const CHIP_LABEL = "Mi cena de hoy";
 export const LINK_HREF = "/plans";
 
-/** An answer whose block carries vertical option buttons (spec REQ-34) and a navigation link, plus one answer-level question button. */
+/**
+ * An answer in the shape the server sends for options (chat.ts): the option buttons are answer-level (`buttons`, layout
+ * "option") followed by a chip, and only a navigation link is in the block's own `buttons`.
+ */
 export function optionsAnswer(): ChatAnswer {
-  const base = buildAnswer({ kind: "options", lead: [{ text: "Encontré varias opciones." }], buttons: [question(CHIP_LABEL)] });
   const options: Button[] = OPTION_LABELS.map((label) => ({ type: "question", label, message: label, layout: "option" }));
-  base.blocks[0].buttons = [...options, { type: "link", label: LINK_LABEL, href: LINK_HREF }];
+  const base = buildAnswer({ kind: "answer", lead: [{ text: "Encontré varias opciones." }], buttons: [...options, question(CHIP_LABEL)] });
+  base.blocks[0].buttons = [{ type: "link", label: LINK_LABEL, href: LINK_HREF }];
   return base;
 }
 

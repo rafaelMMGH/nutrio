@@ -5,7 +5,7 @@
 
 import { useMemo, useState } from "react";
 import { Bot, RotateCcw } from "lucide-react";
-import { STARTERS, variantOf, type Block, type Button, type ChatAnswer, type Rich } from "@/lib/assistant";
+import { optionAnnouncement, optionButtons, STARTERS, variantOf, type Block, type Button, type ChatAnswer, type Rich } from "@/lib/assistant";
 import { clipRich, richLength } from "@/lib/client/text-stream";
 import { AssistantButton } from "./AssistantButton";
 import { useTypedLength } from "./useTypedLength";
@@ -72,16 +72,8 @@ function Lead({ rich, typed }: { rich: Rich; typed: number | null }) {
   );
 }
 
-/** "3 opciones: A; B; C" for the screen reader: the option buttons are outside the live region, so their count and labels go in as text. */
-function optionsAnnouncement(buttons: Button[]): string | null {
-  const labels = buttons.filter((button) => variantOf(button) === "option").map((button) => button.label);
-  if (labels.length === 0) return null;
-  return `${labels.length} ${labels.length === 1 ? "opción" : "opciones"}: ${labels.join("; ")}`;
-}
-
 // `assistant-turn-later` marks what fades in once the first lead has typed (sections, the sources line, later blocks).
-function BlockContent({ block, typed }: { block: Block; typed: number | null | "later" }) {
-  const announcement = optionsAnnouncement(block.buttons);
+function BlockContent({ block, announcement, typed }: { block: Block; announcement: string | null; typed: number | null | "later" }) {
   return (
     <div className={typed === "later" ? "assistant-turn-block assistant-turn-later" : "assistant-turn-block"}>
       {block.title && <h3 className="assistant-turn-block-title">{block.title}</h3>}
@@ -103,7 +95,7 @@ function BlockContent({ block, typed }: { block: Block; typed: number | null | "
 function AnswerContent({ answer, typed }: { answer: ChatAnswer; typed: number | null }) {
   return (
     <>
-      {answer.blocks.map((block, index) => <BlockContent key={index} block={block} typed={index === 0 ? typed : "later"} />)}
+      {answer.blocks.map((block, index) => <BlockContent key={index} block={block} announcement={optionAnnouncement(answer, index)} typed={index === 0 ? typed : "later"} />)}
       {answer.sources.length > 0 && <p className="assistant-turn-sources assistant-turn-later">Basado en: {answer.sources.join(", ")}</p>}
     </>
   );
@@ -167,7 +159,7 @@ function AssistantReply({ turn, buttonsAction, onRetry }: { turn: Extract<Turn, 
         <div className="assistant-turn-live" aria-live="polite">
           {answer ? <AnswerContent answer={answer} typed={typed} /> : turn.status === "error" ? <p>{turn.server ? SERVER_ERROR_TEXT : ERROR_TEXT}</p> : null}
         </div>
-        {answer && <ButtonList buttons={answer.blocks.flatMap((block) => block.buttons)} action={buttonsAction} className="assistant-actions" />}
+        {answer && <ButtonList buttons={[...optionButtons(answer), ...answer.blocks.flatMap((block) => block.buttons)]} action={buttonsAction} className="assistant-actions" />}
         {pending && <div className="assistant-turn-pending"><Loader text="Pensando…" /></div>}
       </div>
       {turn.status === "error" && onRetry && (
@@ -175,7 +167,7 @@ function AssistantReply({ turn, buttonsAction, onRetry }: { turn: Extract<Turn, 
           <RotateCcw size={14} aria-hidden="true" /> Reintentar
         </button>
       )}
-      {answer && <ButtonList buttons={answer.buttons} action={buttonsAction} />}
+      {answer && <ButtonList buttons={answer.buttons.filter((button) => variantOf(button) !== "option")} action={buttonsAction} />}
     </article>
   );
 }

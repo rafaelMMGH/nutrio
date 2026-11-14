@@ -54,6 +54,26 @@ export function variantOf(button: Button): ButtonVariant {
   return button.layout === "option" ? "option" : "chip";
 }
 
+/** The option buttons of an answer: the server sends them answer-level (`buttons`, layout "option"), never inside a block. */
+export function optionButtons(answer: Pick<ChatAnswer, "buttons">): Button[] {
+  return answer.buttons.filter((button) => variantOf(button) === "option");
+}
+
+/**
+ * "3 opciones: A; B; C" for the screen reader (REQ-33): the option buttons sit outside the live region, so their count
+ * and labels go in as text, in the one block that holds them and in no other. The answer does not say which block that
+ * is; in a 2-block answer it is the block titled with the slot the option messages start with ("Cena, opción 2"),
+ * and without such a title the first block.
+ */
+export function optionAnnouncement(answer: Pick<ChatAnswer, "blocks" | "buttons">, blockIndex: number): string | null {
+  const options = optionButtons(answer);
+  if (options.length === 0) return null;
+  const first = options[0];
+  const titled = answer.blocks.findIndex((block) => block.title !== null && first.type === "question" && first.message.startsWith(`${block.title},`));
+  if (blockIndex !== Math.max(0, titled)) return null;
+  return `${options.length} ${options.length === 1 ? "opción" : "opciones"}: ${options.map((button) => button.label).join("; ")}`;
+}
+
 /** One titled part of an answer: options, paging and navigation buttons belong to the block. */
 export type Block = { title: string | null; lead: Rich; sections: Section[]; buttons: Button[] };
 
