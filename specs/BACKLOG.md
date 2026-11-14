@@ -2,19 +2,19 @@
 
 Open work for future sessions. The orchestrator should read this at session start and offer the top open item. Tick items when done; move finished items to "Done" with the date.
 
-_Last updated: 2026-11-13 (assistant-data-scope implementation complete)_
+_Last updated: 2026-11-14 (assistant-data-scope spec v1.9 planned; Phase 11 analyze round 1 PASS)_
 
 ## In progress
 
-- [ ] **Assistant data scope: implementation COMPLETE, awaiting the user's merge decision.** Branch `feature/assistant-data-scope` (local, never pushed; see `git log` for the tip; no `src/` change since 027e90e). **Start here: `specs/assistant-data-scope/HANDOFF.md`** (state, what remains, rules, traps). Spec v1.7 (`planned`), plan revision 10; 78 of 78 active tasks done, 45 of 45 batches. Gates: tsc clean, unit 810/810, last full e2e 398/398 (at 027e90e; the user chose no further full run), targeted runs green. Also delivers chat-polish REQ-23 (HTTP 500), which keeps `assistant-chat-polish` in `partial` until this merges.
-  - What remains (all the user's, HANDOFF.md section 2): (1) the manual ≤1 s check on real data at :3000, one question per topic; (2) spec v1.8 via the spec-change route (accepted choices v1.7 does not record, incl. removing `ReplyKind` "options"/"empty") or an explicit deferral; (3) the Constitution principle 1 reminder (below); (4) optional cart-snapshot decision; (5) push and PR, with the user's yes; (6) cleanup of six prunable agent worktrees and their branches, with the user's yes.
+- [ ] **Assistant data scope: spec v1.9 planned, next is Gate 2 for the Phase 11 difference.** Branch `feature/assistant-data-scope` (local, never pushed; see `git log` for the tip). **Start here: `specs/assistant-data-scope/HANDOFF.md`** (state, what remains, rules, traps). Spec v1.9 (`planned`; v1.8 6fda37f, v1.9 65a0046), plan revision 11; tasks: the 78 of v1.7 done plus Phase 11 T081-T091 (4 done: the bug-fix batch B1/B8/B4 and the `ReplyKind` cleanup, 3316cd6, e24a633, c56b7aa, 61fea0c), 82 ticks of 91 ids. Gates: tsc clean, unit 819/819; e2e after the bug-fix batch 8 files 158 passed; last full e2e 398/398 at 027e90e (before the batch). Bug notes: `specs/bugs/assistant-option-announcement.md`, `assistant-identity-before-dish.md`, `assistant-generic-custom-slot.md`. Also delivers chat-polish REQ-23 (HTTP 500), which keeps `assistant-chat-polish` in `partial` until this merges.
+  - What remains (HANDOFF.md section 2): (1) Gate 2 with the user's decisions B (T086), E (T088: one full e2e), BF2 yes/no (T085, T087) and who does the 360 px visual check (T089); (2) BF2 and the full e2e if accepted; (3) the manual ≤1 s check on real data at :3000 (T090); (4) the Constitution principle 1 reminder (below); (5) optional cart-snapshot decision; (6) push and PR, with the user's yes; (7) T091 final docs (ticks and results). Worktree/branch cleanup: done 2026-11-13.
   - Future (not in this feature): conversation memory so "¿y la cena?" works; the design is stateless so it can be added.
 
-- [ ] **E2E run guard**, branch `fix/e2e-run-guard` (no commits of its own yet; its base, `feature/theme-switcher`, is merged into `main`, so the PR can target `main`). The bug note is `specs/bugs/e2e-run-guard.md`. **Still open (2026-11-13):** a second concurrent e2e run can still break the first; assistant-data-scope does not depend on it (it ran e2e one at a time).
+- [ ] **E2E run guard** (no branch now: `fix/e2e-run-guard` had no commits of its own and was DELETED on 2026-11-13 during the branch cleanup; restart from `main`, and the PR targets `main`). The bug note is `specs/bugs/e2e-run-guard.md`. **Still open (2026-11-13):** a second concurrent e2e run can still break the first; assistant-data-scope does not depend on it (it ran e2e one at a time).
   - **⚠️ The code is in `stash@{0}`, not in the working tree.** On 2026-10-24 at 18:27 another Claude session stashed it ("fix/e2e-run-guard WIP: run guard + local server.js/package.json changes") and switched to `fix/shopping-list-quick`.
-  - **The stash also holds the user's own unrelated changes:** the `src/server.js` deletion and `package.json` dropping `legacy:dev`. To resume:
+  - **The stash also holds the user's own unrelated changes:** the `src/server.js` deletion and `package.json` dropping `legacy:dev`. **Never pop or drop `stash@{0}` without the user.** To resume, together with the user:
     1. Wait until no other session is working in this folder.
-    2. `git switch fix/e2e-run-guard`, then `git stash pop`.
+    2. From `main`: `git switch -c fix/e2e-run-guard`, then take the guard code from `stash@{0}` with the user (e.g. check out only the guard files from the stash; do not pop it over her unrelated changes without her).
     3. Keep `src/server.js` and `package.json` out of the guard commit.
   - **Files:** `tests/e2e/run-lock.ts` (new), `tests/e2e/global-setup.ts`, `tests/e2e/global-teardown.ts`, `.gitignore`.
   - **Review round 1: FAIL.** Fix these, then re-review:
@@ -30,7 +30,7 @@ _Last updated: 2026-11-13 (assistant-data-scope implementation complete)_
 - [ ] **REMIND THE USER when assistant-data-scope finishes:** CONSTITUTION principle 1 still says tests are "today ... a Playwright e2e test", but this feature treats `node:test` unit tests as the fail-first proof for logic (spec v1.6). The user decided on 2026-10-29 NOT to amend the Constitution. Ask once more at the end whether to leave it or propose a one-line amendment (a Constitution change needs a team PR).
 - [ ] **Manual phone check** for the assistant (13 items, `specs/assistant-chat-polish/tasks.md` T041): iPhone Safari + VoiceOver, Android Chrome + TalkBack.
 
-- [ ] **Push `fix/e2e-run-guard` and open its PR** after the commit, with base `main`.
+- [ ] **Push `fix/e2e-run-guard` and open its PR** after the branch is recreated from `main` and the guard is committed (the old branch was deleted 2026-11-13), with base `main`.
 - [ ] **Restart Claude Code** so the new speed rules load. These are scout and size triage before grilling, sub-batches of about 300 lines, running only the affected tests while iterating plus one full run per batch, tests shown failing on purpose, and minor findings folded into the next batch. They live in `.claude/agents/*.md`, which is gitignored and local only, and in `docs/agent-workflow.md`.
 - [ ] **Decide on uncommitted local changes** that have been kept out of every commit so far:
   - the deletion of `src/server.js` and `package.json` dropping the `legacy:dev` script (both currently inside `stash@{0}`, see the run guard above)
