@@ -2,7 +2,8 @@
 
 import { RefObject, useEffect } from "react";
 
-// Closes a popover on outside click or Escape.
+// Closes a popover on outside click or Escape. Escape is marked handled (preventDefault) so a panel listening behind the
+// popover, such as the assistant, stays open until the next Escape.
 export function useDismiss(open: boolean, close: () => void, ref: RefObject<HTMLElement | null>) {
   useEffect(() => {
     if (!open) return;
@@ -10,7 +11,9 @@ export function useDismiss(open: boolean, close: () => void, ref: RefObject<HTML
       if (!ref.current?.contains(event.target as Node)) close();
     };
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") close();
+      if (event.key !== "Escape") return;
+      event.preventDefault();
+      close();
     };
     document.addEventListener("mousedown", onPointer);
     document.addEventListener("keydown", onKey);

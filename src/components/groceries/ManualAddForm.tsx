@@ -63,6 +63,8 @@ export function ManualAddForm({ known }: Props) {
       event.preventDefault();
       pick(suggestions[highlight]);
     } else if (event.key === "Escape") {
+      // Handled here: the assistant panel behind skips defaultPrevented events.
+      event.preventDefault();
       setOpen(false);
     }
   }

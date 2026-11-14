@@ -3,7 +3,7 @@ import type { Button } from "@/lib/assistant";
 import { expectIssues } from "./fixtures";
 import { auditNow, visit } from "./theme-audit";
 import { canvasColor, contrast, effectiveBackground, toRgb, type Rgba, type Theme } from "./theme-helpers";
-import { assistantUi, buildAnswer, cartAnswer, createChatUser, deleteChatUser, expect, focusWalk, CHIP_LABEL, LINK_HREF, LINK_LABEL, LONG_LEAD, longLeadAnswer, mockChat, openAssistant, OPTION_LABELS, optionsAnswer, test } from "./assistant-helpers";
+import { assistantUi, buildAnswer, cartAnswer, createChatUser, deleteChatUser, expect, focusWalk, CHIP_LABEL, LINK_HREF, LINK_LABEL, LONG_LEAD, longLeadAnswer, mockChat, openAssistant, OPTION_LABELS, optionsAnswer, seedRecipes, test } from "./assistant-helpers";
 
 // The assistant as a phone sheet. Spec assistant-chat-polish, US5: REQ-15 (geometry, touch targets, safe areas, the
 // on-screen keyboard, long tokens), REQ-14 at 360 px (backdrop, focus rings), REQ-17 (turn names, live region) and REQ-22
@@ -496,6 +496,56 @@ test.describe("REQ-22: desktop is non-modal", () => {
     await expect(ui.panel).toBeHidden();
     await expect(ui.fab).toBeFocused();
     await expect(ui.fab).toHaveAccessibleName("Abrir asistente");
+  });
+
+  // A popup that closes on Escape marks the event handled (preventDefault), so the panel behind it stays open until a second Escape.
+  test("Escape closes the account menu first and leaves the panel open", async ({ chat }) => {
+    await chat.goto("/");
+    const ui = await openSheet(chat);
+    const chip = chat.getByRole("button", { name: "Cuenta de Asistente a11y" });
+    await chip.click();
+    const menu = chat.getByRole("menu", { name: "Cuenta" });
+    await expect(menu).toBeVisible();
+    await chat.keyboard.press("Escape");
+    await expect(menu).toBeHidden();
+    // aria-expanded flips with the state: the panel's own 180 ms close transition would keep it "visible" for a moment.
+    await expect(ui.fab).toHaveAttribute("aria-expanded", "true");
+    await expect(ui.panel).toBeVisible();
+    await chat.keyboard.press("Escape");
+    await expect(ui.panel).toBeHidden();
+    await expect(ui.fab).toBeFocused();
+  });
+
+  test("Escape closes the dashboard weight popover first and leaves the panel open", async ({ chat }) => {
+    await chat.goto("/");
+    const ui = await openSheet(chat);
+    await chat.getByRole("button", { name: "Registrar peso y meta" }).click();
+    const popover = chat.getByRole("dialog", { name: "Peso y meta" });
+    await expect(popover).toBeVisible();
+    await chat.keyboard.press("Escape");
+    await expect(popover).toBeHidden();
+    // aria-expanded flips with the state: the panel's own 180 ms close transition would keep it "visible" for a moment.
+    await expect(ui.fab).toHaveAttribute("aria-expanded", "true");
+    await expect(ui.panel).toBeVisible();
+    await chat.keyboard.press("Escape");
+    await expect(ui.panel).toBeHidden();
+  });
+
+  test("Escape closes the ingredient suggestions first; without a list it closes the panel", async ({ chat }) => {
+    seedRecipes([{ name: "Receta de sugerencias", ingredients: [{ name: "Aguacate" }] }]);
+    await chat.goto("/groceries/cart");
+    const ui = await openSheet(chat);
+    const field = chat.getByRole("combobox", { name: "Ingrediente" });
+    await field.fill("agua");
+    const list = chat.getByRole("listbox", { name: "Ingredientes guardados" });
+    await expect(list).toBeVisible();
+    await chat.keyboard.press("Escape");
+    await expect(list).toBeHidden();
+    // aria-expanded flips with the state: the panel's own 180 ms close transition would keep it "visible" for a moment.
+    await expect(ui.fab).toHaveAttribute("aria-expanded", "true");
+    await expect(ui.panel).toBeVisible();
+    await chat.keyboard.press("Escape");
+    await expect(ui.panel).toBeHidden();
   });
 
   test("a chip leaves focus in the input, while pending and after the answer", async ({ chat }) => {
