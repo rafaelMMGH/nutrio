@@ -977,6 +977,7 @@ test.describe("REQ-35: Enter and Space on buttons and links", () => {
     // A native anchor ignores Space (it scrolls the page), so only Enter navigates.
     // A router.push navigation only touches the URL after its RSC fetch, so hold a real interval in the page
     // before asserting once: expect.poll would return on the first matching sample and pass vacuously.
+    // In dev the push lands after the RSC fetch and compile (over 500 ms), so the window must outlast that.
     const before = await chat.evaluate(() => {
       const counts = { push: 0, replace: 0 };
       const wrap = (method: "pushState" | "replaceState", key: "push" | "replace") => {
@@ -992,7 +993,7 @@ test.describe("REQ-35: Enter and Space on buttons and links", () => {
       return { pathname: location.pathname, length: history.length };
     });
     await chat.keyboard.press("Space");
-    await chat.evaluate(() => new Promise((resolve) => setTimeout(resolve, 500)));
+    await chat.evaluate(() => new Promise((resolve) => setTimeout(resolve, 3500)));
     const after = await chat.evaluate(() => ({
       calls: (window as unknown as { __historyCalls: { push: number; replace: number } }).__historyCalls,
       pathname: location.pathname,
