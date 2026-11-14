@@ -1,6 +1,6 @@
 # Spec: Assistant chat polish
 
-**Status:** partial (everything except v1.9 REQ-23 is implemented; REQ-23 is delivered as a task of feature/assistant-data-scope)
+**Status:** implemented (v1.9 REQ-23 was delivered with feature/assistant-data-scope, merged as PR #7 on 2026-11-14; the rest was merged as PR #6 on 2026-10-28)
 **Version:** 1.9 · **Branch:** feature/assistant-chat-polish · **Owner:** Rafael Martinez
 
 ## Overview
