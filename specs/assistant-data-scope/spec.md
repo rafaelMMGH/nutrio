@@ -1,6 +1,6 @@
 # Spec: Assistant data scope
 
-**Status:** planned (spec-change v1.9.1, docs-only: refreshes the progress numbers, 91 of 91 task ids done, and adds no scope; v1.9 Gate 1 approved by the user 2026-11-14; v1.8 passed Gate 1 on 2026-11-13; v1.7 was approved by the user 2026-10-29 with Gate 2 on plan revision 9. It describes what was built and adds no scope. Becomes `implemented` only after the merge, which the user does later)
+**Status:** implemented (merged to main as PR #7 on 2026-11-14; spec v1.9.1 describes what was built, 91 of 91 task ids done; history: v1.9.1 docs-only progress refresh, v1.9 Gate 1 approved by the user 2026-11-14, v1.8 passed Gate 1 on 2026-11-13, v1.7 approved by the user 2026-10-29 with Gate 2 on plan revision 9)
 **Version:** 1.9.1 · **Branch:** feature/assistant-data-scope · **Owner:** Rafael Martinez · **Date:** 2026-11-14
 **Related:** [assistant-chat-polish](../assistant-chat-polish/spec.md) v1.9 (parts superseded by this spec) · **Contract:** [contracts/chat-api.md](contracts/chat-api.md)
 
