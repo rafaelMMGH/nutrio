@@ -29,7 +29,6 @@ _Last updated: 2026-11-13 (assistant-data-scope implementation complete)_
 
 - [ ] **REMIND THE USER when assistant-data-scope finishes:** CONSTITUTION principle 1 still says tests are "today ... a Playwright e2e test", but this feature treats `node:test` unit tests as the fail-first proof for logic (spec v1.6). The user decided on 2026-10-29 NOT to amend the Constitution. Ask once more at the end whether to leave it or propose a one-line amendment (a Constitution change needs a team PR).
 - [ ] **Manual phone check** for the assistant (13 items, `specs/assistant-chat-polish/tasks.md` T041): iPhone Safari + VoiceOver, Android Chrome + TalkBack.
-- [ ] **Delete local branch `backup/assistant-9a-before-split`** (safety copy from a commit re-split; identical tree to the branch).
 
 - [ ] **Push `fix/e2e-run-guard` and open its PR** after the commit, with base `main`.
 - [ ] **Restart Claude Code** so the new speed rules load. These are scout and size triage before grilling, sub-batches of about 300 lines, running only the affected tests while iterating plus one full run per batch, tests shown failing on purpose, and minor findings folded into the next batch. They live in `.claude/agents/*.md`, which is gitignored and local only, and in `docs/agent-workflow.md`.
@@ -40,7 +39,7 @@ _Last updated: 2026-11-13 (assistant-data-scope implementation complete)_
 ## Assistant chat (follow-ups)
 
 - [ ] **Optional spec-change:** combined questions on a recipe page ("¿Qué lleva y cómo se hace?") currently show only Preparación (today's narrowing rule, kept by spec v1.4). Decide whether they should show both sections.
-- [ ] **Stale snapshot:** `a-theme-visual` "signed in, light › cart looks as it did" fails on main because local cart data grew (1882 px vs 900). Refresh it or make the test data-independent.
+- [ ] **Fragile snapshot:** `a-theme-visual` "signed in, light › cart looks as it did" failed on main because local cart data grew (1882 px vs 900). Refreshed on 2026-11-13 (assistant-data-scope T057, cart only, the user's yes); it stays fragile: it depends on the real cart's item count (cloned DB) and shows today's date in an unmasked `<p>` (CartView.tsx:64). Options: seed deterministic cart data or mask the header (test-side); the user has not decided.
 - [ ] **Escape in app popups (pre-existing):** `src/components/useDismiss.ts:13` (UserMenu) and `src/components/groceries/ManualAddForm.tsx:65` don't `preventDefault` on Escape, so one Escape also closes the open assistant panel. Small bug fix.
 - [ ] **Safe areas:** the app sets no `viewport-fit=cover`, so `env(safe-area-inset-*)` is 0; the REQ-15 safe-area check is weak.
 
@@ -65,6 +64,8 @@ Findings, with file:line references: `specs/bugs/shopping-list-findings.md`.
 - [ ] Optional: in `src/lib/client/theme.ts`, after a real reveal-update failure, call `applyTheme(next)` as a fallback so the stored choice and the page agree.
 
 ## Done
+
+- 2026-11-13: **Delete local branch `backup/assistant-9a-before-split`**: closed, nothing to delete (the branch no longer existed when checked).
 
 - 2026-10-28: **Assistant chat polish**, `feature/assistant-chat-polish`, spec v1.8 implemented (22 REQs, US1–US5). Merged as PR #6 on 2026-10-28.
 
