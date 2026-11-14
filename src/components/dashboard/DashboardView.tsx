@@ -4,12 +4,10 @@ import Link from "next/link";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { useDismiss } from "@/components/useDismiss";
 import { toast } from "sonner";
-import { ArrowRight, ArrowUpRight, CalendarClock, Check, ChevronLeft, ChevronRight, ClipboardCheck, Dumbbell, FileUp, Filter, Flame, Minus, Pencil, Plus, Search, ShoppingBag, ShoppingCart, Utensils } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CalendarClock, Check, ChevronLeft, ChevronRight, ClipboardCheck, Dumbbell, FileUp, Flame, Minus, Pencil, Plus, Search, ShoppingBag, ShoppingCart, Utensils } from "lucide-react";
 import {
   DayLog,
   Meal,
-  WATER_GLASS_LITERS,
-  WATER_GOAL_LITERS,
   addDays,
   dateKey,
   equivalentGroup,
@@ -25,7 +23,8 @@ import {
   plural,
   qty
 } from "./food";
-import { MAX_MESSAGE, SCOPE_LABEL, messageLength, type ScopeKey } from "@/lib/assistant";
+import { MAX_MESSAGE, messageLength } from "@/lib/assistant";
+import * as progress from "@/lib/progress";
 import "./home.css";
 
 const WEEKDAYS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
@@ -38,7 +37,7 @@ type Props = {
   setWizard: (wizard: { step: number; data: any } | null) => void;
   user: any;
   goals: { weight_goal_kg: number | null; activity_goal_days: number };
-  askAssistant: (message: string, scope: ScopeKey) => Promise<void>;
+  askAssistant: (message: string) => Promise<void>;
   assistantBusy: boolean;
 };
 
@@ -128,10 +127,9 @@ export function DashboardView({ data, user, goals: serverGoals, setView, setWiza
   const logs = useDailyLogs(data.dashboard.dailyLogs, refresh);
 
   const schedule = data.dashboard.schedule as { plan_name: string; water_goal_liters: number | null; meals: Meal[] } | null;
-  const waterGlasses = Math.min(12, Math.max(4, Math.round((schedule?.water_goal_liters ?? WATER_GOAL_LITERS) / WATER_GLASS_LITERS)));
+  const waterGlasses = progress.waterGoalGlasses(schedule?.water_goal_liters);
   const meals: Meal[] = (schedule?.meals ?? []).map((meal) => ({ ...meal, time_window: times[meal.id] ?? meal.time_window }));
-  const mealIds = new Set(meals.map((meal) => meal.id));
-  const doneOn = (date: string) => Math.min(meals.length, logs.get(date).meals_done.filter((id) => mealIds.has(id)).length);
+  const doneOn = (date: string) => progress.mealsDoneOn(logs.get(date), meals.map((meal) => meal.id));
   const openWizard = () => setWizard({ step: 0, data: null });
 
   const pendingToday = meals.length - doneOn(today);
@@ -237,16 +235,9 @@ export function DashboardView({ data, user, goals: serverGoals, setView, setWiza
 
 /* ---------- Greeting search: questions go to the assistant ---------- */
 
-const ASSISTANT_SCOPES = (["auto", "Plan activo", "Recetario", "Carrito"] as const).map((value) => ({ value, label: SCOPE_LABEL[value] }));
-
 // `busy` is the assistant's: a pending question blocks the bar until it settles or Nueva conversación discards it.
-function SearchBar({ onAsk, busy }: { onAsk: (message: string, scope: ScopeKey) => Promise<void>; busy: boolean }) {
+function SearchBar({ onAsk, busy }: { onAsk: (message: string) => Promise<void>; busy: boolean }) {
   const [query, setQuery] = useState("");
-  const [scope, setScope] = useState<ScopeKey>("auto");
-  const [open, setOpen] = useState(false);
-  const menu = useRef<HTMLDivElement>(null);
-  useDismiss(open, () => setOpen(false), menu);
-  const current = ASSISTANT_SCOPES.find((item) => item.value === scope) ?? ASSISTANT_SCOPES[0];
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -255,7 +246,7 @@ function SearchBar({ onAsk, busy }: { onAsk: (message: string, scope: ScopeKey) 
     if (!message || busy || messageLength(query) > MAX_MESSAGE) return;
     // The question moves into the assistant panel right away, so the field clears on send, not when the answer lands.
     setQuery("");
-    await onAsk(message, scope);
+    await onAsk(message);
   }
 
   return (
@@ -264,36 +255,11 @@ function SearchBar({ onAsk, busy }: { onAsk: (message: string, scope: ScopeKey) 
       <input
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        placeholder={scope === "auto" ? "Pregunta por tu plan, recetas o compras" : `Pregunta sobre ${current.label.toLowerCase()}`}
+        placeholder="Pregunta por tu plan, tu avance o tus compras"
         aria-label="Preguntar al asistente"
         enterKeyHint="send"
         disabled={busy}
       />
-      <div className="home-search-scope" ref={menu}>
-        <button type="button" className={`home-search-filter${scope === "auto" ? "" : " is-on"}`} aria-haspopup="menu" aria-expanded={open} aria-label={`Buscar en: ${current.label}`} disabled={busy} onClick={() => setOpen(!open)}>
-          <Filter size={18} />
-        </button>
-        {open && (
-          <div className="popover home-scope-menu" role="menu">
-            <p>Buscar en</p>
-            {ASSISTANT_SCOPES.map((item) => (
-              <button
-                type="button"
-                role="menuitemradio"
-                aria-checked={item.value === scope}
-                key={item.value}
-                onClick={() => {
-                  setScope(item.value);
-                  setOpen(false);
-                }}
-              >
-                {item.label}
-                {item.value === scope && <Check size={16} />}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
     </form>
   );
 }
@@ -616,7 +582,7 @@ function IntakeCard({ meals, log, label, goalGlasses, isFuture, onWater }: { mea
         <p>
           Agua{" "}
           <b>
-            <Roll value={liters(glasses * WATER_GLASS_LITERS)} />/{liters(goalGlasses * WATER_GLASS_LITERS)} L
+            <Roll value={liters(glasses * progress.WATER_GLASS_LITERS)} />/{liters(goalGlasses * progress.WATER_GLASS_LITERS)} L
           </b>
         </p>
         <div className="home-cups" role="group" aria-label="Vasos de agua de 250 ml">
@@ -674,15 +640,17 @@ function ReportCard(props: {
   onSaveGoals: (patch: Partial<Goals>) => void;
 }) {
   const { meals, logs, today, goals, doneOn } = props;
-  const monday = addDays(today, -((parseKey(today).getDay() + 6) % 7));
-  const week = Array.from({ length: 7 }, (_, index) => addDays(monday, index));
-  const sofar = week.filter((date) => date <= today);
+  const monday = progress.mondayOf(today);
+  // Sunday as the end day: days that have not arrived have no log, so the whole week counts the same as up to today.
+  const week = progress.weekDays(monday, addDays(monday, 6));
+  const sunday = week[6];
   const total = meals.length;
+  const slotIds = meals.map((meal) => meal.id);
 
-  const weekWater = sofar.reduce((sum, date) => sum + Math.min(logs.get(date).water_glasses, props.waterGlasses), 0) * WATER_GLASS_LITERS;
-  const weekWaterGoal = props.waterGlasses * WATER_GLASS_LITERS * 7;
-  const weekMeals = sofar.reduce((sum, date) => sum + doneOn(date), 0);
-  const exercised = week.filter((date) => logs.get(date).exercised);
+  const weekWater = progress.weekWater(logs.get, monday, sunday, props.waterGlasses);
+  const weekWaterGoal = props.waterGlasses * progress.WATER_GLASS_LITERS * 7;
+  const weekMeals = progress.weekMeals(logs.get, slotIds, monday, sunday);
+  const exerciseDays = progress.weekExercise(logs.get, monday, sunday);
 
   let streak = 0;
   let cursor = total && doneOn(today) >= total ? today : addDays(today, -1);
@@ -703,7 +671,7 @@ function ReportCard(props: {
       </header>
       <div className="home-tiles">
         <WeightTile logs={logs} today={today} monday={monday} goal={goals.weight_goal_kg} onSaveDay={props.onSaveDay} onSaveGoals={props.onSaveGoals} />
-        <ActivityTile week={week} today={today} done={exercised.length} goal={goals.activity_goal_days} logs={logs} onSaveDay={props.onSaveDay} onSaveGoals={props.onSaveGoals} />
+        <ActivityTile week={week} today={today} done={exerciseDays} goal={goals.activity_goal_days} logs={logs} onSaveDay={props.onSaveDay} onSaveGoals={props.onSaveGoals} />
         <div className="home-tile tone-water">
           <span className="home-tile-label">Agua de la semana</span>
           <span className="home-wave" style={{ transform: `translateY(${(1 - clamp(weekWater / weekWaterGoal)) * 72}%)` }} aria-hidden>
@@ -768,16 +736,12 @@ const kg = (value: number) => value.toLocaleString("es-MX", { maximumFractionDig
 
 function WeightTile({ logs, today, monday, goal, onSaveDay, onSaveGoals }: { logs: Logs; today: string; monday: string; goal: number | null; onSaveDay: (date: string, patch: Partial<DayLog>) => void; onSaveGoals: (patch: Partial<Goals>) => void }) {
   const [open, setOpen] = useState(false);
-  const weights = logs
-    .all()
-    .filter(([date, log]) => date <= today && typeof log.weight_kg === "number")
-    .sort(([a], [b]) => a.localeCompare(b)) as [string, DayLog & { weight_kg: number }][];
-  const start = weights[0]?.[1].weight_kg ?? null;
-  const latest = weights.at(-1)?.[1].weight_kg ?? null;
-  const beforeWeek = weights.filter(([date]) => date < monday).at(-1)?.[1].weight_kg ?? null;
-  const change = latest !== null && beforeWeek !== null ? latest - beforeWeek : null;
-  // Progress from the first weight logged toward the goal, in whichever direction the goal lies.
-  const ratio = latest !== null && start !== null && goal !== null ? (start === goal ? 1 : (start - latest) / (start - goal)) : 0;
+  const { latest, change, ratio } = progress.weightStats(
+    logs.all().map(([date, log]): [string, number | null | undefined] => [date, log.weight_kg]),
+    today,
+    monday,
+    goal
+  );
 
   return (
     <div className="home-tile tone-weight">

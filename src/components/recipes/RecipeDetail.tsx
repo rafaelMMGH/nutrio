@@ -4,9 +4,9 @@ import Link from "next/link";
 import { useMemo, useState, type CSSProperties } from "react";
 import { Archive, ArrowLeft, Check, ChefHat, CircleCheck, Pencil, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { ViewTransition } from "@/components/shared/ViewTransition";
-import { foodGroup, foodIcon, isReadableName, normalize, plural, qty } from "@/components/dashboard/food";
+import { foodGroup, foodIcon, isReadableName, plural, qty } from "@/components/dashboard/food";
 import { useAssistantContext } from "@/components/app/assistant";
-import { recipeSuggestions } from "@/lib/assistant";
+import { recipeSteps } from "@/lib/recipe-steps";
 import { recipeMeta } from "./recipe-meta";
 import { RecipeEditDialog } from "./RecipeEditDialog";
 import { useRecipeActions } from "./useRecipeActions";
@@ -14,13 +14,6 @@ import { useAddState } from "./useAddState";
 import "./recipes.css";
 
 type Props = { recipe: any };
-
-// The plan's preparation note, one sentence per step; PDFs without a note only carry "Extraído de …".
-function steps(description = "") {
-  const text = description.trim();
-  if (!text || /^extraido de/.test(normalize(text))) return [];
-  return text.split(/(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÑ¿])/).map((step) => step.trim()).filter((step) => step.length > 2);
-}
 
 const order = (index: number) => ({ "--i": index }) as CSSProperties;
 
@@ -31,17 +24,11 @@ export function RecipeDetail({ recipe }: Props) {
   const [editing, setEditing] = useState(false);
   const [addAll, runAddAll] = useAddState(() => actions.addRecipe(recipe));
   const ingredients: any[] = recipe.ingredients ?? [];
-  const preparation = steps(recipe.description);
+  const preparation = recipeSteps(recipe.description);
   const groupCounts = meta.groups.map((group) => ({ ...group, count: ingredients.filter((item) => foodGroup(item.category)?.key === group.key).length }));
   const plans = [...new Set((recipe.appearances ?? []).map((a: any) => a.plan_name).filter(Boolean))] as string[];
-  const protein = ingredients.find((item) => foodGroup(item.category)?.key === "proteinas" && isReadableName(item.name));
 
-  useAssistantContext({
-    subtitle: `Sobre ${recipe.name}`,
-    defaultScope: "Receta",
-    recipeId: recipe.id,
-    suggestions: recipeSuggestions(recipe.id, protein?.name)
-  });
+  useAssistantContext({ subtitle: `Sobre ${recipe.name}` });
 
   async function remove() {
     setBusy(true);

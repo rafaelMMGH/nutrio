@@ -1,44 +1,33 @@
 // Shared by the assistant UI and the chat API (spec assistant-chat-polish). Pure on purpose: no db or Node imports,
 // so both the client bundle and the server can load it.
 
+import type { Period } from "@/lib/domain/chat-dates";
+
 /** Longest message, in UTF-16 code units, counted on the trimmed text (REQ-10). */
 export const MAX_MESSAGE = 500;
 /** Length from which the composer shows the "n/500" counter. */
 export const COUNTER_FROM = 450;
 
-/** Wire values of the `scope` request field. "Receta" is "Esta receta" in the UI. */
-export type ScopeKey = "auto" | "Plan activo" | "Recetario" | "Carrito" | "Receta";
-
-export const SCOPE_LABEL: Record<ScopeKey, string> = {
-  auto: "Todo",
-  "Plan activo": "Plan activo",
-  Recetario: "Recetario",
-  Carrito: "Carrito",
-  Receta: "Esta receta"
-};
-
-/** Maps a wire value to a scope: "Carrito actual" is an alias of "Carrito", anything unknown is "auto" (contract). */
-export function toScopeKey(value: unknown): ScopeKey {
-  if (value === "Carrito actual") return "Carrito";
-  return typeof value === "string" && Object.hasOwn(SCOPE_LABEL, value) ? (value as ScopeKey) : "auto";
-}
+/** The starter questions of the empty state, the greeting and the no-match reply (spec Copy, REQ-4). */
+export const STARTERS = ["Mi cena de hoy", "Mi avance de la semana", "Mi peso", "Mi carrito"] as const;
 
 /**
- * Lowercase, accent-free text without the leading and trailing ¿ ? ¡ ! . characters (spec Terms).
- * Whitespace is trimmed first and after the strip, so "  ¿Hola?  " and "hola" compare equal.
+ * Normalized text (spec Terms): lowercase, accents removed (ñ compares as n), every non-letter, non-digit character
+ * a space, runs of spaces collapsed and the ends trimmed. Plurals are not folded here; the matcher does that.
  */
 export function normalizeText(value: string): string {
   return value
     .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
+    .replace(/\p{M}/gu, "")
     .toLowerCase()
-    .trim()
-    .replace(/^[¿?¡!.\s]+|[¿?¡!.\s]+$/g, "");
+    .replace(/[^\p{L}\p{N}]+/gu, " ")
+    .trim();
 }
 
-/** The words of a text: maximal runs of letters and digits of its normalized form. */
+/** The words of a text: the runs of letters and digits of its normalized form. */
 export function words(value: string): string[] {
-  return normalizeText(value).match(/[\p{L}\p{N}]+/gu) ?? [];
+  const text = normalizeText(value);
+  return text ? text.split(" ") : [];
 }
 
 /** Length that every limit uses: the trimmed text's `.length`. */
@@ -49,46 +38,79 @@ export function messageLength(value: string): number {
 // Response of POST /api/rag/chat (contracts/chat-api.md). `answer`, `context_used` and `sources` are the original fields.
 export type Span = { text: string; highlight?: true };
 export type Rich = Span[];
-export type ReplyKind = "answer" | "overview" | "unknown" | "out_of_scope" | "missing_recipe";
-export type FollowUp = { text: string; scope: ScopeKey };
+export type ReplyKind = "answer" | "detail" | "clarify" | "did_you_mean" | "greeting" | "no_match";
 export type Section = { title: string; items: Rich[] };
 
-export type ChatAnswer = {
-  answer: string;
-  context_used: string;
-  sources: string[];
-  kind: ReplyKind;
-  lead: Rich;
-  body: string | null;
-  sections: Section[];
-  follow_ups: FollowUp[];
-};
+/** A button the server sends (the client derives none): a question that is sent as a user turn, or an in-app link ("/", "/plans", "/recipes/<id>"). */
+export type Button =
+  | { type: "question"; label: string; message: string; layout?: "option" }
+  | { type: "link"; label: string; href: string };
 
-/** A suggestion or follow-up: its text, the scope it is asked in and, for "Receta", the recipe it is about. */
-export type Chip = { text: string; scope: ScopeKey; recipeId?: string };
+/** How a button looks and behaves (spec REQ-34): `option` is a vertical block choice, `chip` any other question, `link` an in-app anchor. */
+export type ButtonVariant = "option" | "chip" | "link";
 
-const chip = (text: string, scope: ScopeKey): Chip => ({ text, scope });
-
-/** Starter questions of the dashboard and of every page without its own list. Default scope: Todo. */
-export function dashboardSuggestions(): Chip[] {
-  return [chip("¿Qué recetas hay en mi plan?", "Recetario"), chip("¿Qué tengo en mi carrito?", "Carrito"), chip("¿Qué ingredientes necesito comprar?", "Carrito")];
+export function variantOf(button: Button): ButtonVariant {
+  if (button.type === "link") return "link";
+  return button.layout === "option" ? "option" : "chip";
 }
 
-/** Starter questions of the groceries pages. Default scope: Carrito. */
-export function groceriesSuggestions(): Chip[] {
-  return [chip("¿Qué tengo en mi carrito?", "Carrito"), chip("¿Qué ingredientes necesito comprar?", "Carrito"), chip("¿Qué recetas hay en mi plan?", "Recetario")];
+/** The option buttons of an answer: the server sends them answer-level (`buttons`, layout "option"), never inside a block. */
+export function optionButtons(answer: Pick<ChatAnswer, "buttons">): Button[] {
+  return answer.buttons.filter((button) => variantOf(button) === "option");
 }
 
 /**
- * Starter questions of a recipe page. Default scope: Esta receta. The protein question appears only when the recipe
- * has a protein ingredient (its name is passed in); it has no topic word, so the narrowed recipe answer is its reply.
+ * "3 opciones: A; B; C" for the screen reader (REQ-33): the option buttons sit outside the live region, so their count
+ * and labels go in as text, in the one block that holds them and in no other. The answer does not say which block that
+ * is; in a 2-block answer it is the block titled with the slot the option messages start with ("Cena, opción 2"),
+ * and without such a title the first block.
  */
-export function recipeSuggestions(recipeId: string, proteinName?: string | null): Chip[] {
-  const about = (text: string): Chip => ({ text, scope: "Receta", recipeId });
-  return [
-    about("¿Qué ingredientes lleva?"),
-    about("¿Cómo se prepara?"),
-    ...(proteinName ? [about(`¿Cuánto ${proteinName.toLowerCase()} lleva?`)] : []),
-    chip("¿Qué tengo en mi carrito?", "Carrito")
-  ];
+export function optionAnnouncement(answer: Pick<ChatAnswer, "blocks" | "buttons">, blockIndex: number): string | null {
+  const options = optionButtons(answer);
+  if (options.length === 0) return null;
+  const first = options[0];
+  // options are Button[] and only the `question` variant has `message`; the narrowing is required for tsc (TS2339 without it).
+  const titled = answer.blocks.findIndex((block) => block.title !== null && first.type === "question" && first.message.startsWith(`${block.title},`));
+  if (blockIndex !== Math.max(0, titled)) return null;
+  return `${options.length} ${options.length === 1 ? "opción" : "opciones"}: ${options.map((button) => button.label).join("; ")}`;
 }
+
+/** One titled part of an answer. Its `buttons` are navigation links only: the option buttons are answer-level, in the answer's `buttons`. */
+export type Block = { title: string | null; lead: Rich; sections: Section[]; buttons: Button[] };
+
+/** What the resolver found in a question; only the test trace (`resolved`) exposes it. Fields are filled as the resolver learns them. */
+export type Intent = {
+  topic: string;
+  slot?: string;
+  /** Which of several same-named slots a typed ordinal or "<slot> <n>" names (1-based, REQ-11); the plan decides if it applies. */
+  ordinal?: number;
+  /** The ordinal was a bare number ("colación 2"): on a slot that is not duplicated it means option n (REQ-11). */
+  numbered?: boolean;
+  /** Goals narrowed to one metric ("meta de peso"). */
+  metric?: "weight" | "exercise" | "water";
+  /** What an identity question asks for. */
+  of?: "name" | "plan";
+  /** Dish questions: the recipe found, the candidates offered or nothing found; "clarify" is a dish cue with an empty phrase. */
+  outcome?: "found" | "didYouMean" | "notFound" | "clarify";
+  /** Dish questions: the phrase as typed, without the cue and the leading article (REQ-26). */
+  phrase?: string;
+  recipeIds?: string[];
+  option?: number;
+  page?: number;
+  /** Metric questions: the period the message names (REQ-14); absent means the metric's default. */
+  period?: Period;
+  /** Metric questions: the message has a date cue that forms no recognized phrase, so the builder says so and shows its default (REQ-14). */
+  periodUnrecognized?: true;
+};
+
+export type ChatAnswer = {
+  answer: string;
+  context_used: "Todo el sistema";
+  sources: string[];
+  kind: ReplyKind;
+  blocks: Block[];
+  /** Follow-ups then overflow, or the starters or clarify choices. */
+  buttons: Button[];
+  /** Only with the `x-e2e-trace: 1` test hook (plan D2); never in production. */
+  resolved?: Intent[];
+};

@@ -1,7 +1,7 @@
 # Spec: Assistant chat polish
 
-**Status:** implemented
-**Version:** 1.8 · **Branch:** feature/assistant-chat-polish · **Owner:** Rafael Martinez
+**Status:** partial (everything except v1.9 REQ-23 is implemented; REQ-23 is delivered as a task of feature/assistant-data-scope)
+**Version:** 1.9 · **Branch:** feature/assistant-chat-polish · **Owner:** Rafael Martinez
 
 ## Overview
 
@@ -9,25 +9,42 @@ The floating assistant answers with rule-based keyword matching over the user's 
 - answers are plain text lines joined by newlines
 - an unknown question gets a dead-end "No encontré esa información…"
 - a failed request leaves a generic error with no retry
-- scope can only be chosen from the dashboard search bar
+- scope can only be chosen from the dashboard search bar **[Superseded: no scopes]**
 - there is no way to start over
 - auto-scroll and the loader ignore reduced motion
 
-This feature adds structured answers, a meal-times topic, one-topic-per-question matching with strict scopes, follow-ups, a helpful unknown reply, in-panel scope switching, retry with a timeout, a new-conversation action and a better composer. The API response changes additively. There is no data-model change and no migration.
+This feature adds structured answers, a meal-times topic, one-topic-per-question matching with strict scopes **[Superseded]**, follow-ups, a helpful unknown reply, in-panel scope switching **[Superseded]**, retry with a timeout, a new-conversation action and a better composer. The API response changes additively. There is no data-model change and no migration.
+
+## Superseded by assistant-data-scope (v1.9)
+
+[assistant-data-scope](../assistant-data-scope/spec.md) v1.2 replaces the rules listed below. Until that spec is implemented, the code still follows this one; once it ships, assistant-data-scope wins (Constitution 2). Affected text is marked **[Superseded]** inline. **Blanket rule:** anything in this spec that refers to a scope, the scope switcher or menu, "Alcance", chips carrying a scope, "Esta receta", or page or recipe context is void, whether or not it is tagged. Everything else stays in force, including the structure, chips under the latest answer only, the repeat rule (for follow-ups), retry, the composer, scroll, motion (as amended below), accessibility and modality.
+
+- **No new npm packages** (Decision "UI building blocks" and the NFR): the only exception is fuse.js, pinned at exactly 7.5.0 (user-approved, Constitution 4). prompt-kit's `response-stream` is copied code, not a package.
+- **Chat tests stay green** (NFR and Definition of done): the scope tests may be rewritten or removed as assistant-data-scope specifies.
+- **Motion:** amended, not replaced. The typing effect of assistant-data-scope REQ-33 (≤1 s) is exempt from the 200 ms fade cap.
+
+- **Matching:** the exhaustive-vocabulary rule, whole-word and stem-only matching, and the "Normalized text" term. Replaced by normalization, synonyms and typo tolerance (its REQ-1, REQ-2).
+- **Tier 3 meal nouns → meal times** (the REQ-18 answer that lists every meal for "¿A qué hora es la cena?"; "desayuno" alone in REQ-19). The times answer now needs "a qué hora", "cuándo" or "horario" plus a slot, and it answers only that slot (its REQ-8). "¿Cuál es mi cena?"-style questions and bare slot words list options (its REQ-9).
+- **REQ-19 precedence and tie rules:** replaced by its REQ-6 resolution order, with up to 2 topics per answer (its REQ-24).
+- **Scopes:** the Terms "Scope" entry, the Topics "Answers in" and scope columns, the page-suggestions table, REQ-4, the scope parts of REQ-5, the REQ-6 unknown reply, REQ-12, the scope part of REQ-13, REQ-20, REQ-21, the Esta receta content in REQ-1, the "Alcance" control in REQ-15's header, the scope-menu step of Escape in REQ-22, and the Focus rule "After a scope change". Replaced by no scopes and no page or recipe context (its REQ-4) and by the no-match reply (its REQ-29).
+- **Plan lead "Tu objetivo" and the plan vocabulary's objetivo(s):** "objetivo" and "meta" now give the goals answer (its REQ-21). "objetivo"/"meta" plus "plan", and plan questions, give the plan summary with the lead "Tu plan activo es <plan>. Tu objetivo: <objetivo>" (its REQ-31). "No tienes un plan activo." becomes "Aún no tienes un plan activo." (its REQ-27).
+- **Layout:** assistant answers with no bubble. Replaced by its REQ-32.
+- **REQ-17 (live region):** amended, not replaced. Buttons stay outside the live region; for option lists the option count and labels are announced as text ("3 opciones: …"; its REQ-33).
+- **Copy "used verbatim":** amended. The plan lead, the no-plan lead and the meal-times answers for slot questions follow its Copy (see [contracts/chat-api.md](contracts/chat-api.md) Copy).
 
 ## Goals / Non-goals
 
 - Goal: answers carry server-defined structure (lead, sections, highlights, follow-ups), and the panel renders exactly that structure (REQ-1 to REQ-4, REQ-18, REQ-19).
-- Goal: the user always has a next step: follow-ups, the unknown reply, "Preguntar en Todo" and retry (REQ-5 to REQ-8, REQ-20).
-- Goal: a composer with defined keys and limits, a new-conversation action, predictable scrolling, and scope choice from the panel and the search bar (REQ-9 to REQ-13, REQ-21).
-- Goal: existing chat e2e tests keep working, apart from the intended scope changes (REQ-6, REQ-20). Motion, accessibility and touch use are specified and measurable (REQ-14 to REQ-17, REQ-22).
+- Goal: the user always has a next step: follow-ups, the unknown reply, "Preguntar en Todo" **[Superseded]** and retry (REQ-5 to REQ-8, REQ-20).
+- Goal: a composer with defined keys and limits, a new-conversation action, predictable scrolling, and scope choice from the panel and the search bar **[Superseded: scope choice]** (REQ-9 to REQ-13, REQ-21).
+- Goal: existing chat e2e tests keep working, apart from the intended scope changes (REQ-6, REQ-20) **[Superseded: scope tests may be rewritten or removed]**. Motion, accessibility and touch use are specified and measurable (REQ-14 to REQ-17, REQ-22).
 - Non-goal: persisted history, streaming, real AI/LLM calls, copy or feedback buttons on answers, and a dedicated `/asistente` page.
 
 ## Decisions
 
 Rationale only; the rules live in the REQs.
 
-- **UI building blocks:** adapted from an existing open-source chat kit; no new packages (Constitution 4).
+- **UI building blocks:** adapted from an existing open-source chat kit; no new packages (Constitution 4). **[Superseded: assistant-data-scope; only exception fuse.js 7.5.0]**
 - **Placement:** the FAB and panel stay on all signed-in pages, because the panel already carries page context.
 - **History in memory only:** persisting it would need a migration for little gain.
 - **Nueva conversación without confirmation, discarding a pending answer:** starting over is one action, and a cleared thread must stay clear.
@@ -67,16 +84,17 @@ Rationale only; the rules live in the REQs.
 - **One input limit and counting rule on client, bar and server:** bounded input keeps answers and layout predictable; one rule avoids disagreement; the client alone can be bypassed.
 - **Look:** structured answers need width; the theme-switcher spec requires both themes.
 - **Accessibility and motion minimums:** common standards; forced-colors users must still see state; CLAUDE.md requires respecting reduced motion.
-- **Definition of done:** every REQ has a passing e2e test (Constitution 1); existing chat tests stay green with updated selectors; zero console errors or failed API calls except the deliberate failure and timeout in REQ-8 and the rejected requests in REQ-10.
+- **Server errors return 500 with a generic body; 400 only for invalid input (v1.9):** a raw error message in a 400 hides real failures and leaks internals. Logging with context satisfies Constitution 6.
+- **Definition of done:** every REQ has a passing e2e test (Constitution 1); existing chat tests stay green with updated selectors (scope tests may be rewritten or removed per assistant-data-scope); zero console errors or failed API calls except the deliberate failure and timeout in REQ-8, the rejected requests in REQ-10, and the injected 500 and rejected 400 in REQ-23.
 
 ## User stories
 
 Terms:
-- **Panel:** the floating assistant panel on signed-in pages. **Answer:** an assistant turn. **Scope:** Todo, Plan activo, Recetario, Carrito or Esta receta. Any scope other than Todo is narrowed.
-- **Normalized text:** ignoring case, accents, and leading and trailing ¿ ? ¡ ! . characters. A **word** is a maximal run of letters and digits in the normalized text.
+- **Panel:** the floating assistant panel on signed-in pages. **Answer:** an assistant turn. **Scope** **[Superseded]**: Todo, Plan activo, Recetario, Carrito or Esta receta. Any scope other than Todo is narrowed.
+- **Normalized text** **[Superseded]**: ignoring case, accents, and leading and trailing ¿ ? ¡ ! . characters. A **word** is a maximal run of letters and digits in the normalized text.
 - **Length:** the trimmed text's string length in UTF-16 code units (an emoji may count as 2).
 
-**Topics.** The vocabulary is exhaustive: a word matches if it equals a listed word or starts with a listed stem (*), after normalization; singular and plural forms both match. Follow-ups are listed in order with the scope each is asked in.
+**Topics** **[Superseded: vocabulary rule, Tier 3, "Answers in" and follow-up scopes]**. The vocabulary is exhaustive: a word matches if it equals a listed word or starts with a listed stem (*), after normalization; singular and plural forms both match. Follow-ups are listed in order with the scope each is asked in.
 
 | Topic | Tier | Vocabulary | Answers in | Follow-ups (scope) |
 |---|---|---|---|---|
@@ -87,7 +105,7 @@ Terms:
 | Recipes: this recipe | 2 | same as recipe list | Esta receta | "¿Qué ingredientes lleva?" (Esta receta), "¿Cómo se prepara?" (Esta receta), "¿Qué hay en mi carrito?" (Carrito) |
 | Plan | 2 | plan(es), suplement*, recomend*, objetivo(s) | Todo, Plan activo | "¿A qué hora es mi comida?" (Plan activo), "¿Qué suplementos tomo?" (Plan activo), "¿Qué recetas hay en mi plan?" (Recetario) |
 
-**Page suggestions** (current strings, in order, each with its scope):
+**Page suggestions** **[Superseded]** (current strings, in order, each with its scope):
 
 | Page | Default scope | Suggestions (scope) |
 |---|---|---|
@@ -100,13 +118,13 @@ As the user, I want answers laid out with a lead, titled lists and highlighted v
 
 - **REQ-1:** The response keeps `answer`, `context_used` and `sources` unchanged in type and meaning, and adds a lead (required), zero or more sections (title plus items), highlighted values inside the lead or items, and follow-ups (each with text and scope: the topic's for a topic answer or overview, otherwise none).
   - `answer` is the plain-text form: the lead, then each section's title line and one line per item, newline-separated. For the unknown reply it is the lead and the capability line.
-  - Every section list shows at most 8 items; when more exist, a last item reads "y <n> más". Sources list only the data used for the answer; the unknown reply has none.
+  - A section list with 8 or fewer items shows them all. A longer list shows its first 8 items plus a final item "y <n> más", where n is the number not shown (9 entries in total). Sources list only the data used for the answer; the unknown reply has none.
   - A section with no items is omitted from both the panel and `answer`; the lead still shows. This covers Esta receta with no ingredients or no steps, plan and meal-times answers when the plan has zero meals, and blank recommendations.
   - Content per answer (lead / sections); lead and section-title copy is in Interaction details "Copy":
-    - Plan: lead is "Tu objetivo: <objetivo>"; sections are the meal names, plus supplements when the question names suplement* and recommendations when it names recomend* (as today). Recommendations have one item per non-empty line of the plan's recommendations text, as the Preparación steps are split.
+    - Plan **[Superseded: lead, see assistant-data-scope REQ-31]**: lead is "Tu objetivo: <objetivo>"; sections are the meal names, plus supplements when the question names suplement* and recommendations when it names recomend* (as today). Recommendations have one item per non-empty line of the plan's recommendations text, as the Preparación steps are split.
     - Recipe list (Todo, Recetario, and the Recetario overview): lead introduces the list; one section of recipe names. Filter (changes today's behavior): drop question words in the Topics vocabulary and the stop words que, hay, en, mi, mis, de, del, el, la, los, las, con, para, por, tengo, cual, cuales, como, cuanto, es, un, una; a recipe matches when a remaining word of 3+ letters equals a word of its normalized name. If no word remains or nothing matches, all recipes are listed.
     - Cart (same in Todo and Carrito): lead introduces the cart; one section with one item per consolidated ingredient, quantity highlighted.
-    - Esta receta (also its overview): lead names the recipe; sections are ingredients and preparation, keeping today's narrowing to the ingredients the question names. The "¿Cuánto <proteína> lleva?" chip has no topic word, so this narrowed overview is its intended answer.
+    - Esta receta (also its overview) **[Superseded]**: lead names the recipe; sections are ingredients and preparation, keeping today's narrowing to the ingredients the question names. The "¿Cuánto <proteína> lleva?" chip has no topic word, so this narrowed overview is its intended answer.
   - Given any question in any scope, then the three fields keep their types, the lead is non-empty, and `answer` equals the plain-text form.
   - Given an empty cart and "¿Qué tengo en mi carrito?" in Todo, then the lead is "Tu carrito está vacío." with no sections.
   - Given no active plan and "¿Cuál es el objetivo de mi plan?" in Todo, then the lead is "No tienes un plan activo." with no sections.
@@ -120,16 +138,16 @@ As the user, I want answers laid out with a lead, titled lists and highlighted v
   - Given a non-empty cart and "¿Qué tengo en mi carrito?", then one section lists the cart items and each quantity has font-weight ≥600 or an underline.
 - **REQ-3:** Sources appear only when present, as one muted line "Basado en: <source>, <source>".
   - Given an answer with sources, then the line lists every source. Given none, or the unknown reply, then there is no "Basado en" line.
-- **REQ-4:** Each successful answer is labelled with the scope it was asked in (switcher, search bar per REQ-13, or chip per REQ-5), whatever `context_used` says. An error turn has no label.
+- **REQ-4** **[Superseded: assistant-data-scope REQ-4]**: Each successful answer is labelled with the scope it was asked in (switcher, search bar per REQ-13, or chip per REQ-5), whatever `context_used` says. An error turn has no label.
   - Given I asked in "Recetario", then the label reads "Recetario", and earlier answers keep their labels.
   - Given a search-bar question with "Carrito actual", then the label reads "Carrito".
   - Given a failed request, then the error turn has no label.
-- **REQ-18:** The meal-times answer has a lead (Interaction details "Copy") and one section listing each active-plan meal in plan order, with its time window taken from the plan's stored meal times (default times the dashboard may display are not used) (e.g. "Entre 7 a 8 am") highlighted when the meal has one.
-  - Given an active plan with times and "¿A qué hora es la cena?", then there is one item per meal, each time is highlighted, and the chips are the meal-times follow-ups.
+- **REQ-18** **[Superseded for slot questions: assistant-data-scope REQ-8; the all-meals list remains for time words with no slot]**: The meal-times answer has a lead (Interaction details "Copy") and one section listing each active-plan meal in plan order, with its time window taken from the plan's stored meal times (default times the dashboard may display are not used) (e.g. "Entre 7 a 8 am") highlighted when the meal has one.
+  - **[Superseded: assistant-data-scope REQ-8 answers only cena]** Given an active plan with times and "¿A qué hora es la cena?", then there is one item per meal, each time is highlighted, and the chips are the meal-times follow-ups.
   - Given only some meals have times and "¿Cuál es mi horario?", then every meal is listed and only those with a time have a highlight.
-  - Given no meal times and "¿Cuándo desayuno?", then the lead is "Tu plan no tiene horarios para tus comidas." and the meals are listed without highlights.
+  - **[Superseded: assistant-data-scope REQ-8]** Given no meal times and "¿Cuándo desayuno?", then the lead is "Tu plan no tiene horarios para tus comidas." and the meals are listed without highlights.
   - Given no active plan and "¿Cuál es mi horario?", then the lead is "No tienes un plan activo.", there are no sections, and chips show.
-- **REQ-19:** Each question has at most one winning topic, matched on its words (Terms) against the Topics vocabulary only.
+- **REQ-19** **[Superseded: assistant-data-scope REQ-1, REQ-2, REQ-6, REQ-24]**: Each question has at most one winning topic, matched on its words (Terms) against the Topics vocabulary only.
   - The winner is chosen from all topics regardless of scope; the scope check follows (REQ-20).
   - Precedence: Tier 1, then Tier 2, then Tier 3. Within a tier, ties go to cart, then recipes, then plan.
   - "cuándo" counts as Tier 1 only when the question also has a meal noun or has no other topic word; otherwise it is ignored.
@@ -142,7 +160,7 @@ As the user, I want answers laid out with a lead, titled lists and highlighted v
 ### US2 (P1): Always a next step
 As the user, I want follow-ups, a helpful reply when the assistant doesn't know, and a retry, so that a conversation never dead-ends.
 
-- **REQ-5:** Chips appear under the latest successful answer only. Each chip is asked in its own scope (Topics or page-suggestions table), not the switcher's; its answer is labelled with that scope and the switcher does not change.
+- **REQ-5** **[Superseded in part: chip scopes, the chip-list cases and Esta receta chips; assistant-data-scope REQ-4, REQ-34. Latest-only, disabled-while-pending and the repeat rule stay]**: Chips appear under the latest successful answer only. Each chip is asked in its own scope (Topics or page-suggestions table), not the switcher's; its answer is labelled with that scope and the switcher does not change.
   - Chip list per case:
     - topic answer: that topic's follow-ups
     - no topic in a narrowed scope (overview): the overview topic's follow-ups
@@ -160,18 +178,26 @@ As the user, I want follow-ups, a helpful reply when the assistant doesn't know,
   - Given Esta receta and "¿Qué ingredientes lleva?", then the chips are "¿Cómo se prepara?" and "¿Qué hay en mi carrito?".
   - Given an active plan, each recipe and a non-empty cart, when each Topics follow-up is asked in its scope, then none gets the unknown reply.
   - Given an answer on recipe A with an Esta receta chip, when I navigate to the dashboard and activate it, then the answer is about recipe A and labelled "Esta receta"; the same holds for Reintentar on an Esta receta question.
-- **REQ-6:** In Todo, a question with no matching topic gets the unknown reply: the lead "No encontré eso en tu información.", the capability line as body text, and chips (REQ-5). It is not an error and keeps its scope label. Within Todo, the plan summary is returned only for the plan topic (intended change); the Plan activo overview (REQ-20) still returns it.
+- **REQ-6** **[Superseded: assistant-data-scope REQ-29]**: In Todo, a question with no matching topic gets the unknown reply: the lead "No encontré eso en tu información.", the capability line as body text, and chips (REQ-5). It is not an error and keeps its scope label. Within Todo, the plan summary is returned only for the plan topic (intended change); the Plan activo overview (REQ-20) still returns it.
   - Given Todo and "¿Cuál es la capital de Francia?", then the lead, the capability line and 3 page-suggestion chips show, and "No pude responder" does not.
   - Given Todo with an active plan and an unrecognized question, then no objective or meals appear.
   - Given Todo and a plan-topic question, then the plan summary is returned.
 - **REQ-7:** "Pensando…" shows in the answer position while a request is pending and disappears when the answer or error arrives.
   - Given a delayed response, when I send, then "Pensando…" is visible until the response, then gone.
-- **REQ-8:** A network failure, a non-2xx response, or a request pending over 15 s keeps my question and shows "No pude responder en este momento." with "Reintentar". Reintentar resends the question in the same scope (and recipe, REQ-5). During the retry the error turn is replaced by "Pensando…". On success the answer and its chips appear. A late answer after the timeout is discarded. Reintentar shows only while the error turn is the latest assistant turn; older error turns keep their error text without Reintentar.
+- **REQ-8:** A network failure, a non-2xx response, or a request pending over 15 s keeps my question and shows "No pude responder en este momento." with "Reintentar". (v1.9: only an HTTP 500 shows REQ-23's copy instead, with the same Reintentar behavior; a 400 and every other non-500 non-2xx response keep "No pude responder en este momento.") Reintentar resends the question ~~in the same scope (and recipe, REQ-5)~~ **[Superseded: no scopes; the same message is resent]**. During the retry the error turn is replaced by "Pensando…". On success the answer and its chips appear. A late answer after the timeout is discarded. Reintentar shows only while the error turn is the latest assistant turn; older error turns keep their error text without Reintentar.
   - Given the endpoint fails once, when I send "¿Qué tengo en mi carrito?", then my message stays and the error with Reintentar shows. When I activate Reintentar with the endpoint healthy, then the answer and chips appear, the error is gone, and my question appears once.
   - Given a response delayed beyond 15 s, then the error turn shows at 15 s and the late response adds nothing.
   - Given a retry that fails again, then the error and Reintentar show, with one copy of my question.
   - Given a failed question followed by a later answered question, then the earlier error turn shows no Reintentar.
-- **REQ-20:** Strict scopes. After the winner is chosen (REQ-19):
+- **REQ-23 (v1.9):** Server errors versus invalid requests (Constitution 6).
+  - Any failure while building an answer returns HTTP 500 with a generic body that contains no internal message. The error is logged on the server with context: the route, the user id, the message length and the error with its stack. The client shows "Algo salió mal al responder. Intenta de nuevo." with Reintentar (REQ-8 rules).
+  - HTTP 400 is for invalid or unparsable requests (zod or unparsable body: an empty message, one over 500 characters (REQ-10), or a body that is not valid JSON); its body keeps the standard bad-request shape with the validation issues. A server failure never returns 400, and the 500 body never carries a raw error message.
+  - Testability: the e2e suite can force the answer builder to fail through a test-only failure injection, guarded like assistant-data-scope's date pin (REQ-13 there): it is unavailable outside the test environment. The log entry is asserted by capturing the e2e server's log output.
+  - `src/server.js` (the legacy `dev` entry only) is out of scope.
+  - Given an injected builder failure, when I ask a question, then the response is 500, its body has no internal error text, the captured server log has an entry with the route and the error, and the panel shows "Algo salió mal al responder. Intenta de nuevo." with Reintentar.
+  - Given a message of length 501, then the response is 400 with the validation issues, the captured server log has no error entry, and the panel (if sent from it) shows "No pude responder en este momento.".
+  - Given the same failure injection outside the test environment, then the question is answered normally.
+- **REQ-20** **[Superseded: assistant-data-scope REQ-4]**: Strict scopes. After the winner is chosen (REQ-19):
   - A winner the scope does not answer (Topics table, "Answers in") gets the unknown reply with the out-of-scope chips (REQ-5). "Preguntar en Todo" appends the same question again as my message and answers it in Todo, labelled "Todo"; the switcher is unchanged.
   - No winner: Todo returns the unknown reply (REQ-6); a narrowed scope returns its overview (Recetario: recipe list; Carrito: cart; Plan activo: plan summary; Esta receta: the recipe), as today.
   - In Esta receta, a deleted or missing recipe gets the unknown reply with the missing-recipe chips (REQ-5); this wins over the out-of-scope check.
@@ -191,7 +217,7 @@ As the user, I want a comfortable input and a way to start over.
 - **REQ-10:** The input is a multi-line field labelled "Pregunta" that grows to 5 lines, then scrolls. Its action bar holds the dictation mic and "Enviar".
   - Send is disabled when the field is empty or whitespace, while a request is pending, or when the length exceeds 500. The field and mic stay editable while pending; Enter while pending sends nothing.
   - From a length of 450, a counter "<n>/500" shows. It is the field's accessible description and outside any live region. Over 500 it also shows "Máximo 500 caracteres".
-  - The server rejects a chat request whose message length is 0 or exceeds 500 with the standard bad-request response and no answer.
+  - The server rejects a chat request whose message length is 0 or exceeds 500 with the standard bad-request response and no answer. Only this case and an unparsable body return 400 (REQ-23).
   - At ≤640 px, or on a device whose primary pointer is coarse (touch-first, e.g. a tablet without a keyboard) at any width, Enter adds a newline and only "Enviar" sends. Elsewhere, Enter sends and Shift+Enter adds a newline. Enter never sends during IME composition. Only this Enter rule uses the coarse-pointer condition; the narrow-sheet, modality and focus rules (REQ-15, REQ-22, Interaction details) stay at ≤640 px.
   - Given desktop with a fine primary pointer, when I type a line, press Shift+Enter, type a line and press Enter, then one two-line message is sent and the field clears.
   - Given desktop with a fine primary pointer, when I press Enter twice quickly, then one request is sent and my message appears once.
@@ -210,9 +236,9 @@ As the user, I want a comfortable input and a way to start over.
 ### US5 (P1): Look, motion and accessibility
 As the user, I want the panel to work in both themes, on my phone, with assistive tech and with my motion settings.
 
-- **REQ-14:** In light and dark themes, every element in Interaction details "Contrast" meets WCAG AA (4.5:1 text, 3:1 non-text and large text). Highlights have font-weight ≥600 or an underline; the selected scope has a border or check mark.
-  - Given each theme with a structured answer, chips, sources, an error, a pending state, the counter over the limit, the compact menu open and a focused control, then the e2e contrast check reports zero violations.
-  - Given forced colors are emulated, then highlights keep font-weight ≥600 or an underline, and the selected scope's border or check mark is visible.
+- **REQ-14:** In light and dark themes, every element in Interaction details "Contrast" meets WCAG AA (4.5:1 text, 3:1 non-text and large text). Highlights have font-weight ≥600 or an underline; the selected scope has a border or check mark **[Superseded: no scope]**.
+  - Given each theme with a structured answer, chips, sources, an error, a pending state, the counter over the limit, the compact menu open **[Superseded: no menu]** and a focused control, then the e2e contrast check reports zero violations.
+  - Given forced colors are emulated, then highlights keep font-weight ≥600 or an underline, and the selected scope's border or check mark is visible **[Superseded: no scope]**.
 - **REQ-15:** Narrow and short viewports.
   - At 740×360 (short landscape, desktop layout), the panel height is limited to the viewport. Given 740×360, then the input is fully visible.
   - At ≤640 px, the open panel is a full-height modal sheet and the FAB is hidden while it is open.
@@ -222,7 +248,7 @@ As the user, I want the panel to work in both themes, on my phone, with assistiv
   - Given 360×740, then the sheet fills the viewport height, the FAB is hidden, each target is ≥44×44 px and no target boxes intersect.
   - Given the visual viewport is resized to emulate the keyboard, then the input's box lies inside `visualViewport`.
   - Given 360 px with a long unbroken token, then it wraps and the panel has no horizontal overflow.
-  - The header follows Interaction details "Narrow header". Given 360 px and a non-empty thread, then row 2 shows "Alcance: Plan activo" and the "Nueva conversación" button (accessible name "Nueva conversación"), both ≥44 px, with no overlap and no clipping.
+  - The header follows Interaction details "Narrow header" (**[Superseded: the "Alcance" control is removed by assistant-data-scope REQ-4]**). Given 360 px and a non-empty thread, then row 2 shows "Alcance: Plan activo" and the "Nueva conversación" button (accessible name "Nueva conversación"), both ≥44 px, with no overlap and no clipping.
 - **REQ-16:** Motion follows Interaction details "Motion".
   - Given reduced motion, when an answer arrives, then new messages and the loader compute `animation-name: none` or a 0 duration.
   - Given reduced motion, when the panel or sheet opens and the scroll button and chips appear, then each computes a transition and animation duration of 0.
@@ -235,17 +261,19 @@ As the user, I want the panel to work in both themes, on my phone, with assistiv
 - **REQ-22:** Modality and focus.
   - Opening the panel focuses the input. Desktop is non-modal: no focus trap, the page stays usable.
   - At ≤640 px the sheet is modal: the page behind is inert and does not scroll, Tab stays in the sheet, and a visible "Cerrar asistente" (×) closes it.
-  - Escape closes an open scope menu first, then the panel. Closing returns focus to the FAB.
+  - Escape closes an open scope menu first (**[Superseded]**: no scope menu), then the panel. Closing returns focus to the FAB.
   - Closing the panel or navigating while a request is pending does not cancel it: the answer lands in the thread, with no badge on the FAB.
   - Focus targets follow Interaction details "Focus".
   - Given desktop with the panel open, then a page link is clickable.
   - Given 360 px with the panel open, then Tab never leaves the sheet and the page behind does not scroll.
-  - Given the scope menu is open, when I press Escape, then the menu closes and the panel stays open; pressing Escape again closes the panel and focuses the FAB.
+  - **[Superseded: no scope menu; Escape closes the panel and focuses the FAB]** Given the scope menu is open, when I press Escape, then the menu closes and the panel stays open; pressing Escape again closes the panel and focuses the FAB.
   - Given a pending request, when I close the panel and reopen it after the response, then the answer is in the thread and the FAB showed no badge.
   - Given 360 px, when I activate a chip, then focus is on the new answer turn once it arrives. Given desktop, then focus is on the input.
   - Given 360 px and a chip whose request fails, when I activate it, then focus is on the log while pending, then on the error turn, which is not in the tab order, and Tab moves to Reintentar.
 
-### US4 (P2): Scope in the panel
+### US4 (P2): Scope in the panel **[Superseded: assistant-data-scope REQ-4]**
+REQ-12 and REQ-21 are superseded entirely. In REQ-13 only the scope part is superseded; the search bar still opens the panel, is disabled while pending, and enforces the 500 limit.
+
 As the user, I want to choose what the assistant searches from inside the panel.
 
 - **REQ-12:** The switcher offers Todo, Plan activo, Recetario and Carrito, plus "Esta receta" only on a recipe page. It defaults to the page's scope. A change applies to the next question only (even while pending) and keeps the thread. Navigating keeps the thread and resets the switcher to the new page's default.
@@ -269,30 +297,30 @@ As the user, I want to choose what the assistant searches from inside the panel.
   - Section titles: "Comidas", "Suplementos", "Recomendaciones", "Recetas", "Ingredientes", "Preparación"; empty supplements item "Sin suplementos registrados"
   - Unknown lead: "No encontré eso en tu información."
   - Capability line: "Puedo ayudarte con tu plan de comidas y horarios, tus recetas e ingredientes, y tu lista de compras."
-  - Error: "No pude responder en este momento."
+  - Error: "No pude responder en este momento."; HTTP 500 (v1.9, REQ-23): "Algo salió mal al responder. Intenta de nuevo."
   - "Alcance"; "Alcance: <scope>"; "Preguntar en Todo"; "Cerrar asistente" (× and FAB)
   - "Tu carrito está vacío."; "No tienes un plan activo."; "Tu plan no tiene horarios para tus comidas."; "Aún no tienes recetas."
   - "<n>/500"; "Máximo 500 caracteres"; "y <n> más"
 - **Focus:**
   - Panel open, "Ir al último mensaje", Nueva conversación: the input.
   - After a chip, Reintentar or "Preguntar en Todo": on desktop, the input. At ≤640 px, the log container while waiting, then the new turn (answer or error, focusable by script only); on an error turn, Reintentar is the next focusable control.
-  - After a scope change: the switcher (the option, or the compact button). After close: the FAB.
+  - **[Superseded]** After a scope change: the switcher (the option, or the compact button). After close: the FAB.
 - **Touch targets (≤640 px):** FAB, ×, Nueva conversación, switcher options or the compact button and its menu options, chips, Reintentar, "Ir al último mensaje", mic, send.
-- **Narrow header (≤640 px wide):** row 1: "Asistente" and ×; row 2: "Alcance: <scope>" and "Nueva conversación" as a 44×44 icon button (accessible name and tooltip "Nueva conversación"). The panel subtitle is hidden at ≤640 px wide and in short viewports (≤480 px tall); in short viewports wider than 640 px, "Nueva conversación" keeps its visible text.
-- **Layout:** user bubbles right-aligned, ≤80% of the log width; assistant answers full width with no bubble and a decorative icon; long tokens wrap; no thread cap.
-- **Motion:** under reduced motion nothing animates (messages, the loader as static "Pensando…" text, the panel or sheet, the scroll button, chips) and scrolling is instant. Otherwise fades and transitions are ≤200 ms (the "Pensando…" loader's looping text blink is exempt) and smooth scrolling is allowed.
+- **Narrow header (≤640 px wide)** (**[Superseded: row 2 is removed; see assistant-data-scope REQ-4]**): row 1: "Asistente" and ×; row 2: "Alcance: <scope>" and "Nueva conversación" as a 44×44 icon button (accessible name and tooltip "Nueva conversación"). The panel subtitle is hidden at ≤640 px wide and in short viewports (≤480 px tall); in short viewports wider than 640 px, "Nueva conversación" keeps its visible text.
+- **Layout** (**[Superseded: assistant-data-scope REQ-32]**): user bubbles right-aligned, ≤80% of the log width; assistant answers full width with no bubble and a decorative icon; long tokens wrap; no thread cap.
+- **Motion** (**[Amended: assistant-data-scope REQ-33's typing effect, ≤1 s, is exempt from the 200 ms cap]**): under reduced motion nothing animates (messages, the loader as static "Pensando…" text, the panel or sheet, the scroll button, chips) and scrolling is instant. Otherwise fades and transitions are ≤200 ms (the "Pensando…" loader's looping text blink is exempt) and smooth scrolling is allowed.
 - **Contrast** (both themes): message, lead and item text; scope label, sources, highlights; user bubble; switcher states (default, selected, focus); compact button and menu; chips; send enabled and disabled; placeholder; "Pensando…"; scroll button; error; Reintentar; ×; Nueva conversación; counter and its over-limit state; modal backdrop; focus rings.
 
 ## Edge cases and errors
 
 - Rapid double send or chip activation while pending sends one request (REQ-5, REQ-10).
-- Esta receta selected and I navigate away: the switcher takes the new page's default; Esta receta chips keep their recipe (REQ-5, REQ-12).
+- **[Superseded: no scopes or recipe context]** Esta receta selected and I navigate away: the switcher takes the new page's default; Esta receta chips keep their recipe (REQ-5, REQ-12).
 - A dictation error shows as today (role alert); the field and send still work (REQ-10).
 
 ## Non-functional requirements
 
-- No new npm packages (Constitution 4).
-- The response change is additive. The chat tests in `dashboard.spec.ts`, `theme-switch.spec.ts` and `theme-palette.spec.ts` stay green, with selectors and any Todo-fallback assertion updated per REQ-6.
+- No new npm packages (Constitution 4). **[Superseded: assistant-data-scope; the only exception is fuse.js 7.5.0; prompt-kit `response-stream` is copied code, not a package]**
+- The response change is additive. The chat tests in `dashboard.spec.ts`, `theme-switch.spec.ts` and `theme-palette.spec.ts` stay green, with selectors and any Todo-fallback assertion updated per REQ-6; the scope tests may be rewritten or removed as assistant-data-scope specifies.
 - Timeout 15 s; fades ≤200 ms; touch targets ≥44×44 px at ≤640 px; input length ≤500 on client, search bar and server.
 
 ## Assumptions
@@ -309,7 +337,8 @@ None.
 - [x] US2 (P1): follow-ups, unknown reply, thinking, retry and timeout, strict scopes (REQ-5 to REQ-8, REQ-20)
 - [x] US3 (P1): empty state, new conversation, composer, scroll (REQ-9 to REQ-11)
 - [x] US5 (P1): themes and contrast, narrow sheet, motion, live region, modality (REQ-14 to REQ-17, REQ-22)
-- [x] US4 (P2): scope switcher, search-bar scope, switcher accessibility (REQ-12, REQ-13, REQ-21)
+- [x] US4 (P2): scope switcher, search-bar scope, switcher accessibility (REQ-12, REQ-13, REQ-21); superseded in v1.9
+- [ ] v1.9 REQ-23: 500 versus 400 error handling (delivered on feature/assistant-data-scope)
 
 ## Change log
 
@@ -324,3 +353,4 @@ None.
 | 1.6 | 2026-10-27 | Spec-change: Reintentar only on the latest turn; chips hidden during a retry; loader exempt from the fade cap |
 | 1.7 | 2026-10-27 | Spec-change: Enter adds a newline on coarse-pointer devices too |
 | 1.8 | 2026-10-28 | Spec-change: narrow header shows Nueva conversación as an icon button and hides the subtitle; corrected: icon-only applies at ≤640 px wide only, the ≤480 px-tall condition only hides the subtitle |
+| 1.9 | 2026-10-28 | Spec-change: parts superseded by [assistant-data-scope](../assistant-data-scope/spec.md) (vocabulary and matching, Tier 3 meal nouns and REQ-18 slot answers, REQ-19 precedence, scopes: Terms, REQ-4, REQ-5 scope parts, REQ-6, REQ-12, REQ-13 scope part, REQ-20, REQ-21, Esta receta and page context, plan lead "Tu objetivo" versus objetivo/meta, layout); REQ-1 cap wording fixed (8 items plus "y n más" = 9 entries; code and tests were already right); new REQ-23 (server errors → 500 with generic body and logged details, 400 only for invalid requests; `src/server.js` out of scope); plan and contract version headers bumped. Verify round 1: status partial (REQ-23 delivered on feature/assistant-data-scope); "no new packages" and "tests stay green" superseded (fuse.js 7.5.0 only; scope tests rewritten or removed); blanket void rule for scope and page context plus inline tags (Overview, Goals, REQ-8 retry, REQ-14, REQ-18 Givens, REQ-22 Escape, Edge case, narrow header); Motion amended for the typing effect; REQ-23 test-only failure injection, log capture, 500-only generic body (400 keeps validation issues), Definition-of-done exception; REQ-8 non-500 copy kept. Verify round 2: REQ-17 amended (buttons outside the live region; option count and labels announced as text); "used verbatim" copy amended; contract banner and Copy name the superseded rows (plan lead, "No tienes un plan activo." → "Aún no tienes un plan activo.", meal-times slot answers and no-times lead for slot questions). Spec-change (user decision, 2026-10-28): REQ-23, REQ-10 and contract say 400 is for invalid or unparsable requests (zod or unparsable body), not zod only |

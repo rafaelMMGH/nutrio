@@ -31,10 +31,10 @@ export default defineConfig({
     }
   ],
   webServer: {
-    command: `npx next dev -p ${PORT}`,
+    command: `sh -c "npx next dev -p ${PORT} 2>&1 | tee tests/e2e/.server.log"`,
     url: `http://localhost:${PORT}/login`,
     reuseExistingServer: false,
     timeout: 120_000,
-    env: { DATABASE_URL: e2eDatabaseUrl(), NEXT_DIST_DIR: ".next-e2e" }
+    env: { DATABASE_URL: e2eDatabaseUrl(), NEXT_DIST_DIR: ".next-e2e", E2E_HOOKS: "1" }
   }
 });

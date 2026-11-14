@@ -1,8 +1,9 @@
 import type { Locator, Page } from "@playwright/test";
+import type { Button } from "@/lib/assistant";
 import { expectIssues } from "./fixtures";
-import { auditNow, installToolkit, visit } from "./theme-audit";
+import { auditNow, visit } from "./theme-audit";
 import { canvasColor, contrast, effectiveBackground, toRgb, type Rgba, type Theme } from "./theme-helpers";
-import { assistantUi, buildAnswer, cartAnswer, createChatUser, deleteChatUser, expect, focusWalk, mockChat, openAssistant, test } from "./assistant-helpers";
+import { assistantUi, buildAnswer, cartAnswer, createChatUser, deleteChatUser, expect, focusWalk, CHIP_LABEL, LINK_HREF, LINK_LABEL, LONG_LEAD, longLeadAnswer, mockChat, openAssistant, OPTION_LABELS, optionsAnswer, test } from "./assistant-helpers";
 
 // The assistant as a phone sheet. Spec assistant-chat-polish, US5: REQ-15 (geometry, touch targets, safe areas, the
 // on-screen keyboard, long tokens), REQ-14 at 360 px (backdrop, focus rings), REQ-17 (turn names, live region) and REQ-22
@@ -14,7 +15,8 @@ test.afterAll(() => deleteChatUser());
 const QUESTION = "¿Qué tengo en mi carrito?";
 const FAILED_500 = [/POST \/api\/rag\/chat → 500/, /Failed to load resource.*500/];
 const PHONE = { width: 360, height: 740 };
-const ERROR_TEXT = "No pude responder en este momento.";
+// HTTP 500 has its own copy (chat-polish REQ-23).
+const SERVER_ERROR_TEXT = "Algo salió mal al responder. Intenta de nuevo.";
 
 /** The browser reports no SpeechRecognition on this build: stub it so the mic (a target to measure) is rendered. */
 async function withMic(page: Page) {
@@ -132,18 +134,7 @@ test.describe("REQ-15: the sheet at 360 px", () => {
     expect((await boxOf(ui.input)).height).toBeGreaterThanOrEqual(44);
   });
 
-  test("the scope button and every menu option are 44 px targets that do not overlap", async ({ chat }) => {
-    await chat.goto("/");
-    const ui = await openSheet(chat);
-    const button = ui.panel.getByRole("button", { name: "Alcance: Todo" });
-    await expectTargets({ "×": ui.close, "Alcance": button });
-    await button.click();
-    const options = ui.panel.getByRole("listbox", { name: "Alcance" }).getByRole("option");
-    await expect(options).toHaveCount(4);
-    await expectTargets({ "×": ui.close, "Alcance": button, option: options });
-  });
-
-  test("with a thread: Nueva conversación and Ir al último mensaje too, and the header takes two rows", async ({ chat }) => {
+  test("with a thread: Nueva conversación and Ir al último mensaje too, and the header is one row", async ({ chat }) => {
     await withMic(chat);
     await mockChat(chat, cartAnswer(8));
     await chat.goto("/");
@@ -169,13 +160,14 @@ test.describe("REQ-15: the sheet at 360 px", () => {
     await expect(visibleChips.first()).toBeVisible();
     await expectTargets({ "×": ui.close, "Nueva conversación": chat.getByRole("button", { name: "Nueva conversación" }), chips: visibleChips, send: ui.send });
 
-    // Row 1: title and ×. Row 2: the scope line and Nueva conversación (the scope button sits on it too).
+    // Row 1 holds the title, Nueva conversación and ×; there is no second row (assistant-data-scope REQ-4).
     const title = await boxOf(ui.panel.getByRole("heading", { name: "Asistente" }));
     const close = await boxOf(ui.close);
     const fresh = await boxOf(chat.getByRole("button", { name: "Nueva conversación" }));
-    expect(Math.abs(title.y + title.height / 2 - (close.y + close.height / 2))).toBeLessThan(title.height);
-    expect(fresh.y).toBeGreaterThanOrEqual(close.y + close.height - 1);
-    expect(fresh.x + fresh.width).toBeLessThanOrEqual(PHONE.width - 8);
+    const middle = (box: Box) => box.y + box.height / 2;
+    expect(Math.abs(middle(title) - middle(close))).toBeLessThan(title.height);
+    expect(Math.abs(middle(fresh) - middle(close))).toBeLessThan(fresh.height / 2);
+    expect(fresh.x + fresh.width).toBeLessThanOrEqual(close.x + 0.5);
   });
 
   test.describe("an error", () => {
@@ -322,6 +314,27 @@ test.describe("REQ-15: the narrow header", () => {
       await expect(fresh.locator("span")).toHaveText("Nueva conversación");
     });
   });
+
+  // BUG-B9: with the pill showing, the 400 px panel left the title column 73 px and "Asistente" (93 px) ran under the pill.
+  for (const width of [1280, 641]) {
+    test.describe(`at ${width}x800`, () => {
+      test.use({ viewport: { width, height: 800 } });
+      test(`the title fits its box and ends clear of Nueva conversación`, async ({ chat }) => {
+        await startThread(chat);
+        const title = assistantUi(chat).panel.locator("header h2");
+        const fresh = assistantUi(chat).panel.getByRole("button", { name: "Nueva conversación", exact: true });
+        await expect(fresh.locator("span")).toBeVisible();
+        const fits = await title.evaluate((node) => node.scrollWidth <= node.clientWidth);
+        expect(fits, "the title text overflows its box").toBe(true);
+        const textRight = await title.evaluate((node) => {
+          const range = document.createRange();
+          range.selectNodeContents(node);
+          return range.getBoundingClientRect().right;
+        });
+        expect((await boxOf(fresh)).x - textRight).toBeGreaterThanOrEqual(4);
+      });
+    });
+  }
 });
 
 
@@ -340,9 +353,11 @@ test.describe("REQ-17: turns and the live region", () => {
     await expect(ui.assistantTurns).toHaveCount(1);
     await expect(ui.panel.getByRole("article", { name: "Tú", exact: true })).toHaveCount(1);
     await expect(ui.panel.getByRole("article", { name: "Asistente", exact: true })).toHaveCount(1);
-    const icon = ui.assistantTurns.locator(".assistant-turn-head svg");
-    await expect(icon).toHaveCount(1);
-    await expect(icon).toHaveAttribute("aria-hidden", "true");
+    // The wrapper carries aria-hidden (lucide does not add it to the svg), which hides the icon inside it from assistive tech.
+    const avatar = ui.assistantTurns.locator(".assistant-avatar");
+    await expect(avatar).toHaveCount(1);
+    await expect(avatar).toHaveAttribute("aria-hidden", "true");
+    await expect(avatar.locator("svg.lucide-bot")).toHaveCount(1);
   });
 
   test("the region exists while pending without Pensando…, then holds the lead and every item and nothing else", async ({ chat }) => {
@@ -366,11 +381,48 @@ test.describe("REQ-17: turns and the live region", () => {
     for (const item of ["Ingrediente 01 · 1 g", "Ingrediente 02 · 2 g", "Ingrediente 03 · 3 g"]) await expect(ui.live).toContainText(item);
     const region = (await ui.live.textContent()) ?? "";
     expect(region).not.toContain(QUESTION);
-    expect(region).not.toContain((await ui.labels.first().textContent()) ?? "unreachable");
-    for (const [name, locator] of Object.entries({ "user turn": ui.userTurns, label: ui.labels, chips: ui.chips.first() })) {
+    for (const [name, locator] of Object.entries({ "user turn": ui.userTurns, chips: ui.chips.first() })) {
       expect(await inLiveRegion(locator.first()), `${name} is outside the region`).toBe(false);
     }
     expect(region).not.toContain((await ui.chips.first().textContent()) ?? "unreachable");
+  });
+
+  test("an options answer is announced once, with its count and labels as text, and no button or link is in the region", async ({ chat }) => {
+    await mockChat(chat, longLeadAnswer());
+    await chat.goto("/");
+    const ui = await openSheet(chat);
+    // What a screen reader gets: the region's text without anything aria-hidden (the typed layer), recorded after every change.
+    await chat.evaluate(() => {
+      const announced: string[] = [];
+      (window as unknown as { __announced: string[] }).__announced = announced;
+      const text = (node: Node): string => {
+        if (node instanceof Element && node.getAttribute("aria-hidden") === "true") return "";
+        if (node.nodeType === Node.TEXT_NODE) return node.textContent ?? "";
+        // Hidden children contribute nothing, not even a separator, so the typed layer unmounting does not change what is heard.
+        return [...node.childNodes].map(text).filter(Boolean).join("\u2063");
+      };
+      // The region only exists once the question is sent, so watch the log it will appear in.
+      const record = () => announced.push(text(document.querySelector(".assistant-turn-live") ?? document.createTextNode("")));
+      new MutationObserver(record).observe(document.querySelector(".assistant-chat-log") as HTMLElement, { subtree: true, childList: true, characterData: true, attributes: true });
+    });
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    // Past the typing and the fades, so a late change would be recorded.
+    await chat.waitForTimeout(500);
+
+    const expected = `${OPTION_LABELS.length} opciones: ${OPTION_LABELS.join("; ")}`;
+    await expect(ui.live).toContainText(expected);
+    const heard = await chat.evaluate(() => (window as unknown as { __announced: string[] }).__announced);
+    const distinct = [...new Set(heard.filter((entry) => entry !== ""))];
+    expect(distinct, "the announced text changes once, from empty to the full answer").toHaveLength(1);
+    expect(distinct[0]).toContain(LONG_LEAD);
+    expect(distinct[0]).toContain(expected);
+    expect(distinct[0].split(expected), "the count is announced once").toHaveLength(2);
+    // Buttons and links stay outside the region (chat-polish REQ-17), and the typed layer is hidden from it.
+    await expect(ui.live.locator("a, button")).toHaveCount(0);
+    expect(await inLiveRegion(ui.assistantTurns.last().getByRole("link", { name: LINK_LABEL }))).toBe(false);
+    for (const label of OPTION_LABELS) expect(await inLiveRegion(ui.assistantTurns.last().getByRole("button", { name: label, exact: true })), label).toBe(false);
+    await expect(ui.live.locator(".assistant-lead-typed")).toHaveCount(0);
   });
 
   test.describe("an error", () => {
@@ -382,7 +434,7 @@ test.describe("REQ-17: turns and the live region", () => {
       const ui = await openSheet(chat);
       await ask(chat, QUESTION);
       await expect(ui.assistantTurns).toHaveCount(1);
-      await expect(ui.live).toHaveText(ERROR_TEXT);
+      await expect(ui.live).toHaveText(SERVER_ERROR_TEXT);
       const retry = ui.panel.getByRole("button", { name: "Reintentar" });
       expect(await inLiveRegion(retry)).toBe(false);
       const turn = ui.assistantTurns.first();
@@ -455,21 +507,6 @@ test.describe("REQ-22: desktop is non-modal", () => {
     await expect(ui.input).toBeFocused();
     mock.release();
     await expect(ui.assistantTurns).toHaveCount(1);
-    await expect(ui.input).toBeFocused();
-  });
-
-  test("Preguntar en Todo leaves focus in the input", async ({ chat }) => {
-    await mockChat(chat, buildAnswer({ kind: "out_of_scope", lead: [{ text: "Eso no está en este alcance." }] }));
-    await chat.goto("/");
-    const ui = await openSheet(chat);
-    await ask(chat, QUESTION);
-    await expect(ui.assistantTurns).toHaveCount(1);
-    const second = await mockChat(chat, cartAnswer(3), { hold: true });
-    await chat.getByRole("button", { name: "Preguntar en Todo" }).click();
-    await expect(ui.pending).toHaveCount(1);
-    await expect(ui.input).toBeFocused();
-    second.release();
-    await expect(ui.assistantTurns).toHaveCount(2);
     await expect(ui.input).toBeFocused();
   });
 
@@ -578,20 +615,20 @@ test.describe("REQ-22: the sheet at 360 px is modal", () => {
       await chat.keyboard.press("Shift+Tab");
       expect(await inside(), `Shift+Tab ${press + 1}`).toBe(true);
     }
-    // The ends: Enviar is the last control, the first one is the scope button (the desktop group is hidden at this width).
-    expect([...seen]).toEqual(expect.arrayContaining(["Cerrar asistente", "Enviar", "Nueva conversación", "Pregunta", "Alcance: Todo"]));
-    const scope = ui.panel.getByRole("button", { name: "Alcance: Todo" });
+    // The ends: Enviar is the last control, the first one is Nueva conversación (first in the header, once the thread has a turn).
+    expect([...seen]).toEqual(expect.arrayContaining(["Cerrar asistente", "Enviar", "Nueva conversación", "Pregunta"]));
+    const fresh = ui.panel.getByRole("button", { name: "Nueva conversación" });
     await ui.send.focus();
     await chat.keyboard.press("Tab");
-    await expect(scope).toBeFocused();
+    await expect(fresh).toBeFocused();
     await chat.keyboard.press("Shift+Tab");
     await expect(ui.send).toBeFocused();
-    await scope.focus();
+    await fresh.focus();
     await chat.keyboard.press("Shift+Tab");
     await expect(ui.send).toBeFocused();
   });
 
-  test("with an empty thread the walk still stays in the sheet, skips the hidden desktop group and wraps at the scope button", async ({ chat }) => {
+  test("with an empty thread the walk still stays in the sheet and wraps at the close button", async ({ chat }) => {
     await chat.goto("/");
     const ui = await openSheet(chat);
     const inside = () => chat.evaluate(() => Boolean(document.activeElement?.closest("#assistant-chat-panel")));
@@ -601,17 +638,15 @@ test.describe("REQ-22: the sheet at 360 px is modal", () => {
       expect(await inside(), `Tab ${press + 1}`).toBe(true);
       visited.push(await chat.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? document.activeElement?.textContent?.trim() ?? ""));
     }
-    // Every stop is on screen: the display:none group's buttons are never visited, and the walk wraps around the real ones.
-    expect(visited).toEqual(expect.arrayContaining(["Alcance: Todo", "Cerrar asistente", "Pregunta"]));
-    for (const option of ["Todo", "Plan activo", "Recetario", "Carrito"]) expect(visited).not.toContain(option);
-    // The wrap itself: Shift+Tab on the scope button, the first stop, lands on the last one.
-    const scope = ui.panel.getByRole("button", { name: "Alcance: Todo" });
-    await scope.focus();
+    // The close button is the first stop with no turn yet; the 4 starters sit between it and the input.
+    expect(visited).toEqual(expect.arrayContaining(["Cerrar asistente", "Mi cena de hoy", "Mi avance de la semana", "Mi peso", "Mi carrito", "Pregunta"]));
+    // The wrap itself: Shift+Tab on the close button, the first stop, lands on the last one.
+    await ui.close.focus();
     await chat.keyboard.press("Shift+Tab");
     await expect(ui.panel.locator(":focus")).toHaveCount(1);
     const last = await chat.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? document.activeElement?.textContent?.trim() ?? "");
-    // The walk went round more than once, so a later visit of the scope button is preceded by the last stop.
-    const again = visited.lastIndexOf("Alcance: Todo");
+    // The walk went round more than once, so a later visit of the close button is preceded by the last stop.
+    const again = visited.lastIndexOf("Cerrar asistente");
     expect(again, `visited ${visited.join(" | ")}`).toBeGreaterThan(0);
     expect(last).toBe(visited[again - 1]);
     for (let press = 0; press < 12; press++) {
@@ -665,14 +700,14 @@ test.describe("REQ-22: the sheet at 360 px is modal", () => {
     await expect(ui.assistantTurns.last()).toHaveAttribute("tabindex", "-1");
   });
 
-  test("a chip under an answer and Preguntar en Todo do the same", async ({ chat }) => {
-    await mockChat(chat, buildAnswer({ kind: "out_of_scope", lead: [{ text: "Eso no está en este alcance." }] }));
+  test("a chip under an answer focuses the log while pending and the new turn after, answer after answer", async ({ chat }) => {
+    await mockChat(chat, cartAnswer(3));
     await chat.goto("/");
     const ui = await openSheet(chat);
     await ask(chat, QUESTION);
     await expect(ui.assistantTurns).toHaveCount(1);
     const second = await mockChat(chat, cartAnswer(3), { hold: true });
-    await chat.getByRole("button", { name: "Preguntar en Todo" }).click();
+    await ui.chips.filter({ visible: true }).first().click();
     await expect(ui.pending).toHaveCount(1);
     await expect(ui.log).toBeFocused();
     second.release();
@@ -712,7 +747,7 @@ test.describe("REQ-22: the sheet at 360 px is modal", () => {
       await expect(ui.log).toBeFocused();
       mock.release();
       await expect(ui.assistantTurns).toHaveCount(1);
-      await expect(ui.live).toHaveText(ERROR_TEXT);
+      await expect(ui.live).toHaveText(SERVER_ERROR_TEXT);
       await expect(ui.assistantTurns.first()).toBeFocused();
       await expect(ui.assistantTurns.first()).toHaveAttribute("tabindex", "-1");
       await chat.keyboard.press("Tab");
@@ -763,40 +798,350 @@ for (const theme of ["light", "dark"] as Theme[]) {
       expect(result.violations, "answers").toEqual([]);
       expect(await focusWalk(chat, theme)).toEqual([]);
     });
+  });
+}
 
-    test("the open compact menu passes contrast and its options and button show a focus ring", async ({ chat }) => {
+// ---------------------------------------------------------------------------------------------------------------------
+// assistant-data-scope US6 (REQ-34, REQ-35): the one button component. Written before T056; first run in Batch E.
+
+test.describe("REQ-34: buttons at 360 px", () => {
+  test.use({ viewport: PHONE });
+
+  test("option buttons stretch to the bubble, wrap without truncating and are 44 px tall; nav links are 44x44", async ({ chat }) => {
+    await mockChat(chat, optionsAnswer());
+    await chat.goto("/");
+    const ui = await openSheet(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    await expect(ui.options).toHaveCount(OPTION_LABELS.length);
+
+    // Interpretation: the width is measured against the bubble's inner width (clientWidth minus padding); the spec only says the buttons stretch to it.
+    const measured = await ui.options.evaluateAll((nodes) =>
+      nodes.map((node) => {
+        const bubble = node.closest(".assistant-bubble") as HTMLElement;
+        const style = getComputedStyle(bubble);
+        const inner = bubble.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+        const button = node as HTMLElement;
+        return { label: button.textContent, width: button.getBoundingClientRect().width, inner, height: button.getBoundingClientRect().height, clipped: button.scrollWidth - button.clientWidth, ellipsis: getComputedStyle(button).textOverflow === "ellipsis" };
+      })
+    );
+    for (const item of measured) {
+      expect(Math.abs(item.width - item.inner), `${item.label} stretches`).toBeLessThanOrEqual(1);
+      expect(item.height, `${item.label} height`).toBeGreaterThanOrEqual(44);
+      expect(item.clipped, `${item.label} is not clipped`).toBeLessThanOrEqual(0);
+      expect(item.ellipsis, `${item.label} is not truncated`).toBe(false);
+    }
+    // The long label wraps onto more lines, so it grows taller than the short ones.
+    expect(measured[2].height).toBeGreaterThan(measured[0].height);
+
+    await expectTargets({ options: ui.options, "Ver receta completa": ui.navLinks, "answer chip": ui.assistantTurns.last().getByRole("button", { name: CHIP_LABEL }) });
+  });
+});
+
+test.describe("REQ-34: question buttons and links by answer", () => {
+  test("only the latest answer has question buttons, while links keep working on an old answer", async ({ chat }) => {
+    await mockChat(chat, optionsAnswer());
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(2);
+
+    const first = ui.assistantTurns.nth(0);
+    const last = ui.assistantTurns.nth(1);
+    // By role, so the answer-level chip is covered as well as the options.
+    // The link first: it proves the old answer rendered, so the zero-button count below is not an instant pass.
+    await expect(first.getByRole("link", { name: LINK_LABEL })).toHaveCount(1);
+    await expect(first.getByRole("button")).toHaveCount(0);
+    await expect(last.locator('button[data-variant="option"]')).toHaveCount(OPTION_LABELS.length);
+    await expect(last.getByRole("button")).toHaveCount(OPTION_LABELS.length + 1);
+    await expect(last.getByRole("button", { name: CHIP_LABEL })).toHaveAttribute("data-variant", "chip");
+    await expect(last.getByRole("link", { name: LINK_LABEL })).toHaveCount(1);
+
+    await first.getByRole("link", { name: LINK_LABEL }).click();
+    await expect(chat).toHaveURL(new RegExp(`${LINK_HREF}$`));
+    // The old answer is still in the thread after navigating.
+    await expect(ui.assistantTurns).toHaveCount(2);
+  });
+
+  test("while a request is pending the question buttons are aria-disabled, still focusable, and send nothing", async ({ chat }) => {
+    await mockChat(chat, optionsAnswer());
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+
+    const held = await mockChat(chat, optionsAnswer(), { hold: true });
+    await ask(chat, QUESTION);
+    await expect(ui.pending).toHaveCount(1);
+    // By role: the three options and the "Mi cena de hoy" chip.
+    const buttons = ui.assistantTurns.last().getByRole("button");
+    await expect(buttons).toHaveCount(OPTION_LABELS.length + 1);
+    const count = await buttons.count();
+    await expect(ui.assistantTurns.last().getByRole("button", { name: CHIP_LABEL })).toHaveAttribute("aria-disabled", "true");
+    for (let index = 0; index < count; index++) {
+      const button = buttons.nth(index);
+      await expect(button).toHaveAttribute("aria-disabled", "true");
+      await expect(button).not.toHaveAttribute("disabled", /.*/);
+      await button.focus();
+      await expect(button).toBeFocused();
+      await button.click({ force: true });
+    }
+    // Nothing was added to the thread (synchronous evidence), and nothing reached the route.
+    await expect(ui.userTurns).toHaveCount(2);
+    expect(held.requests).toHaveLength(1);
+
+    held.release();
+    await expect(ui.assistantTurns).toHaveCount(2);
+    await expect(ui.assistantTurns.last().getByRole("button").first()).not.toHaveAttribute("aria-disabled", "true");
+  });
+});
+
+test.describe("REQ-35: names, bubbles and focus order", () => {
+  test("the arrow icon is hidden and the link's accessible name equals its label", async ({ chat }) => {
+    await mockChat(chat, optionsAnswer());
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    const link = ui.panel.getByRole("link", { name: LINK_LABEL, exact: true });
+    await expect(link).toHaveCount(1);
+    await expect(link).toHaveAttribute("href", LINK_HREF);
+    const arrow = link.locator("svg.lucide-arrow-up-right");
+    await expect(arrow).toHaveCount(1);
+    await expect(arrow).toHaveAttribute("aria-hidden", "true");
+    // The arrow comes after the label.
+    expect(await link.evaluate((node) => node.lastElementChild?.matches("svg.lucide-arrow-up-right"))).toBe(true);
+    for (const label of OPTION_LABELS) await expect(ui.panel.getByRole("button", { name: label, exact: true })).toHaveCount(1);
+  });
+
+  test("bubbles and the avatar have no tabindex and Tab visits only buttons, links and controls, in visual order", async ({ chat }) => {
+    await mockChat(chat, optionsAnswer());
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    await expect(chat.locator(".assistant-bubble[tabindex], .assistant-avatar[tabindex], .assistant-avatar [tabindex]")).toHaveCount(0);
+
+    await ui.log.evaluate((node) => (node.querySelector(".assistant-turn") as HTMLElement).scrollIntoView());
+    await chat.locator("#assistant-chat-panel header button:visible").first().focus();
+    const order: { tag: string; variant: string | null; top: number }[] = [];
+    for (let presses = 0; presses < 12; presses++) {
+      await chat.keyboard.press("Tab");
+      const stop = await chat.evaluate(() => {
+        const active = document.activeElement as HTMLElement;
+        const inside = Boolean(active.closest(".assistant-turn"));
+        return { inside, tag: active.tagName, variant: active.getAttribute("data-variant"), top: active.getBoundingClientRect().top - (document.querySelector(".assistant-chat-log") as HTMLElement).getBoundingClientRect().top + (document.querySelector(".assistant-chat-log") as HTMLElement).scrollTop, bubble: active.classList.contains("assistant-bubble") || active.classList.contains("assistant-turn") || active.classList.contains("assistant-avatar") };
+      });
+      expect(stop.bubble, "a bubble, turn or avatar took focus").toBe(false);
+      if (stop.inside) order.push(stop);
+    }
+    // Three options, one link, then the answer-level question button, in the order they are drawn.
+    expect(order.map((stop) => stop.tag)).toEqual(["BUTTON", "BUTTON", "BUTTON", "A", "BUTTON"]);
+    expect(order.map((stop) => stop.variant)).toEqual(["option", "option", "option", "link", "chip"]);
+    expect(order.map((stop) => stop.top)).toEqual([...order.map((stop) => stop.top)].sort((a, b) => a - b));
+  });
+});
+
+for (const theme of ["light", "dark"] as Theme[]) {
+  test.describe(`REQ-35: focus rings on buttons and links in the ${theme} theme`, () => {
+    test.use({ viewport: PHONE });
+
+    test("every option button and nav link shows a ring of 3:1", async ({ chat }) => {
       test.setTimeout(120_000);
+      await mockChat(chat, optionsAnswer());
       await visit(chat, "/", theme);
       const ui = await openSheet(chat);
-      const button = ui.panel.getByRole("button", { name: "Alcance: Todo" });
-      await button.click();
-      const list = ui.panel.getByRole("listbox", { name: "Alcance" });
-      await expect(list).toBeVisible();
-      // The menu is inside .assistant-chat, so this audits its text, fills and edges. The shared hover list has no
-      // [role="option"], so each option is hovered here and audited on its own (the --brand-50 hover background).
-      const result = await auditNow(chat, { scope: ".assistant-chat", tab: false, hover: true });
-      expect(result.violations, "open menu").toEqual([]);
-      for (const name of ["Todo", "Plan activo", "Recetario", "Carrito"]) {
-        await list.getByRole("option", { name, exact: true }).hover();
-        const hovered = await auditNow(chat, { scope: ".assistant-chat", tab: false, hover: false });
-        expect(hovered.violations, `option ${name} hovered`).toEqual([]);
-      }
-
-      const failures: string[] = [];
-      await chat.evaluate(installToolkit);
-      await chat.keyboard.press("Shift");
-      for (const name of ["Todo", "Plan activo", "Recetario", "Carrito"]) {
-        const option = list.getByRole("option", { name, exact: true });
-        await option.focus();
-        await expect(option).toBeFocused();
-        const focus = await chat.evaluate(() => window.__audit.focus());
-        if (!focus.ok) failures.push(`${theme} option ${name} ${focus.ratio.toFixed(2)}:1`);
-      }
-      await chat.keyboard.press("Escape");
-      await expect(button).toBeFocused();
-      const focus = await chat.evaluate(() => window.__audit.focus());
-      if (!focus.ok) failures.push(`${theme} button ${focus.ratio.toFixed(2)}:1`);
-      expect(failures).toEqual([]);
+      await ask(chat, QUESTION);
+      await expect(ui.assistantTurns).toHaveCount(1);
+      const visited: string[] = [];
+      expect(await focusWalk(chat, theme, visited)).toEqual([]);
+      // Each failure above is a ring under 3:1 on that stop, so these stops were all measured.
+      for (const label of OPTION_LABELS) expect(visited, `option ${label}`).toContain(`option:${label}`);
+      expect(visited, "the link").toContain(`link:${LINK_LABEL}`);
+      expect(visited, "the chip").toContain(`chip:${CHIP_LABEL}`);
     });
   });
 }
+
+// Keyboard and focus after a button, and navigation links (REQ-34, REQ-35). The destinations are real routes: "/" is the
+// dashboard the tests start on (the same destination), "/plans" and "/recipes" are other pages with a main heading.
+
+const link = (label: string, href: string): Button => ({ type: "link", label, href });
+
+/** One answer whose block carries the given navigation links, plus the answer-level chip. */
+function linksAnswer(...links: Button[]) {
+  const answer = buildAnswer({ lead: [{ text: "Aquí tienes el siguiente paso." }], buttons: [{ type: "question", label: CHIP_LABEL, message: CHIP_LABEL }] });
+  answer.blocks[0].buttons = links;
+  return answer;
+}
+
+test.describe("REQ-35: Enter and Space on buttons and links", () => {
+  test("Enter and Space ask with an option button; Enter follows a link and Space does not", async ({ chat }) => {
+    const mock = await mockChat(chat, optionsAnswer());
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    const option = ui.options.first();
+    await option.focus();
+    await chat.keyboard.press("Enter");
+    await expect(ui.assistantTurns).toHaveCount(2);
+    await ui.options.last().focus();
+    await chat.keyboard.press("Space");
+    await expect(ui.assistantTurns).toHaveCount(3);
+    expect(mock.requests.map((request) => request.message)).toEqual([QUESTION, OPTION_LABELS[0], OPTION_LABELS[2]]);
+
+    const nav = ui.navLinks.last();
+    await nav.focus();
+    // A native anchor ignores Space (it scrolls the page), so only Enter navigates.
+    // A router.push navigation only touches the URL after its RSC fetch, so hold a real interval in the page
+    // before asserting once: expect.poll would return on the first matching sample and pass vacuously.
+    // In dev the push lands after the RSC fetch and compile (over 500 ms), so the window must outlast that.
+    const before = await chat.evaluate(() => {
+      const counts = { push: 0, replace: 0 };
+      const wrap = (method: "pushState" | "replaceState", key: "push" | "replace") => {
+        const original = history[method].bind(history);
+        history[method] = (...args: Parameters<History["pushState"]>) => {
+          counts[key] += 1;
+          original(...args);
+        };
+      };
+      wrap("pushState", "push");
+      wrap("replaceState", "replace");
+      (window as unknown as { __historyCalls: typeof counts }).__historyCalls = counts;
+      return { pathname: location.pathname, length: history.length };
+    });
+    // The RSC fetch of a Link navigation starts at the click, long before pushState: a slow cold compile of the
+    // target cannot hide a broken Space handler from this check.
+    const rscRequests: string[] = [];
+    chat.on("request", (request) => {
+      if (request.url().includes("_rsc=")) rscRequests.push(request.url());
+    });
+    await chat.keyboard.press("Space");
+    await chat.evaluate(() => new Promise((resolve) => setTimeout(resolve, 3500)));
+    expect(rscRequests).toEqual([]);
+    const after = await chat.evaluate(() => ({
+      calls: (window as unknown as { __historyCalls: { push: number; replace: number } }).__historyCalls,
+      pathname: location.pathname,
+      length: history.length,
+    }));
+    expect(after).toEqual({ calls: { push: 0, replace: 0 }, pathname: before.pathname, length: before.length });
+    await expect(nav).toBeFocused();
+    await chat.keyboard.press("Enter");
+    await expect(chat).toHaveURL(new RegExp(`${LINK_HREF}$`));
+  });
+});
+
+for (const [name, viewport] of [["360 px", PHONE], ["desktop", { width: 1280, height: 800 }]] as const) {
+  test.describe(`REQ-35: focus after an option button at ${name}`, () => {
+    test.use({ viewport });
+
+    // Paging, slot, clarification and did-you-mean buttons are the same question button with another message.
+    test("while pending and after the answer, focus is on the " + (viewport === PHONE ? "log, then the new turn" : "input"), async ({ chat }) => {
+      await mockChat(chat, optionsAnswer());
+      await chat.goto("/");
+      const ui = await openAssistant(chat);
+      await ask(chat, QUESTION);
+      await expect(ui.assistantTurns).toHaveCount(1);
+      const second = await mockChat(chat, optionsAnswer(), { hold: true });
+      await ui.options.first().click();
+      await expect(ui.pending).toHaveCount(1);
+      await expect(viewport === PHONE ? ui.log : ui.input).toBeFocused();
+      second.release();
+      await expect(ui.assistantTurns).toHaveCount(2);
+      await expect(viewport === PHONE ? ui.assistantTurns.last() : ui.input).toBeFocused();
+    });
+  });
+}
+
+test.describe("REQ-34: navigation links at 360 px", () => {
+  test.use({ viewport: PHONE });
+
+  for (const [label, href] of [["Registrar mi peso", "/"], ["Fijar mi meta", "/"], ["Subir mi plan", "/plans"]] as const) {
+    test(`"${label}" closes the sheet and the thread survives`, async ({ chat }) => {
+      await mockChat(chat, linksAnswer(link(label, href)));
+      await chat.goto("/");
+      const ui = await openSheet(chat);
+      await ask(chat, QUESTION);
+      await expect(ui.assistantTurns).toHaveCount(1);
+      await ui.navLinks.first().click();
+      await expect(ui.panel).toBeHidden();
+      await expect(ui.fab).toBeVisible();
+      await expect(chat).toHaveURL(new RegExp(`${href}$`));
+      if (href === "/") await expect(ui.fab).toBeFocused();
+      else await expect(chat.locator("main h1")).toBeFocused();
+      await ui.fab.click();
+      await expect(ui.assistantTurns).toHaveCount(1);
+      await expect(ui.navLinks).toHaveCount(1);
+    });
+  }
+
+  test("a link on an old answer navigates, closes the sheet and the old answer stays", async ({ chat }) => {
+    await mockChat(chat, linksAnswer(link("Ver recetario", "/recipes")));
+    await chat.goto("/");
+    const ui = await openSheet(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(2);
+    await ui.assistantTurns.first().getByRole("link", { name: "Ver recetario" }).click();
+    await expect(ui.panel).toBeHidden();
+    await expect(chat).toHaveURL(/\/recipes$/);
+    await ui.fab.click();
+    await expect(ui.assistantTurns).toHaveCount(2);
+  });
+
+  test("a modified click leaves the sheet open", async ({ chat }) => {
+    await mockChat(chat, linksAnswer(link("Ver recetario", "/recipes")));
+    await chat.goto("/");
+    const ui = await openSheet(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    // Ctrl-click (Cmd on macOS) opens a new tab: that event proves the click acted; the new page is closed again.
+    const opened = chat.context().waitForEvent("page");
+    await ui.navLinks.first().click({ modifiers: ["ControlOrMeta"] });
+    await (await opened).close();
+    await expect(ui.panel).toBeVisible();
+    await expect(chat).toHaveURL(/\/$/);
+  });
+
+  test("with the keyboard: Enter on a link closes the sheet and focus reaches the destination heading", async ({ chat }) => {
+    await mockChat(chat, linksAnswer(link("Ver recetario", "/recipes")));
+    await chat.goto("/");
+    const ui = await openSheet(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    await ui.navLinks.first().focus();
+    await chat.keyboard.press("Enter");
+    await expect(ui.panel).toBeHidden();
+    await expect(chat.locator("main h1")).toBeFocused();
+  });
+});
+
+test.describe("REQ-35: navigation links on desktop", () => {
+  test("the panel stays open and focus moves to the destination's main heading", async ({ chat }) => {
+    await mockChat(chat, linksAnswer(link("Ver recetario", "/recipes")));
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    await ui.navLinks.first().click();
+    await expect(chat).toHaveURL(/\/recipes$/);
+    await expect(ui.panel).toBeVisible();
+    await expect(chat.locator("main h1")).toBeFocused();
+    await expect(ui.assistantTurns).toHaveCount(1);
+  });
+
+  test("a link to the page already open changes nothing", async ({ chat }) => {
+    await mockChat(chat, linksAnswer(link("Registrar mi peso", "/")));
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await ask(chat, QUESTION);
+    await expect(ui.assistantTurns).toHaveCount(1);
+    await ui.navLinks.first().click();
+    await expect(ui.panel).toBeVisible();
+    await expect(chat).toHaveURL(/\/$/);
+  });
+});

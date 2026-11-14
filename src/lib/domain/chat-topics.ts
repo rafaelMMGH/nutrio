@@ -1,79 +1,110 @@
-import { type FollowUp, type ScopeKey, words } from "@/lib/assistant";
+import { words } from "@/lib/assistant";
+import { matchPhrases, matchWord } from "@/lib/domain/chat-match";
 
-// Topic matcher of the assistant (spec assistant-chat-polish, REQ-19). A question has at most one winning topic, found
-// from its words against the vocabulary below only. The vocabulary is exhaustive: do not add words the spec's Topics
-// table does not list.
+// Vocabulary and topic table of the assistant (spec assistant-data-scope, Topics table, REQ-1, REQ-2). Words are
+// matched by chat-match.ts (typos, plurals, stems); this file only says which words and phrases belong to which topic.
 
-export type TopicId = "mealTimes" | "cart" | "recipes" | "plan";
-type Tier = 1 | 2 | 3;
+export type TopicId =
+  | "mealTimes" | "slotOptions" | "dish" | "weight" | "exercise" | "water" | "mealsDone" | "goals" | "weekly" | "ambiguous"
+  | "cart" | "recipes" | "plan" | "identity";
 
-type Vocabulary = { tier: Tier; topic: TopicId; exact: string[]; stems: string[] };
-
-const MEAL_NOUNS = ["desayuno", "desayunos", "comida", "comidas", "cena", "cenas", "colacion", "colaciones"];
-
-// Normalized (lowercase, no accents). A word matches if it equals an `exact` entry or starts with a stem.
-const VOCABULARY: Vocabulary[] = [
-  { tier: 1, topic: "mealTimes", exact: ["hora", "horas", "horario", "horarios"], stems: [] },
-  { tier: 3, topic: "mealTimes", exact: MEAL_NOUNS, stems: [] },
-  { tier: 2, topic: "cart", exact: ["carrito", "carritos"], stems: ["compr"] },
-  { tier: 2, topic: "recipes", exact: [], stems: ["receta", "ingrediente", "prepar"] },
-  { tier: 2, topic: "plan", exact: ["plan", "planes", "objetivo", "objetivos"], stems: ["suplement", "recomend"] }
+/**
+ * Synonym groups. Entries are normalized (`normalizeText`) and in the singular: the matcher folds plurals and does not
+ * normalize them, and its never-fuzzy list is accent-free. A trailing `*` is an exact-prefix stem. `phrases` are
+ * multi-word entries that consume their words. Slot times ("hora" + slot) and the possessor rule are the resolver's (T022).
+ */
+export const VOCABULARY: { topic: TopicId; words: string[]; phrases: string[] }[] = [
+  { topic: "mealTimes", words: ["hora", "horario", "cuando"], phrases: [] },
+  { topic: "slotOptions", words: ["desayuno", "comida", "cena", "colacion", "almuerzo", "merienda", "snack", "desayunar", "comer", "cenar"], phrases: [] },
+  { topic: "dish", words: [], phrases: ["que lleva", "como se prepara", "como se hace", "ingrediente de", "receta de"] },
+  { topic: "weight", words: ["peso", "pesar", "pese", "pesaje", "bascula", "kilo"], phrases: [] },
+  { topic: "exercise", words: ["ejercicio", "entrenar", "entrene", "entrenamiento", "actividad", "gym", "gimnasio"], phrases: [] },
+  { topic: "water", words: ["agua", "hidratacion", "hidratar", "vaso"], phrases: [] },
+  { topic: "mealsDone", words: [], phrases: ["comida llevo", "comida hice", "comida cumplido", "comida cumpli"] },
+  { topic: "goals", words: ["meta", "objetivo"], phrases: [] },
+  { topic: "weekly", words: ["avance", "progreso", "resumen"], phrases: [] },
+  { topic: "ambiguous", words: ["llevo", "voy"], phrases: ["cuanto llevo"] },
+  { topic: "cart", words: ["carrito", "compr*", "super"], phrases: [] },
+  { topic: "recipes", words: ["receta", "ingrediente", "prepar*"], phrases: [] },
+  { topic: "plan", words: ["plan", "suplemento", "recomendacion"], phrases: ["objetivo del plan"] },
+  { topic: "identity", words: [], phrases: ["como me llamo", "mi nombre", "como se llama mi plan", "nombre de mi plan"] }
 ];
 
-// "cuándo" is a weak Tier 1 word (REQ-19): it counts only next to a meal noun or when nothing else is a topic word.
-const WHEN = "cuando";
-
-// Ties inside a tier go to the first topic of this list.
-const TIE_ORDER: TopicId[] = ["cart", "recipes", "plan", "mealTimes"];
-
-/** Topics that answer a question in each scope ("Answers in" of the Topics table). */
-const ANSWERED_IN: Record<TopicId, ScopeKey[]> = {
-  mealTimes: ["auto", "Plan activo"],
-  cart: ["auto", "Carrito"],
-  recipes: ["auto", "Recetario", "Receta"],
-  plan: ["auto", "Plan activo"]
+/**
+ * Title (block title in 2-block answers), Button (the message that offers the topic) and Follow-ups of the Topics table.
+ * `null` where the table has a <slot> or <receta> placeholder: those topics get theirs with their builders (T026, T028).
+ */
+export const TOPICS: Record<TopicId, { title: string | null; button: string | null; followUps: string[] }> = {
+  mealTimes: { title: "Horarios", button: "¿Cuál es mi horario?", followUps: ["Mi cena de hoy", "Mi carrito"] },
+  slotOptions: { title: null, button: null, followUps: [] },
+  dish: { title: null, button: null, followUps: ["Mi carrito", "Mi cena de hoy"] },
+  weight: { title: "Peso", button: "Mi peso", followUps: ["¿Cuál es mi meta?", "¿Cuánto ejercicio llevo?"] },
+  exercise: { title: "Ejercicio", button: "¿Cuánto ejercicio llevo?", followUps: ["¿Cuánta agua llevo?", "Mi peso"] },
+  water: { title: "Agua", button: "¿Cuánta agua llevo?", followUps: ["¿Cuánto ejercicio llevo?", "¿Cuántas comidas llevo?"] },
+  mealsDone: { title: "Comidas", button: "¿Cuántas comidas llevo?", followUps: ["¿Cuánta agua llevo?", "Mi cena de hoy"] },
+  goals: { title: "Metas", button: "¿Cuál es mi meta?", followUps: ["Mi avance de la semana", "Mi peso"] },
+  weekly: { title: "Avance", button: "Mi avance de la semana", followUps: ["Mi peso", "¿Cuál es mi meta?"] },
+  ambiguous: { title: null, button: null, followUps: [] },
+  cart: { title: "Carrito", button: "Mi carrito", followUps: ["¿Qué recetas hay en mi plan?", "Mi cena de hoy"] },
+  recipes: { title: "Recetas", button: "¿Qué recetas hay en mi plan?", followUps: ["Mi carrito", "Mi cena de hoy"] },
+  plan: { title: "Plan", button: "¿Cuál es mi plan?", followUps: ["¿Cuál es mi meta?", "¿Qué suplementos tomo?", "¿Qué recetas hay en mi plan?"] },
+  identity: { title: "Nombre / Plan", button: null, followUps: ["¿Cuál es mi plan?", "Mi avance de la semana"] }
 };
 
-export function answersIn(topic: TopicId, scope: ScopeKey): boolean {
-  return ANSWERED_IN[topic].includes(scope);
-}
+const PHRASES = new Map(VOCABULARY.flatMap(({ topic, phrases }) => phrases.map((phrase) => [phrase, topic] as const)));
+const ENTRY_TOPICS = new Map<string, TopicId[]>();
+for (const { topic, words: entries } of VOCABULARY) for (const entry of entries) ENTRY_TOPICS.set(entry, [...(ENTRY_TOPICS.get(entry) ?? []), topic]);
+// Words of phrases are entries too, so an exact "lleva" never fuzzy-matches the entry "llevo" (REQ-2), but they trigger nothing alone.
+const WORD_ENTRIES = [...new Set([...ENTRY_TOPICS.keys(), ...[...PHRASES.keys()].flatMap((phrase) => phrase.split(" "))])];
 
-const fu = (text: string, scope: ScopeKey): FollowUp => ({ text, scope });
+// Vocabulary entries are singular, as the matcher expects (REQ-2), and the greeting phrases match "buenos dias" through
+// their plural forms. The thanks word stays "gracias": its singular "gracia" is one edit from "garcia" and "Grecia".
+const GREETING_WORDS = ["hola"];
+const THANKS_WORD = "gracias";
+const GREETING_PHRASES = ["bueno dia", "buena tarde", "buena noche", "que tal"];
 
-const FOLLOW_UPS: Record<"mealTimes" | "cart" | "recipeList" | "thisRecipe" | "plan", FollowUp[]> = {
-  mealTimes: [fu("¿Qué recetas hay en mi plan?", "Recetario"), fu("¿Qué hay en mi carrito?", "Carrito"), fu("¿Cuál es mi objetivo?", "Plan activo")],
-  cart: [fu("¿Qué recetas hay en mi plan?", "Recetario"), fu("¿A qué hora es mi comida?", "Plan activo")],
-  recipeList: [fu("¿Qué hay en mi carrito?", "Carrito"), fu("¿A qué hora es mi comida?", "Plan activo")],
-  thisRecipe: [fu("¿Qué ingredientes lleva?", "Receta"), fu("¿Cómo se prepara?", "Receta"), fu("¿Qué hay en mi carrito?", "Carrito")],
-  plan: [fu("¿A qué hora es mi comida?", "Plan activo"), fu("¿Qué suplementos tomo?", "Plan activo"), fu("¿Qué recetas hay en mi plan?", "Recetario")]
-};
-
-/** The topic's full follow-up list, unfiltered. The recipes topic has two: the recipe list, and "this recipe" in scope Receta. */
-export function followUpsFor(topic: TopicId, scope: ScopeKey): FollowUp[] {
-  if (topic === "recipes") return FOLLOW_UPS[scope === "Receta" ? "thisRecipe" : "recipeList"];
-  return FOLLOW_UPS[topic];
-}
-
-/** Tiers of the topics a (normalized) word belongs to. */
-function classify(word: string): { tier: Tier; topic: TopicId }[] {
-  return VOCABULARY.filter((entry) => entry.exact.includes(word) || entry.stems.some((stem) => word.startsWith(stem))).map(({ tier, topic }) => ({ tier, topic }));
-}
-
-/** True when a normalized word is in the vocabulary (including "cuando"): the recipe-list filter drops such words. */
-export function isTopicWord(word: string): boolean {
-  return word === WHEN || classify(word).length > 0;
-}
-
-/** The winning topic of a question, or null when no word is a topic word. Tier 1 beats 2 beats 3; ties follow `TIE_ORDER`. */
-export function matchTopic(question: string): TopicId | null {
+/** "hello" or "thanks" when the message is made only of greeting or thanks words, else null (a greeting before a question is ignored by the matcher). */
+export function greetingOf(question: string): "hello" | "thanks" | null {
   const tokens = words(question);
-  const hits = tokens.flatMap(classify);
-  const hasMealNoun = tokens.some((word) => MEAL_NOUNS.includes(word));
-  if (tokens.includes(WHEN) && (hasMealNoun || hits.length === 0)) hits.push({ tier: 1, topic: "mealTimes" });
-  for (const tier of [1, 2, 3] as const) {
-    const topics = hits.filter((hit) => hit.tier === tier).map((hit) => hit.topic);
-    const winner = TIE_ORDER.find((topic) => topics.includes(topic));
-    if (winner) return winner;
-  }
-  return null;
+  const consumed = new Set(matchPhrases(tokens, GREETING_PHRASES).flatMap(({ from, to }) => Array.from({ length: to - from }, (_, offset) => from + offset)));
+  const rest = tokens.filter((_, at) => !consumed.has(at));
+  const entries = [...GREETING_WORDS, THANKS_WORD];
+  if (!tokens.length || !rest.every((token) => matchWord(token, entries).length)) return null;
+  return rest.some((token) => matchWord(token, [THANKS_WORD]).length) ? "thanks" : "hello";
 }
+
+/** A vocabulary entry found in a question: the topic, the entry (a phrase or a word) and the index of its first word. */
+export type TopicHit = { topic: TopicId; entry: string; at: number };
+
+// "comidas … llevo": the noun and the verbs of the meals-done phrases, which may be apart in a question (1c2 review M5).
+const MEALS_DONE_PHRASES = VOCABULARY.filter(({ topic }) => topic === "mealsDone").flatMap(({ phrases }) => phrases.map((phrase) => phrase.split(" ")));
+const MEALS_DONE_NOUNS = [...new Set(MEALS_DONE_PHRASES.map(([noun]) => noun))];
+const MEALS_DONE_VERBS = [...new Set(MEALS_DONE_PHRASES.map(([, verb]) => verb))];
+
+/**
+ * Every vocabulary entry a question's words match. Phrases come first and consume their words; then meals done is
+ * looked for over the words left, apart or not; then each remaining word against the word entries. No REQ-6 rules.
+ */
+export function topicHits(tokens: readonly string[]): TopicHit[] {
+  const hits: TopicHit[] = [];
+  const consumed = new Set<number>();
+  for (const { phrase, from, to } of matchPhrases(tokens, [...PHRASES.keys()])) {
+    hits.push({ topic: PHRASES.get(phrase)!, entry: phrase, at: from });
+    for (let index = from; index < to; index++) consumed.add(index);
+  }
+  // A word that exactly equals an entry of another phrase ("lleva") never reaches "llevo" (matchWord), so "qué lleva la comida" is not meals done.
+  const unconsumed = (entries: string[]) => tokens.flatMap((token, at) => (!consumed.has(at) && matchWord(token, WORD_ENTRIES).some((entry) => entries.includes(entry)) ? [at] : []));
+  const [noun, verb] = [unconsumed(MEALS_DONE_NOUNS)[0], unconsumed(MEALS_DONE_VERBS)[0]];
+  if (noun !== undefined && verb !== undefined) {
+    hits.push({ topic: "mealsDone", entry: MEALS_DONE_PHRASES[0].join(" "), at: Math.min(noun, verb) });
+    consumed.add(noun).add(verb);
+  }
+  tokens.forEach((token, at) => {
+    if (consumed.has(at)) return;
+    for (const entry of matchWord(token, WORD_ENTRIES)) for (const topic of ENTRY_TOPICS.get(entry) ?? []) hits.push({ topic, entry, at });
+  });
+  return hits.sort((a, b) => a.at - b.at);
+}
+
+/** The topics a question matches, in order of first appearance, without the REQ-6 rules (the answer uses `resolve`; this is the vocabulary tests' view). */
+export const matchTopics = (question: string): TopicId[] => [...new Set(topicHits(words(question)).map((hit) => hit.topic))];

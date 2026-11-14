@@ -465,3 +465,57 @@ test.describe("REQ-11: the composer growing", () => {
     await expect(scrollButton(chat)).toBeHidden();
   });
 });
+
+// Moved from the deleted assistant-scope.spec.ts: the search bar's behavior that never depended on a scope.
+test.describe("REQ-13: a search-bar question", () => {
+  const bar = (page: Page) => page.getByRole("search").getByLabel("Preguntar al asistente");
+
+  test("opens the panel, answers and focuses the panel input", async ({ chat }) => {
+    await mockChat(chat, cartAnswer());
+    await chat.goto("/");
+    const ui = assistantUi(chat);
+    await bar(chat).fill("¿Qué tengo en mi carrito?");
+    await bar(chat).press("Enter");
+    await expect(ui.panel).toBeVisible();
+    await expect(ui.input).toBeFocused();
+    await expect(ui.assistantTurns).toHaveCount(1);
+  });
+
+  test("with the panel already open a bar question still moves focus to the panel input", async ({ chat }) => {
+    await mockChat(chat, cartAnswer());
+    await chat.goto("/");
+    const ui = await openAssistant(chat);
+    await bar(chat).fill("¿Qué tengo en mi carrito?");
+    await bar(chat).press("Enter");
+    await expect(ui.assistantTurns).toHaveCount(1);
+    await expect(ui.input).toBeFocused();
+  });
+
+  test("the bar's input is disabled while a question is pending", async ({ chat }) => {
+    const mock = await mockChat(chat, cartAnswer(), { hold: true });
+    await chat.goto("/");
+    await bar(chat).fill("¿Qué tengo en mi carrito?");
+    await bar(chat).press("Enter");
+    await expect(assistantUi(chat).pending).toHaveCount(1);
+    await expect(bar(chat)).toBeDisabled();
+    mock.release();
+    await expect(assistantUi(chat).assistantTurns).toHaveCount(1);
+    await expect(bar(chat)).toBeEnabled();
+  });
+
+  test("a question over 500 characters, trimmed, sends nothing, and 500 plus padding does", async ({ chat }) => {
+    const mock = await mockChat(chat, cartAnswer());
+    await chat.goto("/");
+    await bar(chat).fill("a".repeat(MAX_MESSAGE + 1));
+    await bar(chat).press("Enter");
+    await chat.waitForTimeout(400);
+    expect(mock.requests).toHaveLength(0);
+    await expect(assistantUi(chat).panel).toBeHidden();
+    await expect(bar(chat)).toHaveValue("a".repeat(MAX_MESSAGE + 1));
+
+    await bar(chat).fill(`  ${"a".repeat(MAX_MESSAGE)}  `);
+    await bar(chat).press("Enter");
+    await expect(assistantUi(chat).assistantTurns).toHaveCount(1);
+    expect(mock.requests).toHaveLength(1);
+  });
+});

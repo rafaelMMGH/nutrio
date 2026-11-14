@@ -14,6 +14,7 @@
     "db:import": "tsx --env-file=.env.local scripts/import-db-json.ts",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
+    "test:unit": "tsx --test tests/unit/*.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:report": "playwright show-report"
   },

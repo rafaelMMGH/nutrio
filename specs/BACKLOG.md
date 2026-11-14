@@ -2,15 +2,19 @@
 
 Open work for future sessions. The orchestrator should read this at session start and offer the top open item. Tick items when done; move finished items to "Done" with the date.
 
-_Last updated: 2026-10-28_
+_Last updated: 2026-11-14 (assistant-data-scope T091 closed; merge pending)_
 
 ## In progress
 
-- [ ] **E2E run guard**, branch `fix/e2e-run-guard` (no commits of its own yet; its base, `feature/theme-switcher`, is merged into `main`, so the PR can target `main`). The bug note is `specs/bugs/e2e-run-guard.md`.
+- [ ] **Assistant data scope: spec v1.9 implemented on the branch, merge pending (the user's push/PR).** Branch `feature/assistant-data-scope` (local, never pushed; tip = 6ccfcb4, the T087 LOW-2 comment commit, plus the docs commit after it). **Start here: `specs/assistant-data-scope/HANDOFF.md`**. Gate 2 approved 2026-11-14 (58dce85); Phase 11 T081-T090 done and T091 closed 2026-11-14: 91 of 91 ids (T025 dropped and T071 removed are not ticks; all ticked). Gates: tsc clean, unit 823/823, full e2e 399/399 (12.4 min), 360 px visual check passed (T089), NFR check <= 120 ms per question on a clone of real data (T090). Bug notes: `specs/bugs/assistant-option-announcement.md` (fixed, verified), `assistant-identity-before-dish.md`, `assistant-generic-custom-slot.md`. Also delivers chat-polish REQ-23 (HTTP 500), which keeps `assistant-chat-polish` in `partial` until this merges.
+  - What remains (the user's only): (1) push and PR (the Constitution principle 1 amendment, the cart-snapshot fixture and the spec v1.9.1 Progress refresh are DONE and committed 2026-11-14; full e2e 401/401); (2) push and PR, only with her yes. Status `implemented` only after the merge.
+  - Future (not in this feature): conversation memory so "¿y la cena?" works; the design is stateless so it can be added.
+
+- [ ] **E2E run guard** (no branch now: `fix/e2e-run-guard` had no commits of its own and was DELETED on 2026-11-13 during the branch cleanup; restart from `main`, and the PR targets `main`). The bug note is `specs/bugs/e2e-run-guard.md`. **Still open (2026-11-13):** a second concurrent e2e run can still break the first; assistant-data-scope does not depend on it (it ran e2e one at a time).
   - **⚠️ The code is in `stash@{0}`, not in the working tree.** On 2026-10-24 at 18:27 another Claude session stashed it ("fix/e2e-run-guard WIP: run guard + local server.js/package.json changes") and switched to `fix/shopping-list-quick`.
-  - **The stash also holds the user's own unrelated changes:** the `src/server.js` deletion and `package.json` dropping `legacy:dev`. To resume:
+  - **The stash also holds the user's own unrelated changes:** the `src/server.js` deletion and `package.json` dropping `legacy:dev`. **Never pop or drop `stash@{0}` without the user.** To resume, together with the user:
     1. Wait until no other session is working in this folder.
-    2. `git switch fix/e2e-run-guard`, then `git stash pop`.
+    2. From `main`: `git switch -c fix/e2e-run-guard`, then take the guard code from `stash@{0}` with the user (e.g. check out only the guard files from the stash; do not pop it over her unrelated changes without her).
     3. Keep `src/server.js` and `package.json` out of the guard commit.
   - **Files:** `tests/e2e/run-lock.ts` (new), `tests/e2e/global-setup.ts`, `tests/e2e/global-teardown.ts`, `.gitignore`.
   - **Review round 1: FAIL.** Fix these, then re-review:
@@ -23,10 +27,11 @@ _Last updated: 2026-10-28_
 
 ## Needs the user
 
-- [ ] **Manual phone check** for the assistant (13 items, `specs/assistant-chat-polish/tasks.md` T041): iPhone Safari + VoiceOver, Android Chrome + TalkBack.
-- [ ] **Delete local branch `backup/assistant-9a-before-split`** (safety copy from a commit re-split; identical tree to the branch).
+- [ ] **REMIND THE USER after the assistant-data-scope push/PR (her request, 2026-11-14):** the remaining open items stay in this backlog and she wants to be asked about them again at the very end: (1) restart `fix/e2e-run-guard` from `main` (code in `stash@{0}`, never pop without her); (2) manual phone check of the assistant (T041, 13 items); (3) Escape in app popups closes the assistant panel; (4) the period planner overcounts days (needs her decision, 4+3 or 7 each).
 
-- [ ] **Push `fix/e2e-run-guard` and open its PR** after the commit, with base `main`.
+- [ ] **Manual phone check** for the assistant (13 items, `specs/assistant-chat-polish/tasks.md` T041): iPhone Safari + VoiceOver, Android Chrome + TalkBack.
+
+- [ ] **Push `fix/e2e-run-guard` and open its PR** after the branch is recreated from `main` and the guard is committed (the old branch was deleted 2026-11-13), with base `main`.
 - [ ] **Restart Claude Code** so the new speed rules load. These are scout and size triage before grilling, sub-batches of about 300 lines, running only the affected tests while iterating plus one full run per batch, tests shown failing on purpose, and minor findings folded into the next batch. They live in `.claude/agents/*.md`, which is gitignored and local only, and in `docs/agent-workflow.md`.
 - [ ] **Decide on uncommitted local changes** that have been kept out of every commit so far:
   - the deletion of `src/server.js` and `package.json` dropping the `legacy:dev` script (both currently inside `stash@{0}`, see the run guard above)
@@ -35,7 +40,6 @@ _Last updated: 2026-10-28_
 ## Assistant chat (follow-ups)
 
 - [ ] **Optional spec-change:** combined questions on a recipe page ("¿Qué lleva y cómo se hace?") currently show only Preparación (today's narrowing rule, kept by spec v1.4). Decide whether they should show both sections.
-- [ ] **Stale snapshot:** `a-theme-visual` "signed in, light › cart looks as it did" fails on main because local cart data grew (1882 px vs 900). Refresh it or make the test data-independent.
 - [ ] **Escape in app popups (pre-existing):** `src/components/useDismiss.ts:13` (UserMenu) and `src/components/groceries/ManualAddForm.tsx:65` don't `preventDefault` on Escape, so one Escape also closes the open assistant panel. Small bug fix.
 - [ ] **Safe areas:** the app sets no `viewport-fit=cover`, so `env(safe-area-inset-*)` is 0; the REQ-15 safe-area check is weak.
 
@@ -60,6 +64,10 @@ Findings, with file:line references: `specs/bugs/shopping-list-findings.md`.
 - [ ] Optional: in `src/lib/client/theme.ts`, after a real reveal-update failure, call `applyTheme(next)` as a fallback so the stored choice and the page agree.
 
 ## Done
+
+- 2026-11-14: **Constitution principle 1 amended** (unit tests are the fail-first proof, a Playwright e2e test at the end; the user's decision). **Spec v1.9.1** Progress refresh (91 of 91). **Cart snapshot made deterministic** (`specs/bugs/cart-snapshot-fixture.md`: seeded fixed cart, masked date and nav counts; baselines regenerated locally; full e2e 401/401).
+
+- 2026-11-13: **Delete local branch `backup/assistant-9a-before-split`**: closed, nothing to delete (the branch no longer existed when checked).
 
 - 2026-10-28: **Assistant chat polish**, `feature/assistant-chat-polish`, spec v1.8 implemented (22 REQs, US1–US5). Merged as PR #6 on 2026-10-28.
 

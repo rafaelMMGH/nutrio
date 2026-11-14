@@ -86,7 +86,6 @@ export const mealTypePatchSchema = z.object({
 
 export const chatSchema = z.object({
   // Trimmed first, so the limit counts the trimmed text's UTF-16 length like the composer does (REQ-10).
-  message: z.string().trim().min(1).max(MAX_MESSAGE),
-  scope: z.string().default("auto"),
-  recipe_id: z.string().optional()
+  message: z.string().trim().min(1).max(MAX_MESSAGE)
+  // zod strips the `scope` and `recipe_id` that old clients still send (REQ-4).
 });

@@ -16,7 +16,6 @@ import { AssistantChat, SHEET_QUERY } from "@/components/shared/AssistantChat";
 import { ThemeToggle } from "@/components/app/ThemeToggle";
 import "./shell.css";
 import { api, getErrorMessage } from "@/lib/client/api";
-import type { ScopeKey } from "@/lib/assistant";
 import { useMediaQuery } from "@/lib/client/useMediaQuery";
 
 export type ShellUser = { name: string; email: string };
@@ -27,7 +26,7 @@ type Shell = {
   openDrawer: () => void;
   openUpload: () => void;
   assistantBusy: boolean;
-  askAssistant: (message: string, scope: ScopeKey) => Promise<void>;
+  askAssistant: (message: string) => Promise<void>;
 };
 
 const ShellContext = createContext<Shell | null>(null);
@@ -45,7 +44,7 @@ export function AppShell({ user, children }: Props) {
   const router = useRouter();
   const [wizard, setWizard] = useState<{ step: number; data: any } | null>(null);
   const assistant = useAssistantState();
-  const { setOpen: setAssistantOpen, askInScope, busy: assistantBusy } = assistant;
+  const { setOpen: setAssistantOpen, ask, busy: assistantBusy } = assistant;
 
   // At ≤640 px the open panel is a modal sheet (REQ-22): the page behind is inert and cannot scroll. Tab wrapping and
   // focus live in AssistantChat; inert alone would let Tab escape to the browser.
@@ -66,7 +65,7 @@ export function AppShell({ user, children }: Props) {
 
   const openDrawer = useCallback(() => setAssistantOpen(true), [setAssistantOpen]);
 
-  const askAssistant = useCallback((message: string, scope: ScopeKey) => askInScope(message, scope), [askInScope]);
+  const askAssistant = useCallback((message: string) => ask(message), [ask]);
 
   const shell = useMemo<Shell>(() => ({ refresh, openDrawer, assistantBusy, askAssistant, openUpload: () => setWizard({ step: 0, data: null }) }), [refresh, openDrawer, assistantBusy, askAssistant]);
 
@@ -98,17 +97,13 @@ export function AppShell({ user, children }: Props) {
         </AssistantPageProvider>
         <AssistantChat
           subtitle={assistant.context.subtitle}
-          suggestions={assistant.suggestions}
           turns={assistant.turns}
           busy={assistant.busy}
           open={assistant.open}
           onOpenChange={assistant.setOpen}
-          scope={assistant.scope}
-          recipe={Boolean(assistant.context.recipeId)}
-          onScopeChange={assistant.setScope}
           focusRequest={assistant.focusRequest}
           onSend={assistant.send}
-          onSuggest={assistant.sendRequest}
+          onSuggest={assistant.send}
           onRetry={assistant.retry}
           onClear={assistant.clear}
         />

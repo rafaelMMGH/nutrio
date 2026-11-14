@@ -1,0 +1,580 @@
+import assert from "node:assert/strict";
+import { test } from "node:test";
+import { STARTERS, type Button, type ChatAnswer } from "@/lib/assistant";
+import { ragAnswer } from "@/lib/domain/chat";
+import { recipeSteps } from "@/lib/recipe-steps";
+import { type Built, chooseSlot, planSlots, slotOptions, type SlotOptionsView } from "@/lib/domain/chat-meals";
+import type { AppDb } from "@/lib/types";
+import { slotTime } from "../shared/assistant-copy";
+import { PLAN_NAME } from "../shared/assistant-fixture";
+import { memDb, sweep, type MemDbOptions } from "./memdb";
+
+// Spec assistant-data-scope REQ-7 (slot words), REQ-8 (slot times) and the REQ-11 labels, over the in-memory plan.
+// The resolver picks the slot a typed ordinal or "<slot> <n>" names (T030); the options builder is T032.
+
+const TODAY = "2026-10-28";
+const DUPLICATED = ["Desayuno", "Colación", "Comida", "Colación", "Cena"];
+const ask = (message: string, options?: MemDbOptions) => {
+  const { db, user } = memDb(options);
+  return ragAnswer(db, user, message, TODAY, { trace: true });
+};
+const questions = (reply: ChatAnswer) => reply.buttons.flatMap((button) => (button.type === "question" ? [button] : []));
+const highlighted = (reply: ChatAnswer) => reply.blocks[0].lead.filter((span) => span.highlight).map((span) => span.text);
+const refsOf = (meals: string[]) => {
+  const { db, user } = memDb({ meals });
+  return planSlots(db, user.id)!.slots.map((slot) => slot.ref);
+};
+
+test("REQ-8 a slot's time answers only that slot, the time highlighted", () => {
+  const reply = ask("¿A qué hora es la cena?");
+  assert.equal(reply.kind, "answer");
+  assert.match(reply.answer, slotTime("cena", "Entre 8 a 9 pm"));
+  assert.deepEqual(highlighted(reply), ["Entre 8 a 9 pm"]);
+  assert.deepEqual(reply.blocks[0].sections, []);
+  assert.deepEqual(reply.sources, [`Plan activo: ${PLAN_NAME}`]);
+  assert.deepEqual(reply.resolved, [{ topic: "mealTimes", slot: "cena" }]);
+});
+
+test("REQ-8 a slot without a time says so, with nothing highlighted", () => {
+  const reply = ask("¿Cuándo desayuno?", { times: "none" });
+  assert.equal(reply.answer, "Tu plan no tiene horario para tu desayuno.");
+  assert.deepEqual(highlighted(reply), []);
+});
+
+test("REQ-8 with no slot named every slot is listed with its time highlighted", () => {
+  const reply = ask("¿Cuál es mi horario?", { times: "some" });
+  assert.deepEqual(
+    reply.blocks[0].sections[0].items.map((item) => item.map((span) => span.text).join("")),
+    ["Desayuno · Entre 7 a 8 am", "Colación", "Comida · Entre 2 a 3 pm", "Cena"]
+  );
+});
+
+test("REQ-8 REQ-27 without an active plan the reply is the spec's, with no sources", () => {
+  const { db, user } = memDb();
+  db.plans = [];
+  const reply = ragAnswer(db, user, "¿A qué hora es la cena?", TODAY);
+  assert.equal(reply.answer, "Aún no tienes un plan activo.");
+  assert.deepEqual(reply.sources, []);
+});
+
+test("REQ-7 merienda and snack map to colación when the plan has no slot with that name", () => {
+  for (const word of ["merienda", "snack"]) assert.match(ask(`¿A qué hora es mi ${word}?`).answer, slotTime("colación", "Entre 10 a 11 am"), word);
+});
+
+test("REQ-7 a slot with the asked name wins", () => {
+  assert.match(ask("¿A qué hora es mi merienda?", { meals: ["Desayuno", "Merienda", "Cena"] }).answer, slotTime("merienda", "Entre 10 a 11 am"));
+  assert.match(ask("¿A qué hora es mi almuerzo?", { meals: ["Desayuno", "Almuerzo", "Cena"] }).answer, slotTime("almuerzo", "Entre 10 a 11 am"));
+});
+
+test("REQ-7 almuerzo without such a slot asks desayuno or comida, one button per slot that exists", () => {
+  const both = ask("¿A qué hora es mi almuerzo?");
+  assert.equal(both.kind, "clarify");
+  assert.equal(both.answer, "¿Te refieres al desayuno o a la comida?");
+  assert.deepEqual(questions(both).map((button) => [button.label, button.message]), [
+    ["Desayuno", "¿A qué hora es mi desayuno?"],
+    ["Comida", "¿A qué hora es mi comida?"]
+  ]);
+  assert.deepEqual(questions(ask("¿A qué hora es mi almuerzo?", { meals: ["Comida", "Cena"] })).map((button) => button.label), ["Comida"]);
+});
+
+test("REQ-7 an options question about almuerzo offers the slots' options (Given: Comida sends '¿Cuál es mi comida?')", () => {
+  const { db, user } = memDb();
+  const chosen = chooseSlot(planSlots(db, user.id)!, "almuerzo", "options");
+  assert.ok("built" in chosen);
+  assert.deepEqual(chosen.built.buttons?.map((button) => button.type === "question" && button.message), ["¿Cuál es mi desayuno?", "¿Cuál es mi comida?"]);
+});
+
+test("REQ-7 a slot word the plan lacks gets the not-in-plan reply with one button per plan slot", () => {
+  const reply = ask("¿A qué hora es mi almuerzo?", { meals: ["Colación", "Cena"] });
+  assert.equal(reply.kind, "answer");
+  assert.equal(reply.answer, "Tu plan no tiene almuerzo.");
+  assert.deepEqual(questions(reply).map((button) => button.label), ["Colación", "Cena"]);
+  assert.equal(ask("¿A qué hora es mi colación?", { meals: ["Cena"] }).answer, "Tu plan no tiene colación.");
+});
+
+test("REQ-11 duplicate slot names ask which one, with the time in each label when there is one", () => {
+  const reply = ask("¿A qué hora es mi colación?", { meals: DUPLICATED });
+  assert.equal(reply.kind, "clarify");
+  assert.equal(reply.answer, "Tienes 2 colaciones. ¿Cuál?");
+  assert.deepEqual(questions(reply).map((button) => [button.label, button.message]), [
+    ["Primera colación (Entre 10 a 11 am)", "¿A qué hora es mi primera colación?"],
+    ["Segunda colación (Entre 8 a 9 pm)", "¿A qué hora es mi segunda colación?"]
+  ]);
+  assert.deepEqual(questions(ask("¿A qué hora es mi colación?", { meals: DUPLICATED, times: "none" })).map((button) => button.label), ["Primera colación", "Segunda colación"]);
+});
+
+test("REQ-11 the options version of the duplicate choice sends '¿Cuál es mi <ref>?'", () => {
+  const { db, user } = memDb({ meals: DUPLICATED });
+  const chosen = chooseSlot(planSlots(db, user.id)!, "colacion", "options");
+  assert.ok("built" in chosen);
+  assert.deepEqual(chosen.built.buttons?.map((button) => button.type === "question" && button.message), ["¿Cuál es mi primera colación?", "¿Cuál es mi segunda colación?"]);
+});
+
+test("REQ-11 refs: feminine and masculine ordinals up to 10, then '<Slot> <n>'", () => {
+  const FEMININE = ["Primera", "Segunda", "Tercera", "Cuarta", "Quinta", "Sexta", "Séptima", "Octava", "Novena", "Décima"];
+  const MASCULINE = ["Primer", "Segundo", "Tercer", "Cuarto", "Quinto", "Sexto", "Séptimo", "Octavo", "Noveno", "Décimo"];
+  assert.deepEqual(refsOf(Array(11).fill("Colación")), [...FEMININE.map((ordinal) => `${ordinal} colación`), "Colación 11"]);
+  for (const slot of ["Desayuno", "Almuerzo", "Snack"]) {
+    assert.deepEqual(refsOf(Array(10).fill(slot)), MASCULINE.map((ordinal) => `${ordinal} ${slot.toLowerCase()}`), slot);
+  }
+  assert.deepEqual(refsOf(DUPLICATED), ["Desayuno", "Primera colación", "Comida", "Segunda colación", "Cena"]);
+});
+
+test("REQ-11 eleven colaciones: the tenth and eleventh buttons read 'Décima colación' and 'Colación 11'", () => {
+  const reply = ask("¿A qué hora es mi colación?", { meals: Array(11).fill("Colación") });
+  assert.equal(reply.answer, "Tienes 11 colaciones. ¿Cuál?");
+  const labels = questions(reply).map((button) => button.label);
+  assert.equal(labels.length, 11);
+  assert.deepEqual(labels.slice(9), ["Décima colación (Entre 10 a 11 am)", "Colación 11 (Entre 2 a 3 pm)"]);
+});
+
+test("REQ-11 two snacks read '2 snacks' (the loanword takes only an s)", () => {
+  assert.equal(ask("¿A qué hora es mi snack?", { meals: ["Desayuno", "Snack", "Snack"] }).answer, "Tienes 2 snacks. ¿Cuál?");
+});
+
+// T028 part 2: typed ordinals and "<slot> <n>" (REQ-11), the duplicate buttons no longer loop, the sweep.
+const SECOND_COLACION = slotTime("segunda colación", "Entre 8 a 9 pm");
+const trace = (message: string, options?: MemDbOptions) => ask(message, options).resolved;
+
+test("REQ-11 the duplicate-colación buttons answer their slot's time instead of asking again", () => {
+  const first = ask("¿A qué hora es mi primera colación?", { meals: DUPLICATED });
+  assert.equal(first.kind, "answer");
+  assert.match(first.answer, slotTime("primera colación", "Entre 10 a 11 am"));
+  assert.match(ask("¿A qué hora es mi segunda colación?", { meals: DUPLICATED }).answer, SECOND_COLACION);
+});
+
+test("REQ-11 typed ordinals pick the slot, with or without accents and in either gender", () => {
+  for (const typed of ["segunda colación", "segunda colacion", "SEGUNDA COLACIÓN", "colación 2", "colacion 2"]) {
+    assert.match(ask(`¿A qué hora es mi ${typed}?`, { meals: DUPLICATED }).answer, SECOND_COLACION, typed);
+  }
+  const meals = ["Desayuno", "Desayuno", "Cena"];
+  assert.match(ask("¿A qué hora es mi segundo desayuno?", { meals }).answer, slotTime("segundo desayuno", "Entre 10 a 11 am"));
+  assert.match(ask("¿A qué hora es mi colación 11?", { meals: Array(11).fill("Colación") }).answer, /^(Tu horario de colación 11: |Tu colación 11 es: )/);
+});
+
+test("REQ-11 an ordinal the plan lacks asks which one; on a single slot it is that slot", () => {
+  assert.equal(ask("¿A qué hora es mi tercera colación?", { meals: DUPLICATED }).answer, "Tienes 2 colaciones. ¿Cuál?");
+  assert.match(ask("¿A qué hora es mi primera cena?").answer, slotTime("cena", "Entre 8 a 9 pm"));
+});
+
+test("REQ-11 a typed ordinal reaches the options reading with the slot's position", () => {
+  assert.deepEqual(trace("segunda colacion", { meals: DUPLICATED }), [{ topic: "slotOptions", slot: "colacion", ordinal: 2 }]);
+});
+
+test("REQ-11 with REQ-6 step 4: '¿Qué lleva la segunda colación?' is the second colación's options, not a not-found reply", () => {
+  const reply = ask("¿Qué lleva la segunda colación?", { meals: DUPLICATED });
+  assert.deepEqual(reply.resolved, [{ topic: "slotOptions", slot: "colacion", ordinal: 2 }]);
+  assert.ok(!["did_you_mean", "no_match"].includes(reply.kind), reply.kind);
+  // T031 part 2: the slot's lead and its own options, in plan order.
+  assert.match(reply.answer, /segunda colación/);
+  assert.deepEqual(questions(reply).map((button) => button.label), ["Opción 1: Huevo, Aguacate", "Opción 2: Frijoles, Sal", "Opción 3: Avena, Canela", "Ver más opciones"]);
+  assert.deepEqual(questions(reply).slice(0, 3).map((button) => button.message), [1, 2, 3].map((n) => `Segunda colación, opción ${n}`));
+});
+
+test("REQ-5 every slot button of the duplicate, almuerzo and not-in-plan replies resolves to its slot's time", () => {
+  const swept = (message: string, options: MemDbOptions) => {
+    const { db, user } = memDb(options);
+    return sweep(db, user, [ragAnswer(db, user, message, TODAY)], TODAY);
+  };
+  assert.deepEqual(swept("¿A qué hora es mi colación?", { meals: DUPLICATED }), ["¿A qué hora es mi primera colación?", "¿A qué hora es mi segunda colación?"]);
+  assert.deepEqual(swept("¿A qué hora es mi almuerzo?", {}), ["¿A qué hora es mi desayuno?", "¿A qué hora es mi comida?"]);
+  assert.deepEqual(swept("¿A qué hora es mi almuerzo?", { meals: ["Colación", "Cena"] }), ["¿A qué hora es mi colación?", "¿A qué hora es mi cena?"]);
+});
+
+test("REQ-7 merienda with neither a merienda nor a colación slot gets the not-in-plan reply", () => {
+  assert.equal(ask("¿A qué hora es mi merienda?", { meals: ["Desayuno", "Cena"] }).answer, "Tu plan no tiene merienda.");
+});
+
+test("REQ-11 the masculine ordinals also end at ten: the eleventh desayuno is 'Desayuno 11'", () => {
+  assert.equal(refsOf(Array(11).fill("Desayuno"))[10], "Desayuno 11");
+});
+
+test("REQ-27 an active plan with no slots is treated as no plan (user ruling 2026-11-13)", () => {
+  const reply = ask("¿A qué hora es mi cena?", { meals: [] });
+  assert.equal(reply.answer, "Aún no tienes un plan activo.");
+  const { db, user } = memDb({ meals: [] });
+  assert.equal(planSlots(db, user.id), null);
+});
+
+// Through ragAnswer this state is unreachable since a plan without slots is no plan (planSlots returns null); the starters
+// fallback survives through `slotChoices` in the dish clarify, which this calls directly.
+test("REQ-27 the choice of a slot in a slot list that is empty offers the starters", () => {
+  const chosen = chooseSlot({ planName: PLAN_NAME, slots: [] }, "cena", "options");
+  assert.ok("built" in chosen);
+  assert.deepEqual(chosen.built.buttons?.map((button) => button.type === "question" && button.message), STARTERS);
+});
+
+// REQ-9, REQ-10, REQ-11 (T031 part 1): the options builder. With the default plan Cena has 5 options (4 generic and
+// "Sándwich de atún"), Comida 7 (5 generic, "Pollo asado", "Ensalada de pollo") and Colación 5 (generic).
+const options = (slot: string, { ordinal, ...view }: SlotOptionsView & { ordinal?: number } = {}, config?: MemDbOptions, tweak?: (db: AppDb) => void) => {
+  const { db, user } = memDb(config);
+  tweak?.(db);
+  return slotOptions(db, user.id, { topic: "slotOptions", slot, ordinal }, `¿Qué lleva la ${slot}?`, view);
+};
+const labels = (built: Built) => builtQuestions(built).map((button) => button.label);
+const builtQuestions = (built: { buttons?: Button[] }) => (built.buttons ?? []).flatMap((button) => (button.type === "question" ? [button] : []));
+const optionButtons = (built: Built) => builtQuestions(built).filter((button) => button.layout === "option");
+const leadText = (built: Built) => built.lead.map((span) => span.text).join("");
+/** Gives a recipe exactly `count` of the plan's ingredients, taking them from the first three the fixture seeds. */
+const withIngredientCount = (recipeName: string, count: number) => (db: AppDb) => {
+  const recipe = db.recipes.find((item) => item.name === recipeName)!;
+  const own = db.ingredientUsages.filter((usage) => usage.source_id === recipe.id);
+  db.ingredientUsages = db.ingredientUsages.filter((usage) => !own.includes(usage));
+  const names = ["Pollo", "Arroz", "Brócoli", "Calabaza"];
+  names.slice(0, count).forEach((name, index) => {
+    const id = `ing-${name}`;
+    if (!db.ingredients.some((item) => item.id === id)) db.ingredients.push({ ...db.ingredients[0], id, canonical_name: name });
+    db.ingredientUsages.push({ ...own[0], id: `${recipe.id}-x${index}`, ingredient_id: id });
+  });
+};
+
+test("REQ-9 5 options: page 1 is 3 option buttons and 'Ver más opciones', in plan order", () => {
+  const built = options("cena");
+  assert.deepEqual(labels(built), ["Opción 1: Huevo, Aguacate", "Opción 2: Avena, Canela", "Opción 3: Frijoles, Sal", "Ver más opciones"]);
+  assert.deepEqual(optionButtons(built).map((button) => button.message), ["Cena, opción 1", "Cena, opción 2", "Cena, opción 3"]);
+  assert.equal(builtQuestions(built)[3].message, "Cena, más opciones (página 2)");
+  assert.equal(builtQuestions(built)[3].layout, undefined);
+  assert.deepEqual(built.sources, [`Plan activo: ${PLAN_NAME}`]);
+});
+
+test("REQ-9 page 2 of 5 shows options 4 and 5 with 'Opciones anteriores' only", () => {
+  const built = options("cena", { page: 2 });
+  assert.deepEqual(labels(built), ["Opción 4: Huevo, Aguacate", "Sándwich de atún", "Opciones anteriores"]);
+  assert.deepEqual(optionButtons(built).map((button) => button.message), ["Cena, opción 4", "Cena, opción 5"]);
+  assert.equal(builtQuestions(built)[2].message, "Cena, más opciones (página 1)");
+});
+
+test("REQ-9 a middle page has both paging buttons; 7 options: page 3 is option 7 with 'Opciones anteriores' only", () => {
+  assert.deepEqual(labels(options("comida", { page: 2 })).slice(3), ["Ver más opciones", "Opciones anteriores"]);
+  const last = options("comida", { page: 3 });
+  assert.deepEqual(labels(last), ["Ensalada de pollo", "Opciones anteriores"]);
+  assert.equal(optionButtons(last)[0].message, "Comida, opción 7");
+  assert.equal(builtQuestions(last)[1].message, "Comida, más opciones (página 2)");
+});
+
+test("REQ-9 a page past the last shows the last page; page 1 equals the plain answer", () => {
+  assert.deepEqual(labels(options("cena", { page: 9 })), labels(options("cena", { page: 2 })));
+  assert.deepEqual(options("cena", { page: 1 }), options("cena"));
+});
+
+test("REQ-9 labels: the recipe name, or 'Opción <n>: <first 3 ingredients>' with '…' only above 3, or 'Opción <n>'", () => {
+  const label = (count: number) => labels(options("cena", {}, undefined, withIngredientCount("Cena opcion 2", count)))[1];
+  assert.equal(label(4), "Opción 2: Pollo, Arroz, Brócoli…");
+  assert.equal(label(3), "Opción 2: Pollo, Arroz, Brócoli");
+  assert.equal(label(0), "Opción 2");
+  assert.equal(labels(options("cena", { page: 2 }))[1], "Sándwich de atún");
+});
+
+test("REQ-9 the lead is one of the three variants, the same for the same question", () => {
+  const lead = leadText(options("cena"));
+  assert.ok(["Estas son tus opciones de cena:", "Para tu cena puedes elegir:", "Tus opciones de cena son:"].includes(lead), lead);
+  assert.equal(leadText(options("cena")), lead);
+});
+
+/** The cena slot's options, in the fixture's insertion order. */
+const cenaOptions = (db: AppDb) => {
+  const cena = db.mealTypes.find((meal) => meal.name === "Cena")!;
+  return db.mealOptions.filter((option) => option.meal_type_id === cena.id);
+};
+
+test("REQ-9 plan order comes from option_number, not from the order the rows are stored in", () => {
+  const plain = labels(options("cena"));
+  assert.deepEqual(labels(options("cena", {}, undefined, (db) => db.mealOptions.reverse())), plain);
+});
+
+test("REQ-9 a soft-deleted option or recipe is skipped, and the labels count the options that are listed", () => {
+  const second = cenaOptions(memDb().db)[1];
+  const skipped = (tweak: (db: AppDb) => void) => labels(options("cena", {}, undefined, tweak));
+  const withoutSecond = ["Opción 1: Huevo, Aguacate", "Opción 2: Frijoles, Sal", "Opción 3: Huevo, Aguacate", "Ver más opciones"];
+  assert.deepEqual(skipped((db) => { cenaOptions(db)[1].deleted_at = "2026-02-01T00:00:00.000Z"; }), withoutSecond);
+  assert.deepEqual(skipped((db) => { db.recipes.find((recipe) => recipe.id === second.recipe_id)!.deleted_at = "2026-02-01T00:00:00.000Z"; }), withoutSecond);
+});
+
+test("REQ-9 exactly one page: 3 options have no paging buttons", () => {
+  const keep = (count: number) => (db: AppDb) => { const own = cenaOptions(db); db.mealOptions = db.mealOptions.filter((option) => !own.includes(option) || own.indexOf(option) < count); };
+  assert.deepEqual(labels(options("cena", {}, undefined, keep(3))), ["Opción 1: Huevo, Aguacate", "Opción 2: Avena, Canela", "Opción 3: Frijoles, Sal"]);
+});
+
+test("REQ-28 the lead variants are all in use: different questions reach each of the three", () => {
+  const seen = new Set(["¿Cuál es mi cena?", "¿Qué hay de cena?", "¿Qué puedo cenar?", "cena", "¿Qué lleva la cena?", "mi cena", "ingredientes de la cena", "¿Qué cenaré hoy?"].map((question) => {
+    const { db, user } = memDb();
+    return leadText(slotOptions(db, user.id, { topic: "slotOptions", slot: "cena" }, question));
+  }));
+  assert.equal(seen.size, 3, [...seen].join(" | "));
+});
+
+test("REQ-10 a number beyond the slot's options says how many it has, then the first page", () => {
+  const built = options("cena", { asked: 7 });
+  assert.equal(leadText(built), "Tu cena tiene 5 opciones.");
+  assert.deepEqual(labels(built), labels(options("cena")));
+  assert.equal(leadText(options("cena", { asked: 7 }, { meals: ["Cena"] }, (db) => { db.mealOptions = db.mealOptions.slice(0, 1); })), "Tu cena tiene 1 opción.");
+});
+
+test("REQ-11 'Segunda colación' lists the second slot's options, buttons sending its ref", () => {
+  const built = options("colacion", { ordinal: 2 }, { meals: DUPLICATED });
+  assert.match(leadText(built), /segunda colación/);
+  assert.ok(optionButtons(built).length > 0);
+  assert.deepEqual(optionButtons(built).map((button) => button.message), optionButtons(built).map((_, index) => `Segunda colación, opción ${index + 1}`));
+  const second = options("colacion", { ordinal: 2, page: 2 }, { meals: DUPLICATED });
+  assert.equal(builtQuestions(second).at(-1)?.message, "Segunda colación, más opciones (página 1)");
+});
+
+test("REQ-11 duplicated slots without an ordinal still ask which one, with the options question on each button", () => {
+  const built = options("colacion", {}, { meals: DUPLICATED });
+  assert.equal(built.kind, "clarify");
+  assert.deepEqual(builtQuestions(built).map((button) => button.message), ["¿Cuál es mi primera colación?", "¿Cuál es mi segunda colación?"]);
+});
+
+test("REQ-27 a slot without options says so; without a plan or slot the other replies hold", () => {
+  assert.equal(leadText(options("cena", {}, { fixture: false })), "Tu plan no tiene opciones para tu cena.");
+  assert.equal(leadText(options("almuerzo", {}, { meals: ["Cena"] })), "Tu plan no tiene almuerzo.");
+});
+
+test("REQ-9 through ragAnswer: '¿Qué puedo cenar?' answers with the first page of cena options", () => {
+  const reply = ask("¿Qué puedo cenar?");
+  assert.equal(reply.kind, "answer");
+  assert.deepEqual(builtQuestions(reply).map((button) => button.label), ["Opción 1: Huevo, Aguacate", "Opción 2: Avena, Canela", "Opción 3: Frijoles, Sal", "Ver más opciones"]);
+});
+
+test("REQ-5 every options, option and paging button resolves to slotOptions and answers (T031 part 2)", () => {
+  const swept = (message: string, options: MemDbOptions, more: string[] = []) => {
+    const { db, user } = memDb(options);
+    return sweep(db, user, [message, ...more].map((text) => ragAnswer(db, user, text, TODAY)), TODAY);
+  };
+  assert.equal(swept("¿Cuál es mi cena?", {}, ["Cena, más opciones (página 2)"]).length, 7);
+  assert.equal(swept("¿Cuál es mi comida?", {}, ["Comida, más opciones (página 2)", "Comida, más opciones (página 3)"]).length, 10);
+  assert.equal(swept("¿Cuál es mi colación?", { meals: DUPLICATED }).length, 2);
+  assert.equal(swept("¿Cuál es mi colación?", { meals: Array(11).fill("Colación") }).length, 11);
+  assert.equal(swept("¿Cuál es mi desayuno?", { meals: ["Desayuno", "Desayuno"] }).length, 2);
+});
+
+// REQ-9, REQ-10, REQ-11 (T033 / T031 part 2): typed selection and paging through ragAnswer.
+const buttonLabels = (reply: ChatAnswer) => questions(reply).map((button) => button.label);
+
+test("REQ-10 'cena opción 2', 'cena opcion 2', 'la 2 de la cena' and the option button give the same answer", () => {
+  const button = ask("Cena, opción 2");
+  assert.deepEqual(button.resolved, [{ topic: "slotOptions", slot: "cena", option: 2 }]);
+  // The detail lead is picked from the dish, not from the typed text, so the whole answer is the same.
+  for (const typed of ["cena opción 2", "cena opcion 2", "la 2 de la cena"]) assert.deepEqual(ask(typed), button, typed);
+});
+
+test("REQ-10 an option number beyond the slot's options says how many there are, then the first page", () => {
+  for (const typed of ["cena opción 7", "Cena, opción 7", "cena 7"]) {
+    const reply = ask(typed);
+    assert.equal(reply.blocks[0].lead[0].text, "Tu cena tiene 5 opciones.", typed);
+    assert.deepEqual(buttonLabels(reply), buttonLabels(ask("¿Cuál es mi cena?")), typed);
+  }
+});
+
+test("REQ-11 '<slot> <n>': option n on a single slot, the slot's ordinal when it is duplicated", () => {
+  assert.equal(ask("cena 9").blocks[0].lead[0].text, "Tu cena tiene 5 opciones.");
+  const second = ask("colación 2", { meals: DUPLICATED });
+  assert.match(second.answer, /segunda colación/);
+  assert.notEqual(second.kind, "clarify");
+  assert.doesNotMatch(second.answer, /tiene \d+ opciones/);
+  // The number picked the slot: a second colación with a single option does not answer "tiene 1 opción".
+  const { db, user } = memDb({ meals: DUPLICATED });
+  const [, secondId] = db.mealTypes.filter((meal) => meal.name === "Colación").map((meal) => meal.id);
+  db.mealOptions = db.mealOptions.filter((option) => option.meal_type_id !== secondId || option.option_number === 1);
+  assert.doesNotMatch(ragAnswer(db, user, "colación 2", TODAY).answer, /tiene \d+ opci/);
+});
+
+test("REQ-9 typed paging: a page, no number = page 2, page 1 = the plain answer, a page past the last = the last", () => {
+  const plain = ask("¿Cuál es mi cena?");
+  assert.deepEqual(buttonLabels(ask("Cena, más opciones (página 2)")), ["Opción 4: Huevo, Aguacate", "Sándwich de atún", "Opciones anteriores"]);
+  assert.deepEqual(buttonLabels(ask("cena más opciones")), buttonLabels(ask("Cena, más opciones (página 2)")));
+  assert.deepEqual(buttonLabels(ask("Cena, más opciones (página 1)")), buttonLabels(plain));
+  assert.deepEqual(buttonLabels(ask("Cena, más opciones (página 9)")), buttonLabels(ask("Cena, más opciones (página 2)")));
+  assert.deepEqual(buttonLabels(ask("Cena, más opciones (página 3.5)")), buttonLabels(ask("Cena, más opciones (página 2)")));
+  assert.deepEqual(buttonLabels(ask("Segunda colación, más opciones (página 2)", { meals: DUPLICATED })).slice(-1), ["Opciones anteriores"]);
+});
+
+test("REQ-3 'la comida opcion 1' is option selection on comida, not a dish and not a not-found reply", () => {
+  const reply = ask("la comida opcion 1");
+  assert.deepEqual(reply.resolved, [{ topic: "slotOptions", slot: "comida", option: 1 }]);
+  assert.ok(!["did_you_mean", "no_match"].includes(reply.kind), reply.kind);
+});
+
+// REQ-12 (T034 part 2, T036): the detail of an option or a dish, through ragAnswer.
+const DETAIL_LEAD = (name: string) => new RegExp(`^(${name} lleva:|Esto lleva ${name}:)$`);
+const itemsOf = (reply: ChatAnswer, title: string) => reply.blocks[0].sections.find((section) => section.title === title)?.items.map((item) => item.map((span) => span.text).join(""));
+const links = (reply: ChatAnswer) => reply.blocks[0].buttons.filter((button) => button.type === "link");
+
+/** An answer over a db the test adjusts first. */
+function askWith(message: string, tweak: (db: AppDb) => void, options?: MemDbOptions) {
+  const { db, user } = memDb(options);
+  tweak(db);
+  return ragAnswer(db, user, message, TODAY, { trace: true });
+}
+
+/** Replaces a recipe's ingredients: `[name, quantity, unit]` rows. */
+function setIngredients(db: AppDb, recipeName: string, rows: [string, number, string][]) {
+  const recipe = db.recipes.find((item) => item.name === recipeName)!;
+  db.ingredientUsages = db.ingredientUsages.filter((usage) => usage.source_id !== recipe.id);
+  rows.forEach(([name, quantity, unit], index) => {
+    const ingredient = { ...db.ingredients[0], id: `x-ing-${index}`, canonical_name: name };
+    db.ingredients.push(ingredient);
+    db.ingredientUsages.push({ ...db.ingredientUsages[0], id: `x-use-${index}`, ingredient_id: ingredient.id, source_id: recipe.id, quantity, unit });
+  });
+}
+
+test("REQ-12 twelve ingredients all show; steps 1-2 are the recipe page's and 'Ver receta completa' links to the recipe", () => {
+  const description = "Uno. Dos. Tres. Cuatro.";
+  const rows = Array.from({ length: 12 }, (_, index): [string, number, string] => [`Ingrediente ${index + 1}`, index + 1, "g"]);
+  const reply = askWith("¿Qué lleva el pollo asado?", (db) => {
+    db.recipes.find((recipe) => recipe.name === "Pollo asado")!.description = description;
+    setIngredients(db, "Pollo asado", rows);
+  });
+  assert.equal(reply.kind, "detail");
+  assert.equal(itemsOf(reply, "Ingredientes")?.length, 12);
+  assert.deepEqual(itemsOf(reply, "Preparación"), recipeSteps(description).slice(0, 2));
+  const { db } = memDb();
+  assert.deepEqual(links(reply), [{ type: "link", label: "Ver receta completa", href: `/recipes/${db.recipes.find((recipe) => recipe.name === "Pollo asado")!.id}` }]);
+  assert.deepEqual(reply.sources, ["Receta: Pollo asado"]);
+  assert.equal(reply.answer.split("\n").length, 1 + 1 + 12 + 1 + 2);
+});
+
+test("REQ-12 two steps or fewer have no link, and an import note or nothing shows the no-preparation item", () => {
+  const withNote = (description: string) => askWith("¿Qué lleva el pollo asado?", (db) => { db.recipes.find((recipe) => recipe.name === "Pollo asado")!.description = description; });
+  assert.deepEqual(links(withNote("Uno. Dos.")), []);
+  for (const description of ["Extraído de plan.pdf", "EXTRAÍDO DE plan.pdf", ""]) {
+    const reply = withNote(description);
+    assert.deepEqual(itemsOf(reply, "Preparación"), ["Esta receta no tiene preparación registrada."], description);
+    assert.deepEqual(links(reply), [], description);
+  }
+});
+
+test("REQ-12 the detail lead has both variants across dishes, and three steps show the link", () => {
+  assert.equal(ask("¿Qué lleva Pollo asado?").answer.split("\n")[0], "Esto lleva Pollo asado:");
+  assert.equal(ask("¿Qué lleva Ensalada de pollo?").answer.split("\n")[0], "Ensalada de pollo lleva:");
+  const reply = askWith("¿Qué lleva el pollo asado?", (db) => { db.recipes.find((recipe) => recipe.name === "Pollo asado")!.description = "Uno. Dos. Tres."; });
+  assert.deepEqual(links(reply).map((button) => button.label), ["Ver receta completa"]);
+});
+
+test("REQ-12 ingredient formats: quantity and unit, quantity only, neither, and stored text such as 'al gusto'", () => {
+  const reply = askWith("¿Qué lleva el pollo asado?", (db) => setIngredients(db, "Pollo asado", [["Huevo", 2, "pieza"], ["Aguacate", 1, ""], ["Sal", 0, ""], ["Limón", 0, "al gusto"]]));
+  assert.deepEqual(itemsOf(reply, "Ingredientes"), ["Huevo · 2 pieza", "Aguacate · 1", "Sal", "Limón · al gusto"]);
+  const [first] = reply.blocks[0].sections[0].items;
+  assert.deepEqual(first, [{ text: "Huevo · " }, { text: "2 pieza", highlight: true }]);
+  assert.deepEqual(reply.blocks[0].sections[0].items[2], [{ text: "Sal" }]);
+});
+
+test("REQ-12 a generic name leads with '<Slot ref>, opción <n>' highlighted; a recipe name leads with the name", () => {
+  const generic = ask("Cena, opción 2");
+  assert.match(generic.answer.split("\n")[0], DETAIL_LEAD("Cena, opción 2"));
+  assert.deepEqual(generic.blocks[0].lead.filter((span) => span.highlight).map((span) => span.text), ["Cena, opción 2"]);
+  assert.deepEqual(generic.sources, ["Receta: Cena opcion 2"]);
+  const named = ask("¿Qué lleva el pollo asado?");
+  assert.match(named.answer.split("\n")[0], DETAIL_LEAD("Pollo asado"));
+  assert.deepEqual(named.blocks[0].lead.filter((span) => span.highlight).map((span) => span.text), ["Pollo asado"]);
+});
+
+test("REQ-12 'Acompaña con' lists the slot's complements with amounts, and is absent when there are none", () => {
+  const breakfast = ask("Desayuno, opción 1");
+  assert.deepEqual(itemsOf(breakfast, "Acompaña con"), ["Agua natural · 1 vaso"]);
+  assert.deepEqual(breakfast.blocks[0].sections.at(-1)?.items[0], [{ text: "Agua natural · " }, { text: "1 vaso", highlight: true }]);
+  assert.deepEqual(itemsOf(ask("Cena, opción 1"), "Acompaña con"), ["Fruta de temporada · 2"]);
+  assert.equal(itemsOf(ask("Comida, opción 1"), "Acompaña con"), undefined);
+});
+
+test("REQ-12 by dish name the complements show only when the recipe is an option in exactly one slot", () => {
+  assert.deepEqual(itemsOf(ask("¿Qué lleva el atole de avena?"), "Acompaña con"), ["Agua natural · 1 vaso"]);
+  const twice = askWith("¿Qué lleva el atole de avena?", (db) => {
+    const atole = db.mealOptions.find((option) => option.recipe_id.endsWith("atole-de-avena"))!;
+    db.mealOptions.push({ ...atole, id: "x-second", meal_type_id: db.mealTypes.find((meal) => meal.name === "Comida")!.id });
+  });
+  assert.equal(itemsOf(twice, "Acompaña con"), undefined);
+  assert.equal(itemsOf(ask("¿Qué lleva Chilaquiles verdes?"), "Acompaña con"), undefined);
+});
+
+test("REQ-12 a soft-deleted add-on is not listed; a soft-deleted usage leaves the add-on listed by its own name", () => {
+  const gone = askWith("Desayuno, opción 1", (db) => { db.sharedAddOns[0].deleted_at = "2026-02-01T00:00:00.000Z"; });
+  assert.equal(itemsOf(gone, "Acompaña con"), undefined);
+  const usageGone = askWith("Desayuno, opción 1", (db) => {
+    db.ingredientUsages.find((usage) => usage.source_id === db.sharedAddOns[0].id)!.deleted_at = "2026-02-01T00:00:00.000Z";
+  });
+  assert.deepEqual(itemsOf(usageGone, "Acompaña con"), ["Complemento del desayuno"]);
+});
+
+test("REQ-12 by dish name a soft-deleted option of the same recipe in another slot does not hide the complements", () => {
+  const reply = askWith("¿Qué lleva el atole de avena?", (db) => {
+    const atole = db.mealOptions.find((option) => option.recipe_id.endsWith("atole-de-avena"))!;
+    db.mealOptions.push({ ...atole, id: "x-deleted", meal_type_id: db.mealTypes.find((meal) => meal.name === "Comida")!.id, deleted_at: "2026-02-01T00:00:00.000Z" });
+  });
+  assert.deepEqual(itemsOf(reply, "Acompaña con"), ["Agua natural · 1 vaso"]);
+});
+
+test("REQ-3 a dish found by name never opens another user's row, even one with the same id stored first", () => {
+  const reply = askWith("¿Qué lleva el pollo asado?", (db) => {
+    const own = db.recipes.find((recipe) => recipe.name === "Pollo asado")!;
+    db.recipes.unshift({ ...own, user_id: "someone-else", description: "Receta ajena." });
+  });
+  assert.equal(reply.kind, "detail");
+  assert.deepEqual(itemsOf(reply, "Preparación"), recipeSteps("Sazona el pollo. Hornea 30 minutos. Sirve con limón.").slice(0, 2));
+});
+
+test("REQ-11 a single-option slot goes straight to its detail; with no ingredients or steps there are no empty headings", () => {
+  const only = (tweak: (db: AppDb) => void = () => {}) => askWith("¿Qué hay de desayuno?", (db) => {
+    const breakfast = db.mealTypes.find((meal) => meal.name === "Desayuno")!;
+    db.mealOptions = db.mealOptions.filter((option) => option.meal_type_id !== breakfast.id || option.option_number === 1);
+    tweak(db);
+  });
+  const reply = only();
+  assert.equal(reply.kind, "detail");
+  assert.deepEqual(reply.resolved, [{ topic: "slotOptions", slot: "desayuno" }]);
+  assert.match(reply.answer.split("\n")[0], DETAIL_LEAD("Desayuno, opción 1"));
+  const bare = only((db) => {
+    const recipe = db.recipes.find((item) => item.name === "Desayuno opcion 1")!;
+    recipe.description = "";
+    db.ingredientUsages = db.ingredientUsages.filter((usage) => usage.source_id !== recipe.id);
+  });
+  assert.equal(bare.kind, "detail");
+  assert.deepEqual(bare.blocks[0].sections.map((section) => section.title), ["Preparación", "Acompaña con"]);
+  assert.ok(bare.blocks[0].sections.every((section) => section.items.length > 0));
+});
+
+test("REQ-10 an in-range option opens its detail, indexed like the labels: a soft-deleted option does not count", () => {
+  const reply = askWith("cena opción 2", (db) => { cenaOptions(db)[1].deleted_at = "2026-02-01T00:00:00.000Z"; });
+  assert.equal(reply.kind, "detail");
+  assert.match(reply.answer.split("\n")[0], DETAIL_LEAD("Cena, opción 2"));
+  assert.deepEqual(itemsOf(reply, "Ingredientes"), ["Frijoles · 1 taza", "Sal"]);
+  assert.equal(ask("Segunda colación, opción 2", { meals: DUPLICATED }).kind, "detail");
+});
+
+test("REQ-10 option 0 and a decimal option are out of range: how many there are, then the first page", () => {
+  for (const typed of ["cena opción 0", "la 0 de la cena", "cena opción 2.5", "cena opción 2,5"]) {
+    const reply = ask(typed);
+    assert.equal(reply.kind, "answer", typed);
+    assert.equal(reply.blocks[0].lead[0].text, "Tu cena tiene 5 opciones.", typed);
+    assert.deepEqual(buttonLabels(reply), buttonLabels(ask("¿Cuál es mi cena?")), typed);
+  }
+});
+
+test("pinned (LOW-1, LOW-3, MEDIUM-3): '<slot> 2 veces' is option n, a time word wins over an option, a duplicated slot asks which", () => {
+  const twice = ask("cena 2 veces");
+  assert.equal(twice.kind, "detail");
+  assert.match(twice.answer.split("\n")[0], DETAIL_LEAD("Cena, opción 2"));
+  assert.equal(ask("cena 12 veces").blocks[0].lead[0].text, "Tu cena tiene 5 opciones.");
+  assert.match(ask("cena hora opción 2").answer, slotTime("cena", "Entre 8 a 9 pm"));
+  const clarify = ask("colación opción 2", { meals: DUPLICATED });
+  assert.equal(clarify.kind, "clarify");
+  assert.equal(clarify.answer, "Tienes 2 colaciones. ¿Cuál?");
+});
+
+test("REQ-3 each found dish shows the detail lead, and 'la comida opcion 1' shows comida option 1's detail", () => {
+  for (const name of ["Pollo asado", "Ensalada de pollo", "Sándwich de atún", "Atole de avena", "Chilaquiles verdes", "Tacos de frijol"]) {
+    const reply = ask(`¿Qué lleva ${name}?`);
+    assert.equal(reply.kind, "detail", name);
+    assert.match(reply.answer.split("\n")[0], DETAIL_LEAD(name), name);
+    assert.deepEqual(reply.sources, [`Receta: ${name}`], name);
+  }
+  const comida = ask("la comida opcion 1");
+  assert.equal(comida.kind, "detail");
+  assert.match(comida.answer.split("\n")[0], DETAIL_LEAD("Comida, opción 1"));
+});
+
+test("REQ-5 the detail's own buttons and every option, paging and follow-up button of the US2 answers resolve and repeat", () => {
+  const { db, user } = memDb();
+  const answers = ["¿Cuál es mi cena?", "Cena, más opciones (página 2)", "Cena, opción 2", "¿Qué lleva el pollo asado?", "¿Cuál es mi comida?"].map((message) => ragAnswer(db, user, message, TODAY));
+  assert.ok(sweep(db, user, answers, TODAY).length >= 8);
+});

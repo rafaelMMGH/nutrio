@@ -165,7 +165,7 @@ export const lightLockedPages = [
   { name: "not found", path: "/no-existe" }
 ];
 
-/** Dates, times and counters that change between runs, plus the topbar area that holds the switch. */
+/** Dates, times and counters that change between runs (the groceries nav counts come from real recipes and templates), plus the topbar area that holds the switch. */
 export function dynamicMasks(page: Page): Locator[] {
-  return [".topbar-account", "time", ".home-hello", ".home-strip-days", ".home-timeline", ".home-count", ".home-tiles", ".home-intake-list", ".home-water"].map((selector) => page.locator(selector));
+  return [".topbar-account", "time", ".home-hello", ".home-strip-days", ".home-timeline", ".home-count", ".home-tiles", ".home-intake-list", ".home-water", ".groceries-nav em"].map((selector) => page.locator(selector));
 }

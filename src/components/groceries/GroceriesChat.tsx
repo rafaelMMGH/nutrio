@@ -1,10 +1,9 @@
 "use client";
 
 import { useAssistantContext } from "@/components/app/assistant";
-import { groceriesSuggestions } from "@/lib/assistant";
 
-// Points the floating assistant at the cart and the recipes while a Compras page is open.
+// Labels the floating assistant's header while a Compras page is open; the answers do not depend on the page (REQ-4).
 export function GroceriesChat() {
-  useAssistantContext({ subtitle: "Sobre tus compras", defaultScope: "Carrito", suggestions: groceriesSuggestions() });
+  useAssistantContext({ subtitle: "Sobre tus compras" });
   return null;
 }

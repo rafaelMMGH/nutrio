@@ -10,7 +10,7 @@ Changing a principle requires a PR reviewed by the team. Keep this list short (5
 
 These are starting examples. Edit, remove, or replace them to fit your team.
 
-1. **Tests prove behavior.** No behavior change ships without a test that fails before and passes after (today that means a Playwright e2e test in `tests/e2e/`).
+1. **Tests prove behavior.** No behavior change ships without a test that fails before and passes after. During development, fast unit tests (`tests/unit/`, `npm run test:unit`) are the fail-first proof for logic; once all review rounds are done, a Playwright e2e test in `tests/e2e/` must also pass for the behavior (the full e2e suite runs at the end).
    *Why:* tests are how reviewers and agents verify intent.
 
 2. **Specs are the source of truth.** Code that diverges from an approved spec is a bug in one of them; fix the spec through the spec-change route or fix the code.

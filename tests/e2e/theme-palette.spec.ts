@@ -80,16 +80,6 @@ const sharedUi: SharedUi[] = [
     }
   },
   {
-    name: "home scope menu",
-    path: "/",
-    sweep: true,
-    open: async (page) => {
-      await page.locator(".home-search-filter").click();
-      await expect(page.locator(".home-scope-menu")).toBeVisible();
-      return ".home-scope-menu";
-    }
-  },
-  {
     name: "weight popover",
     path: "/",
     sweep: true,

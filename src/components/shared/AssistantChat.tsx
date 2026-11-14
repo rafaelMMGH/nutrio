@@ -1,44 +1,43 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
+import { usePathname } from "next/navigation";
 import { Bot, Loader2, MessageSquarePlus, Mic, Square, X } from "lucide-react";
-import { AssistantTurn, ChipList, type AssistantRequest, type Turn, type TurnChip } from "./AssistantTurn";
+import { AssistantTurn, ButtonList, STARTER_BUTTONS, type Turn } from "./AssistantTurn";
 import { useMediaQuery } from "@/lib/client/useMediaQuery";
 import { PromptInput } from "./PromptInput";
-import { ScopeSwitcher } from "./ScopeSwitcher";
 import { ScrollButton } from "./ScrollButton";
 import { useChatScroll } from "./useChatScroll";
 import { useDictation } from "./useDictation";
-import type { ScopeKey } from "@/lib/assistant";
+import { mayUpgradeFocus } from "@/lib/client/focus-upgrade";
+import { questionButtonsTurnId } from "@/lib/client/assistant-thread";
 import "./assistant-chat.css";
 
 // Same breakpoint as the sheet rules in assistant-chat.css.
 export const SHEET_QUERY = "(max-width: 640px)";
+/** How long to wait for a destination heading to stream in before leaving focus on the main region. */
+const HEADING_WAIT_MS = 3000;
 
 type Props = {
   title?: string;
   subtitle: string;
-  suggestions?: TurnChip[];
   turns: Turn[];
   busy: boolean;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  /** Where the next typed question is asked, and whether the page is a recipe (which adds "Esta receta"). */
-  scope: ScopeKey;
-  recipe: boolean;
-  onScopeChange: (scope: ScopeKey) => void;
   /** Changes whenever something outside the panel (the dashboard search bar) asks, so the input takes focus even if the panel is already open. */
   focusRequest: number;
   onSend: (message: string) => void;
-  onSuggest: (request: AssistantRequest) => void;
+  /** A question button: sends its message as a user turn. */
+  onSuggest: (message: string) => void;
   onRetry: (turn: Turn) => void;
   /** Nueva conversación: empties the thread and drops any pending answer. */
   onClear: () => void;
 };
 
 // Floating chat over the RAG endpoint: a FAB in the bottom-right corner opens the panel (kept mounted so the
-// conversation survives closing it). Suggestion chips when empty, one article per turn, pill composer with dictation.
-export function AssistantChat({ title = "Asistente", subtitle, suggestions = [], turns, busy, open, onOpenChange, scope, recipe, onScopeChange, focusRequest, onSend, onSuggest, onRetry, onClear }: Props) {
+// conversation survives closing it). The 4 starters when empty, one article per turn, pill composer with dictation.
+export function AssistantChat({ title = "Asistente", subtitle, turns, busy, open, onOpenChange, focusRequest, onSend, onSuggest, onRetry, onClear }: Props) {
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fabRef = useRef<HTMLButtonElement>(null);
@@ -50,7 +49,7 @@ export function AssistantChat({ title = "Asistente", subtitle, suggestions = [],
     if (open) inputRef.current?.focus();
   }, [open, focusRequest]);
 
-  // Escape closes the panel; a popup inside it (the compact scope menu) takes Escape first by calling preventDefault.
+  // Escape closes the panel; a popup inside it takes Escape first by calling preventDefault.
   // In the modal sheet Tab wraps, because inert on the page alone lets focus escape to the browser's own controls.
   useEffect(() => {
     if (!open) return;
@@ -98,10 +97,58 @@ export function AssistantChat({ title = "Asistente", subtitle, suggestions = [],
     onOpenChange(false);
   }
 
+  // A navigation link (REQ-34, REQ-35). The thread lives in the shell, so it survives the navigation. A link to the page
+  // already open only closes the sheet and focuses the FAB; one that navigates closes the sheet at ≤640 px and, once the
+  // path has changed, hands focus to the destination's main heading, as a normal navigation would.
+  const pathname = usePathname();
+  const navigatingFrom = useRef<string | null>(null);
+  function onLogClick(event: MouseEvent<HTMLElement>) {
+    const link = (event.target as Element).closest<HTMLAnchorElement>('a[data-variant="link"]');
+    // A modified click opens a new tab or window: this page and the sheet stay as they are.
+    if (!link || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+    const destination = new URL(link.href);
+    if (destination.pathname + destination.search === location.pathname + location.search) {
+      if (sheet) close();
+      return;
+    }
+    navigatingFrom.current = pathname;
+    if (sheet) {
+      dictation.stop();
+      onOpenChange(false);
+    }
+  }
+  useEffect(() => {
+    if (navigatingFrom.current === null || navigatingFrom.current === pathname) return;
+    navigatingFrom.current = null;
+    const focusTarget = (target: HTMLElement) => {
+      if (!target.hasAttribute("tabindex")) target.tabIndex = -1;
+      target.focus();
+    };
+    const heading = document.querySelector<HTMLElement>("main h1");
+    if (heading) return focusTarget(heading);
+    const main = document.querySelector<HTMLElement>("main");
+    if (!main) return;
+    // The destination's loading state commits first and has no heading: the main region holds focus meanwhile, and the
+    // heading takes it when the page streams in, unless the user moved focus since.
+    focusTarget(main);
+    const observer = new MutationObserver(() => {
+      const arrived = main.querySelector<HTMLElement>("h1");
+      if (!arrived) return;
+      observer.disconnect();
+      if (mayUpgradeFocus(document.activeElement, document.body, main)) focusTarget(arrived);
+    });
+    observer.observe(main, { childList: true, subtree: true });
+    const giveUp = setTimeout(() => observer.disconnect(), HEADING_WAIT_MS);
+    return () => {
+      observer.disconnect();
+      clearTimeout(giveUp);
+    };
+  }, [pathname]);
+
   function wrapTab(event: KeyboardEvent) {
     const panel = panelRef.current;
     if (!panel) return;
-    // Only what Tab can really land on: not the display:none switcher variant, not roving tabindex="-1" options, not disabled or hidden.
+    // Only what Tab can really land on: not display:none, not roving tabindex="-1" options, not disabled or hidden.
     const stops = [...panel.querySelectorAll<HTMLElement>("button, textarea, input, a[href], [tabindex]")].filter(
       (node) =>
         node.tabIndex >= 0 &&
@@ -136,14 +183,11 @@ export function AssistantChat({ title = "Asistente", subtitle, suggestions = [],
     inputRef.current?.focus();
   }
 
-  // Chips sit under the latest finished answer. An error as the latest finished turn hides them, and so does a pending
-  // retry (it stands in for its error turn); a pending new question keeps them on screen, disabled.
-  const latest = turns.findLast((turn) => turn.role === "assistant" && turn.status !== "pending");
+  // Question buttons sit under the latest finished answer only; a pending new question keeps them on screen, disabled.
   const lastAssistant = turns.findLast((turn) => turn.role === "assistant");
-  const retrying = lastAssistant?.role === "assistant" && lastAssistant.status === "pending" && lastAssistant.retrying;
-  const chipsTurnId = !retrying && latest?.role === "assistant" && latest.status === "answer" ? latest.id : null;
+  const buttonsTurnId = questionButtonsTurnId(turns);
 
-  // A chip or Reintentar disappears or turns disabled once the request is sent, which would drop focus on <body>. Desktop
+  // A button or Reintentar disappears or turns disabled once the request is sent, which would drop focus on <body>. Desktop
   // goes to the input. The sheet keeps the on-screen keyboard down: focus waits on the log, then moves to the new turn
   // (REQ-22), unless the user has moved it somewhere else meanwhile.
   const followTurn = useRef(false);
@@ -164,9 +208,9 @@ export function AssistantChat({ title = "Asistente", subtitle, suggestions = [],
     if (last && log && document.activeElement === log && log.lastElementChild instanceof HTMLElement) log.lastElementChild.focus({ preventScroll: true });
   }, [turns]);
 
-  const askChip = (request: AssistantRequest) => {
+  const askButton = (message: string) => {
     dictation.stop();
-    onSuggest(request);
+    onSuggest(message);
     keepFocus();
   };
   const retry = (turn: Turn) => {
@@ -207,7 +251,6 @@ export function AssistantChat({ title = "Asistente", subtitle, suggestions = [],
             <h2>{title}</h2>
             <p>{subtitle}</p>
           </div>
-          <ScopeSwitcher value={scope} onChange={onScopeChange} recipe={recipe} sheet={sheet} />
           {turns.length > 0 && (
             <button type="button" className="assistant-chat-new" onClick={startOver} aria-label="Nueva conversación" title="Nueva conversación">
               <MessageSquarePlus size={16} aria-hidden="true" /> <span>Nueva conversación</span>
@@ -216,14 +259,14 @@ export function AssistantChat({ title = "Asistente", subtitle, suggestions = [],
           <button type="button" className="assistant-chat-close" onClick={close} aria-label="Cerrar asistente"><X size={18} /></button>
         </header>
         <div className="assistant-chat-body">
-          <div className="assistant-chat-log" ref={logRef} tabIndex={-1}>
+          <div className="assistant-chat-log" ref={logRef} tabIndex={-1} onClick={onLogClick}>
             {turns.length === 0 && (
               <div className="assistant-chat-empty">
                 <p>Pregúntame lo que quieras saber. Respondo con la información de tus planes.</p>
-                <ChipList chips={suggestions} disabled={busy} onAsk={askChip} />
+                <ButtonList buttons={STARTER_BUTTONS} action={{ disabled: busy, onAsk: askButton }} />
               </div>
             )}
-            {turns.map((turn) => <AssistantTurn key={turn.id} turn={turn} chipsAction={turn.id === chipsTurnId ? { disabled: busy, onAsk: askChip } : undefined} onRetry={turn.id === lastAssistant?.id ? retry : undefined} />)}
+            {turns.map((turn) => <AssistantTurn key={turn.id} turn={turn} buttonsAction={turn.id === buttonsTurnId ? { disabled: busy, onAsk: askButton } : undefined} onRetry={turn.id === lastAssistant?.id ? retry : undefined} />)}
           </div>
           <ScrollButton visible={!atBottom} onClick={jumpToLast} />
         </div>
