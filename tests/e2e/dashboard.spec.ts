@@ -117,18 +117,75 @@ test("carousel: name, rating and Preparación actual change together; rating sur
   await page.waitForURL(`**${second.href}`);
 });
 
-test('"Marcar cumplida" saves the meal and moves the Semana adherence', async ({ page }) => {
-  test.skip((await page.locator(".nt-done").count()) === 0, "no meals planned today");
-  const button = page.locator(".nt-done");
-  const before = mealsDone();
-  const wasDone = (await button.getAttribute("aria-pressed")) === "true";
-  await Promise.all([page.waitForResponse((r) => r.url().includes("/api/daily-logs/") && r.request().method() === "PUT" && r.status() < 400), button.click()]);
-  await expect(button).toHaveAttribute("aria-pressed", String(!wasDone));
-  expect(mealsDone()).toBe(before + (wasDone ? -1 : 1));
-  await expect(page.locator(".nt-gauge-tile").first().locator(".nt-gauge-label")).toContainText(/Adherencia \(\d+\/\d+\)/);
-  // Leave the day as it was.
-  await Promise.all([page.waitForResponse((r) => r.url().includes("/api/daily-logs/") && r.request().method() === "PUT" && r.status() < 400), button.click()]);
-  expect(mealsDone()).toBe(before);
+const saved = (page: Page) => page.waitForResponse((r) => r.url().includes("/api/daily-logs/") && r.request().method() === "PUT" && r.status() < 400);
+const slotIds = () =>
+  sql("select id from meal_types where deleted_at is null and plan_version_id in (select v.id from plan_versions v join plans p on p.id = v.plan_id where v.is_current and p.status = 'active' and p.deleted_at is null) order by display_order").split("\n").filter(Boolean);
+const setDone = (ids: string[]) =>
+  sql(`insert into daily_logs (id, user_id, date, meals_done, water_glasses, created_at, updated_at) select 'e2e-' || '${TODAY}', id, '${TODAY}', '{}', 0, now(), now() from users order by seq limit 1 on conflict do nothing; update daily_logs set meals_done = '{${ids.join(",")}}' where date = '${TODAY}'`);
+
+test('"Marcar cumplida" saves the meal, moves the adherence and slides to the next pending meal', async ({ page }) => {
+  const slots = slotIds();
+  test.skip(slots.length < 2, "the active plan has fewer than two meals today");
+  const original = sql(`select array_to_string(meals_done, ',') from daily_logs where date = '${TODAY}'`);
+  try {
+    // Nothing done yet: the hero opens on the first meal.
+    setDone([]);
+    await openHome(page);
+    const dots = page.locator(".nt-pager button");
+    const button = page.locator(".nt-done");
+    const title = page.locator(".nt-hero-copy h2");
+    await expect(dots.nth(0)).toHaveAttribute("aria-selected", "true");
+    const firstTitle = await title.textContent();
+
+    await Promise.all([saved(page), button.click()]);
+    expect(mealsDone()).toBe(1);
+    // The carousel moves on to the next pending meal, whose button is not pressed.
+    await expect(dots.nth(1)).toHaveAttribute("aria-selected", "true");
+    await expect(button).toHaveAttribute("aria-pressed", "false");
+    await expect(page.locator(".nt-gauge-tile").first().locator(".nt-gauge-label")).toContainText(/Adherencia \(\d+\/\d+\)/);
+
+    // Unmarking keeps the slide.
+    await dots.nth(0).click();
+    await expect(title).toHaveText(firstTitle!);
+    await expect(button).toHaveAttribute("aria-pressed", "true");
+    await Promise.all([saved(page), button.click()]);
+    await expect(button).toHaveAttribute("aria-pressed", "false");
+    await page.waitForTimeout(700);
+    await expect(dots.nth(0)).toHaveAttribute("aria-selected", "true");
+    expect(mealsDone()).toBe(0);
+
+    // From the last meal the search wraps around to the first pending one.
+    await dots.last().click();
+    await Promise.all([saved(page), button.click()]);
+    await expect(dots.nth(0)).toHaveAttribute("aria-selected", "true");
+  } finally {
+    setDone(original ? original.split(",") : []);
+  }
+});
+
+test('"Marcar cumplida" on the last pending meal stays on that slide', async ({ page }) => {
+  const slots = slotIds();
+  test.skip(slots.length < 2, "the active plan has fewer than two meals today");
+  const original = sql(`select array_to_string(meals_done, ',') from daily_logs where date = '${TODAY}'`);
+  try {
+    // Every meal done except the third (or the last one in shorter plans): the hero opens on it.
+    const pending = Math.min(2, slots.length - 1);
+    setDone(slots.filter((_, index) => index !== pending));
+    await openHome(page);
+    const dots = page.locator(".nt-pager button");
+    const button = page.locator(".nt-done");
+    await expect(dots.nth(pending)).toHaveAttribute("aria-selected", "true");
+    const title = await page.locator(".nt-hero-copy h2").textContent();
+
+    await Promise.all([saved(page), button.click()]);
+    await expect(button).toHaveAttribute("aria-pressed", "true");
+    await page.waitForTimeout(700);
+    await expect(dots.nth(pending)).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator(".nt-hero-copy h2")).toHaveText(title!);
+    expect(mealsDone()).toBe(slots.length);
+  } finally {
+    setDone(original ? original.split(",") : []);
+  }
 });
 
 test("Métricas: title without a range, four tabs, four gauges in order, no order counter", async ({ page }) => {

@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useState, type KeyboardEvent } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { ArrowUpRight, Check, Clock, CookingPot, Star } from "lucide-react";
 import { foodIcon, mealLabel, mealTitle, type Meal } from "@/components/dashboard/food";
 import { prepMinutes, recipeRating } from "@/lib/metrics";
 import { DottedProgress, Figure, IconBadge, Pill } from "./primitives";
+
+// How long "Cumplida" stays on screen before the carousel moves to the next pending meal.
+const ADVANCE_DELAY = 450;
 
 // Fixed until the real logic exists (alt-dashboard P9).
 const PREP_PROGRESS = 0.68;
@@ -39,6 +42,25 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
   const [index, setIndex] = useState(() => Math.max(0, meals.findIndex((meal) => !doneIds.includes(meal.id))));
   const meal = meals[Math.min(index, meals.length - 1)];
 
+  // After marking a meal done the carousel moves on to the next pending one. The short wait lets "Cumplida" show first.
+  const advance = useRef<number | undefined>(undefined);
+  const cancelAdvance = () => window.clearTimeout(advance.current);
+  useEffect(() => cancelAdvance, []);
+  function go(next: number) {
+    cancelAdvance();
+    setIndex(next);
+  }
+  function toggle(mealId: string, done: boolean) {
+    cancelAdvance();
+    onToggle(mealId, done);
+    if (!done) return;
+    // The next meal after this one that is still pending, wrapping around; with none left the slide stays.
+    const pending = (id: string) => id !== mealId && !doneIds.includes(id);
+    const steps = meals.map((_, step) => (index + step) % meals.length).slice(1);
+    const next = steps.find((position) => pending(meals[position].id));
+    if (next !== undefined) advance.current = window.setTimeout(() => setIndex(next), ADVANCE_DELAY);
+  }
+
   if (!meal) {
     return (
       <section className="nt-hero is-empty" aria-labelledby="nt-dash-title">
@@ -66,7 +88,7 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
     const step = ["ArrowDown", "ArrowRight"].includes(event.key) ? 1 : ["ArrowUp", "ArrowLeft"].includes(event.key) ? -1 : 0;
     if (!step || meals.length < 2) return;
     event.preventDefault();
-    setIndex((index + step + meals.length) % meals.length);
+    go((index + step + meals.length) % meals.length);
   }
 
   return (
@@ -80,7 +102,7 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
           <Pill tone="surface" className="nt-rating" aria-label={`Puntuación ${rating} de 5`}>
             <Star size={16} fill="var(--nt-yellow-accent)" stroke="var(--nt-yellow-accent)" aria-hidden /> {rating}
           </Pill>
-          <button type="button" className={`nt-done${done ? " is-done" : ""}`} aria-pressed={done} onClick={() => onToggle(meal.id, !done)}>
+          <button type="button" className={`nt-done${done ? " is-done" : ""}`} aria-pressed={done} onClick={() => toggle(meal.id, !done)}>
             <Check size={16} aria-hidden /> {done ? "Cumplida" : "Marcar cumplida"}
           </button>
         </div>
@@ -102,7 +124,7 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
       {meals.length > 1 && (
         <div className="nt-pager" role="tablist" aria-label="Comidas de hoy" aria-orientation="vertical" onKeyDown={onKey}>
           {meals.map((item, i) => (
-            <button key={item.id} type="button" role="tab" aria-selected={i === index} tabIndex={i === index ? 0 : -1} aria-label={`${mealLabel(item.name)}: ${mealTitle(item)}`} title={mealLabel(item.name)} className={i === index ? "is-active" : undefined} onClick={() => setIndex(i)} ref={(node) => { if (node && i === index && document.activeElement?.parentElement === node.parentElement) node.focus(); }} />
+            <button key={item.id} type="button" role="tab" aria-selected={i === index} tabIndex={i === index ? 0 : -1} aria-label={`${mealLabel(item.name)}: ${mealTitle(item)}`} title={mealLabel(item.name)} className={i === index ? "is-active" : undefined} onClick={() => go(i)} ref={(node) => { if (node && i === index && document.activeElement?.parentElement === node.parentElement) node.focus(); }} />
           ))}
         </div>
       )}
