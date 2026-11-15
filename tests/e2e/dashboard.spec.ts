@@ -24,6 +24,10 @@ test("top bar: order of §5.1, visual-only buttons labelled, profile at the righ
   const bar = page.locator(".nt-topbar");
   const order = await bar.evaluate((node) => [...node.children].map((child) => child.className.split(" ")[0]));
   expect(order).toEqual(["nt-brand", "nt-search", "nt-chef", "nt-cta", "nt-tools", "nt-profile"]);
+  // Chef's selection + "Procesar plan" are centred between the search and the alerts button.
+  const box = async (selector: string) => (await bar.locator(selector).boundingBox())!;
+  const [search, chef, cta, tools] = [await box(".nt-search"), await box(".nt-chef"), await box(".nt-cta"), await box(".nt-tools")];
+  expect(Math.abs(chef.x - (search.x + search.width) - (tools.x - (cta.x + cta.width)))).toBeLessThanOrEqual(2);
   await expect(bar.locator(".nt-brand")).toContainText("NUTRIO");
   await expect(bar.getByPlaceholder("Buscar recetas, planes, ingredientes…")).toBeVisible();
   await expect(bar.locator(".nt-chef")).toContainText("Chef's selection");
