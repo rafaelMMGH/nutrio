@@ -19,39 +19,46 @@ type User = { name: string; email: string };
 export function TopBar({ user, chef, busy, onAsk, onUpload, onLogout, inert }: { user: User; chef: Chef; busy: boolean; onAsk: (message: string) => Promise<void>; onUpload: () => void; onLogout: () => void; inert?: boolean }) {
   return (
     <header className="nt-topbar" inert={inert}>
-      <Link href="/" className="nt-brand" aria-label="NUTRIO, ir al inicio">
-        <Emblem />
-        <span>NUTRIO</span>
-      </Link>
-      <AiSearch busy={busy} onAsk={onAsk} />
-      <Link href="/recipes" className="nt-chef" aria-label="Chef's selection: recetas nuevas, ver recetario">
-        <ChefHat size={20} strokeWidth={1.6} aria-hidden />
-        <span className="nt-chef-text">
-          <strong>Chef&apos;s selection</strong>
-          <small>Recetas nuevas</small>
-        </span>
-        <span className="nt-chef-thumbs" aria-hidden>
-          {chef.latest.map((recipe) => (
-            <img key={recipe.id} src={foodIcon(recipe.name)} alt="" />
-          ))}
-          {chef.rest > 0 && <b>+{chef.rest}</b>}
-        </span>
-      </Link>
-      <button type="button" className="nt-cta" onClick={onUpload}>
-        <Plus size={18} aria-hidden /> Procesar plan
-      </button>
-      <div className="nt-tools">
-        <IconButton label="Alertas">
-          <Bell />
-        </IconButton>
-        <IconButton label="Notas">
-          <NotebookPen />
-        </IconButton>
-        <IconButton label="Bandeja de entrada" badge={12}>
-          <Inbox />
-        </IconButton>
+      {/* Three groups: brand + search on the left, Chef's selection + CTA centred in the bar, tools + profile on the right. */}
+      <div className="nt-top-left">
+        <Link href="/" className="nt-brand" aria-label="NUTRIO, ir al inicio">
+          <Emblem />
+          <span>NUTRIO</span>
+        </Link>
+        <AiSearch busy={busy} onAsk={onAsk} />
       </div>
-      <ProfileMenu user={user} onLogout={onLogout} />
+      <div className="nt-top-center">
+        <Link href="/recipes" className="nt-chef nt-glass" aria-label="Chef's selection: recetas nuevas, ver recetario">
+          <ChefHat size={20} strokeWidth={1.6} aria-hidden />
+          <span className="nt-chef-text">
+            <strong>Chef&apos;s selection</strong>
+            <small>Recetas nuevas</small>
+          </span>
+          <span className="nt-chef-thumbs" aria-hidden>
+            {chef.latest.map((recipe) => (
+              <img key={recipe.id} src={foodIcon(recipe.name)} alt="" />
+            ))}
+            {chef.rest > 0 && <b>+{chef.rest}</b>}
+          </span>
+        </Link>
+        <button type="button" className="nt-cta" onClick={onUpload}>
+          <Plus size={18} aria-hidden /> Procesar plan
+        </button>
+      </div>
+      <div className="nt-top-right">
+        <div className="nt-tools">
+          <IconButton label="Alertas">
+            <Bell />
+          </IconButton>
+          <IconButton label="Notas">
+            <NotebookPen />
+          </IconButton>
+          <IconButton label="Bandeja de entrada" badge={12}>
+            <Inbox />
+          </IconButton>
+        </div>
+        <ProfileMenu user={user} onLogout={onLogout} />
+      </div>
     </header>
   );
 }
