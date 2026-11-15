@@ -96,7 +96,7 @@ html.dark:not(:has([data-theme-lock])) .app-shell.nt { background: var(--nt-bg);
 .nt-tools { display: flex; gap: 12px; flex: none; margin-left: 12px; }
 
 .nt-profile { position: relative; flex: none; }
-.nt-profile-btn { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: transparent; color: var(--nt-ink); font: inherit; cursor: pointer; text-align: left; border-radius: var(--nt-radius-pill); }
+.nt-profile-btn { display: flex; align-items: center; gap: 10px; padding: 0; border: 0; background: transparent; color: var(--nt-ink); font: inherit; cursor: pointer; text-align: left; border-radius: var(--nt-radius-pill); box-shadow: 0 0 0 1px var(--nt-glass-line); }
 .nt-avatar { display: grid; place-items: center; width: 44px; height: 44px; box-sizing: border-box; border-radius: 50%; font-weight: 500; }
 .nt-profile-text { display: grid; line-height: 1.3; }
 .nt-profile-text strong { font-size: 14px; font-weight: 500; }
