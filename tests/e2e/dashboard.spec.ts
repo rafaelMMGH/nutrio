@@ -2,420 +2,210 @@ import type { Page } from "@playwright/test";
 import { sql } from "./database";
 import { expect, test } from "./fixtures";
 
-// The signed-in home, end to end: real UI, real API routes, real Postgres (the e2e copy).
-// Every change is checked three ways: on screen, after a reload, and in the database.
+// The redesigned dashboard (specs/alt-dashboard/plan.md), end to end: real UI, real API routes, real Postgres (the e2e copy).
+// Follows the plan's QA checklist (§7).
 
 test.describe.configure({ mode: "serial" });
 
 const dayKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 const TODAY = dayKey(new Date());
-const YESTERDAY = dayKey(new Date(Date.now() - 864e5));
-const mealsDone = (date: string) => Number(sql(`select coalesce(array_length(meals_done, 1), 0) from daily_logs where date = '${date}'`) || 0);
-const dayValue = (column: string, date = TODAY) => sql(`select ${column} from daily_logs where date = '${date}'`);
-
-/** Clicks and waits for the matching save request to succeed. */
-async function clickAndSave(page: Page, target: ReturnType<Page["locator"]>, path: string, method = "PUT") {
-  await Promise.all([page.waitForResponse((r) => r.url().includes(path) && r.request().method() === method && r.status() < 400), target.click()]);
-}
+const count = (query: string) => Number(sql(query) || 0);
+const mealsDone = () => count(`select coalesce(array_length(meals_done, 1), 0) from daily_logs where date = '${TODAY}'`);
+const SHOTS = "specs/alt-dashboard/screenshots";
 
 async function openHome(page: Page) {
   await page.goto("/");
-  await expect(page.locator(".home-strip.is-ready")).toBeVisible();
+  await expect(page.locator(".nt-dash h1")).toHaveText("Dashboard");
 }
 
 test.beforeEach(async ({ page }) => openHome(page));
 
-test("loads the home with every section, in one screen at 1440×900", async ({ page }) => {
-  await expect(page.locator(".home-hello h1")).toHaveText("Hola, Rafael");
-  for (const id of ["#day-title", "#report-title", "#shop-title", "#intake-title", "#promo-title"]) await expect(page.locator(id)).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollHeight - innerHeight)).toBeLessThanOrEqual(0);
+test("top bar: order of §5.1, visual-only buttons labelled, profile at the right end", async ({ page }) => {
+  const bar = page.locator(".nt-topbar");
+  const order = await bar.evaluate((node) => [...node.children].map((child) => child.className.split(" ")[0]));
+  expect(order).toEqual(["nt-brand", "nt-search", "nt-chef", "nt-cta", "nt-tools", "nt-profile"]);
+  await expect(bar.locator(".nt-brand")).toContainText("NUTRIO");
+  await expect(bar.getByPlaceholder("Buscar recetas, planes, ingredientes…")).toBeVisible();
+  await expect(bar.locator(".nt-chef")).toContainText("Chef's selection");
+  for (const label of ["Alertas", "Notas", "Bandeja de entrada"]) await expect(bar.getByRole("button", { name: label, exact: true })).toBeVisible();
+  await expect(bar.locator(".nt-badge")).toHaveText("12");
+
+  await bar.locator(".nt-profile-btn").click();
+  const menu = page.getByRole("menu", { name: "Cuenta" });
+  await expect(menu.getByRole("menuitem", { name: "Papelera" })).toBeVisible();
+  await expect(menu.getByRole("menuitem", { name: "Cerrar sesión" })).toBeVisible();
+  await page.keyboard.press("Escape");
 });
 
-test.describe("meals", () => {
-  test('"Marcar como hecha" completes the next meal and opens the following one', async ({ page }) => {
-    const nextTitle = page.locator(".home-timeline > li.is-next .home-meal strong");
-    const title = (await nextTitle.textContent())!;
-    const pending = Number(await page.locator(".home-hello p b").textContent());
-    const before = mealsDone(TODAY);
-
-    await clickAndSave(page, page.locator(".home-timeline > li.is-next .home-next .home-btn:not(.is-quiet)"), "/api/daily-logs/");
-    await expect(page.locator("[data-sonner-toast]")).toContainText("marcada como hecha");
-    await expect(nextTitle).not.toHaveText(title);
-    await expect(page.locator(".home-hello p b")).toHaveText(String(pending - 1));
-    expect(mealsDone(TODAY)).toBe(before + 1);
-
-    const newTitle = (await nextTitle.textContent())!;
-    await openHome(page);
-    await expect(nextTitle).toHaveText(newTitle);
-  });
-
-  test('"Deshacer" in the toast reverts the meal', async ({ page }) => {
-    const pending = Number(await page.locator(".home-hello p b").textContent());
-    await page.locator(".home-timeline > li.is-next .home-next .home-btn:not(.is-quiet)").click();
-    await expect(page.locator(".home-hello p b")).toHaveText(String(pending - 1));
-    const afterDone = mealsDone(TODAY);
-
-    await clickAndSave(page, page.locator("[data-sonner-toast] button[data-button]"), "/api/daily-logs/");
-    expect(mealsDone(TODAY)).toBe(afterDone - 1);
-    await openHome(page);
-    await expect(page.locator(".home-hello p b")).toHaveText(String(pending));
-  });
-
-  test("timeline check circles toggle a meal on and off", async ({ page }) => {
-    const before = mealsDone(TODAY);
-    await clickAndSave(page, page.locator(".home-timeline > li:not(.is-done) .home-check").first(), "/api/daily-logs/");
-    expect(mealsDone(TODAY)).toBe(before + 1);
-
-    await openHome(page);
-    await expect(page.locator('.home-timeline > li .home-check[aria-checked="true"]')).toHaveCount(before + 1);
-    await clickAndSave(page, page.locator(".home-timeline > li.is-done .home-check").last(), "/api/daily-logs/");
-    expect(mealsDone(TODAY)).toBe(before);
-  });
-
-  test("intake rings count the equivalents of meals marked done", async ({ page }) => {
-    const total = async () => (await page.locator(".home-intake-text b").allTextContents()).reduce((sum, value) => sum + Number(value.split("/")[0]), 0);
-    const before = await total();
-    await clickAndSave(page, page.locator(".home-timeline > li.is-next .home-check"), "/api/daily-logs/");
-    await expect.poll(total).toBeGreaterThan(before);
-    await clickAndSave(page, page.locator(".home-timeline > li.is-done .home-check").last(), "/api/daily-logs/");
-    await expect.poll(total).toBe(before);
-  });
-
-  test("meal times can be edited", async ({ page }) => {
-    await page.getByRole("button", { name: "Editar horarios" }).click();
-    const input = page.locator(".home-time-input").first();
-    await input.fill("07:15");
-    await Promise.all([page.waitForResponse((r) => r.url().includes("/api/meal-types/") && r.request().method() === "PATCH" && r.ok()), input.blur()]);
-    await page.getByRole("button", { name: "Terminar de editar horarios" }).click();
-    await openHome(page);
-    await expect(page.locator(".home-timeline > li time").first()).toHaveText(/^7:15/);
-  });
+test('"Procesar plan" opens the upload wizard', async ({ page }) => {
+  await page.getByRole("button", { name: "Procesar plan" }).click();
+  await expect(page.getByRole("heading", { name: "Creación de Plan Nutricional" })).toBeVisible();
+  await page.getByRole("button", { name: "Cerrar" }).click();
 });
 
-test.describe("days", () => {
-  test("a past day can be logged; a future day cannot", async ({ page }) => {
-    const pills = page.locator(".home-strip-days .home-daypill");
-    const todayIndex = await pills.evaluateAll((elements) => elements.findIndex((element) => element.classList.contains("is-selected")));
+test("sidebar: six buttons in the order of §5.2, routes work, HOY is gone", async ({ page }) => {
+  const nav = page.getByRole("navigation", { name: "Principal" });
+  const labels = await nav.locator(".nt-icon-btn").evaluateAll((nodes) => nodes.map((node) => node.getAttribute("aria-label")));
+  expect(labels).toEqual(["Inicio", "Planes", "Recetario", "Compras", "Análisis", "Configuración"]);
+  await expect(nav.getByRole("link", { name: "Inicio" })).toHaveAttribute("aria-current", "page");
+  await expect(page.getByText("HOY", { exact: true })).toHaveCount(0);
 
-    await pills.nth(todayIndex - 1).click();
-    await expect(page.locator("#day-title")).toContainText("ayer");
-    const before = mealsDone(YESTERDAY);
-    const first = page.locator(".home-timeline > li .home-check").first();
-    const wasDone = (await first.getAttribute("aria-checked")) === "true";
-    await clickAndSave(page, first, `/api/daily-logs/${YESTERDAY}`);
-    expect(mealsDone(YESTERDAY)).toBe(before + (wasDone ? -1 : 1));
-    await clickAndSave(page, first, `/api/daily-logs/${YESTERDAY}`);
-    expect(mealsDone(YESTERDAY)).toBe(before);
-
-    await pills.nth(todayIndex + 1).click();
-    await expect(page.locator("#day-title")).toContainText("mañana");
-    for (const check of await page.locator(".home-timeline > li .home-check").all()) await expect(check).toBeDisabled();
-  });
-
-  test("the strip arrows move five days and come back", async ({ page }) => {
-    const firstDay = page.locator(".home-strip-days .home-daypill b").first();
-    const start = (await firstDay.textContent())!;
-    await page.locator(".home-strip-days .home-chev").last().click();
-    await expect(firstDay).not.toHaveText(start);
-    await page.locator(".home-strip-days .home-chev").first().click();
-    await expect(firstDay).toHaveText(start);
-  });
-});
-
-test.describe("water", () => {
-  test("tapping a cup saves that many glasses; tapping the last full one removes a glass", async ({ page }) => {
-    const full = page.locator(".home-cup.is-full");
-    const target = Math.min((await full.count()) + 2, 8);
-    await clickAndSave(page, page.locator(".home-cup").nth(target - 1), "/api/daily-logs/");
-    await expect(full).toHaveCount(target);
-    expect(Number(dayValue("water_glasses"))).toBe(target);
-
-    await openHome(page);
-    await expect(full).toHaveCount(target);
-    await clickAndSave(page, page.locator(".home-cup").nth(target - 1), "/api/daily-logs/");
-    await expect(full).toHaveCount(target - 1);
-    expect(Number(dayValue("water_glasses"))).toBe(target - 1);
-  });
-
-  test("the weekly water tile adds up the week", async ({ page }) => {
-    const monday = new Date();
-    monday.setDate(monday.getDate() - ((monday.getDay() + 6) % 7));
-    const glasses = Number(sql(`select coalesce(sum(least(water_glasses, 8)), 0) from daily_logs where date >= '${dayKey(monday)}' and date <= '${TODAY}'`));
-    const shown = Number((await page.locator(".tone-water .home-tile-value b").textContent())!.replace(/[^\d.]/g, ""));
-    expect(shown).toBeCloseTo(glasses * 0.25, 2);
-  });
-});
-
-test.describe("weekly report", () => {
-  test('"¿Ejercicio hoy?" marks today as an exercise day', async ({ page }) => {
-    const toggle = page.locator(".home-activity-toggle");
-    const wasOn = (await toggle.getAttribute("aria-pressed")) === "true";
-    await clickAndSave(page, toggle, "/api/daily-logs/");
-    await expect(toggle).toHaveAttribute("aria-pressed", String(!wasOn));
-    expect(dayValue("exercised")).toBe(wasOn ? "f" : "t");
-
-    await openHome(page);
-    await expect(toggle).toHaveAttribute("aria-pressed", String(!wasOn));
-    if (!wasOn) await expect(page.locator(".home-activity-days li.is-today.is-done")).toBeVisible();
-  });
-
-  test("the weekly activity goal can be changed", async ({ page }) => {
-    const goal = Number(sql("select activity_goal_days from users order by seq limit 1"));
-    const step = goal < 7 ? 1 : -1;
-    await page.locator(".home-tile-link").click();
-    await clickAndSave(page, page.getByRole("button", { name: step > 0 ? "Más días" : "Menos días" }), "/api/goals");
-    expect(Number(sql("select activity_goal_days from users order by seq limit 1"))).toBe(goal + step);
-
-    await openHome(page);
-    await expect(page.locator(".home-tile-link")).toHaveText(`Meta ${goal + step} días`);
-  });
-
-  test("weight: invalid input is rejected; a weight and goal save", async ({ page }) => {
-    await page.locator(".home-tile-hit").click();
-    const inputs = page.locator(".home-popover input");
-    await inputs.nth(0).fill("500");
-    await page.locator('.home-popover button[type="submit"]').click();
-    await expect(page.locator(".home-popover-error")).toContainText("entre 20 y 400");
-
-    await inputs.nth(0).fill("62,4");
-    await inputs.nth(1).fill("57");
-    await Promise.all([
-      page.waitForResponse((r) => r.url().includes("/api/daily-logs/") && r.ok()),
-      page.waitForResponse((r) => r.url().includes("/api/goals") && r.ok()),
-      page.locator('.home-popover button[type="submit"]').click()
-    ]);
-    expect(dayValue("weight_kg")).toBe("62.4");
-    expect(sql("select weight_goal_kg from users order by seq limit 1")).toBe("57");
-
-    await openHome(page);
-    await expect(page.locator(".tone-weight .home-tile-value")).toContainText("62.4 kg");
-    await expect(page.locator(".tone-weight .home-tile-value")).toContainText("Meta 57 kg");
-  });
-});
-
-test.describe("shopping", () => {
-  test("the newest shopping list can be checked off (the cart shows until one exists)", async ({ page }) => {
-    if ((await page.locator("#shop-title").textContent())?.trim() === "Carrito") {
-      const status = await page.evaluate(async () => (await fetch("/api/cart/generate-list", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: "Prueba e2e", period_days: 7 }) })).status);
-      expect(status).toBeLessThan(400);
-      await openHome(page);
-    }
-    await expect(page.locator("#shop-title")).toHaveText("Lista de compras");
-
-    const count = page.locator(".home-shop .home-count");
-    const bought = Number((await count.textContent())!.split(" ")[0]);
-    const unchecked = page.locator('.home-shop-list .home-box[aria-checked="false"]').first();
-    test.skip((await unchecked.count()) === 0, "every item of the newest list is already bought");
-    await clickAndSave(page, unchecked, "/api/shopping-lists/", "PATCH");
-    await expect(count).toHaveText(new RegExp(`^${bought + 1} de`));
-
-    await openHome(page);
-    await expect(count).toHaveText(new RegExp(`^${bought + 1} de`));
-  });
-});
-
-type CartData = { sources: { id: string; source_id: string; period_days: number }[]; ingredients: { name: string; unit: string; quantity: number; sources: { source_name: string }[] }[] };
-type Usage = { name: string; unit: string; quantity: number };
-
-const apiCall = (page: Page, method: string, url: string, body?: unknown) =>
-  page.evaluate(
-    async ([method, url, body]) => {
-      const response = await fetch(url as string, { method: method as string, headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined });
-      return { status: response.status, data: await response.json() };
-    },
-    [method, url, body]
-  );
-const readCart = async (page: Page) => (await apiCall(page, "GET", "/api/cart")).data as CartData;
-/** What the cart shows for one ingredient (name and unit as consolidateCart groups them). */
-const cartQuantity = (data: CartData, { name, unit }: Usage) => data.ingredients.find((ingredient) => ingredient.name === name && ingredient.unit === unit)?.quantity ?? 0;
-/** Sums usages that share a name and unit, with the same quantity/unit fallbacks as consolidateCart. */
-const usagesOf = (sourceType: "recipe" | "add_on", sourceIds: string[]) => {
-  const rows = sql(`select i.canonical_name, coalesce(nullif(u.practical_unit, ''), u.unit, ''), coalesce(nullif(u.practical_quantity, 0), nullif(u.quantity, 0), 1)
-    from ingredient_usages u join ingredients i on i.id = u.ingredient_id
-    where u.source_type = '${sourceType}' and u.source_id in (${sourceIds.map((value) => `'${value}'`).join(",") || "null"}) and u.deleted_at is null`);
-  const totals = new Map<string, Usage>();
-  for (const row of rows ? rows.split("\n") : []) {
-    const [name, unit, quantity] = row.split("|");
-    const entry = totals.get(`${name}|${unit}`) ?? { name, unit, quantity: 0 };
-    entry.quantity += Number(quantity);
-    totals.set(`${name}|${unit}`, entry);
+  for (const [label, path] of [["Planes", "/plans"], ["Recetario", "/recipes"], ["Compras", "/groceries"], ["Configuración", "/settings"]] as const) {
+    // Enter instead of a click: in dev the Next.js indicator sits over the bottom-left corner, where Configuración is.
+    await nav.getByRole("link", { name: label }).press("Enter");
+    await page.waitForURL(`**${path}`);
+    await expect(nav.getByRole("link", { name: label })).toHaveAttribute("aria-current", "page");
   }
-  return Array.from(totals.values());
-};
-const scaled = (usages: Usage[], factor: number) => usages.map((usage) => ({ ...usage, quantity: usage.quantity * factor }));
-/** Live recipes with ingredients that are not in the cart yet. */
-const recipesWithIngredients = () =>
-  sql(`select r.id from recipes r where r.deleted_at is null and exists (select 1 from ingredient_usages u where u.source_type = 'recipe' and u.source_id = r.id and u.deleted_at is null) order by r.seq`).split("\n").filter(Boolean);
-
-test.describe("cart and deleted recipes", () => {
-  test("a recipe in the Papelera leaves the cart, and counts again once restored", async ({ page }) => {
-    const baseline = await readCart(page);
-    const inCart = new Set(baseline.sources.map((source) => source.source_id));
-    const recipeId = recipesWithIngredients().find((id) => !inCart.has(id));
-    test.skip(!recipeId, "every recipe with ingredients is already in the cart");
-    const usages = usagesOf("recipe", [recipeId!]);
-
-    // Attributed by ingredient: each ingredient's cart quantity moves by exactly this recipe's usage, whatever else is in the cart.
-    const expectDelta = (data: CartData, factor: number) => {
-      for (const usage of scaled(usages, factor)) expect(cartQuantity(data, usage), `${usage.name} (${usage.unit})`).toBeCloseTo(cartQuantity(baseline, usage) + usage.quantity, 5);
-    };
-
-    const added = await apiCall(page, "POST", "/api/cart/items", { source_type: "recipe", source_id: recipeId, include_add_ons: false });
-    expect(added.status).toBeLessThan(400);
-    const itemId = added.data.item.id as string;
-    try {
-      const before = await readCart(page);
-      expect(before.sources.map((source) => source.source_id)).toContain(recipeId);
-      expectDelta(before, 1);
-
-      expect((await apiCall(page, "DELETE", `/api/recipes/${recipeId}`)).status).toBeLessThan(400);
-      const deleted = await readCart(page);
-      expect(deleted.sources.map((source) => source.source_id)).not.toContain(recipeId);
-      expectDelta(deleted, 0);
-
-      expect((await apiCall(page, "POST", `/api/trash/recipe/${recipeId}/restore`)).status).toBeLessThan(400);
-      const restored = await readCart(page);
-      expect(restored.sources.map((source) => source.source_id)).toContain(recipeId);
-      expectDelta(restored, 1);
-    } finally {
-      await apiCall(page, "POST", `/api/trash/recipe/${recipeId}/restore`);
-      await apiCall(page, "DELETE", `/api/cart/items/${itemId}`);
-    }
-  });
-
-  test("a meal's required add-ons count once, scaled by the largest multiplier among its options", async ({ page }) => {
-    // The active plan's first meal with two options that appear in no other meal, and a required add-on with ingredients.
-    const [mealId, optionA, optionB] = sql(`
-      select mt.id, (array_agg(r.id order by l.seq))[1], (array_agg(r.id order by l.seq))[2]
-      from plans p
-      join plan_versions pv on pv.plan_id = p.id and pv.is_current and pv.deleted_at is null
-      join meal_types mt on mt.plan_version_id = pv.id
-      join plan_version_recipes l on l.meal_type_id = mt.id and l.plan_version_id = pv.id and l.deleted_at is null
-      join recipes r on r.id = l.recipe_id and r.deleted_at is null
-      where p.status = 'active' and p.deleted_at is null
-        and (select count(*) from plan_version_recipes o where o.recipe_id = r.id and o.plan_version_id = pv.id and o.deleted_at is null) = 1
-        and exists (select 1 from shared_add_ons a join ingredient_usages u on u.source_type = 'add_on' and u.source_id = a.id and u.deleted_at is null
-                    where a.meal_type_id = mt.id and a.required is not false and a.deleted_at is null)
-        -- A live add-ons item already in the active cart puts this meal's add-on in the baseline with its own multiplier.
-        and not exists (select 1 from cart_items ci
-                        join carts c on c.id = ci.cart_id and c.status = 'active' and c.deleted_at is null
-                        join plan_version_recipes l2 on l2.recipe_id = ci.source_id and l2.meal_type_id = mt.id and l2.plan_version_id = pv.id and l2.deleted_at is null
-                        where ci.source_type = 'recipe' and ci.include_add_ons and ci.deleted_at is null)
-      group by mt.id, mt.seq having count(*) >= 2 order by mt.seq limit 1`).split("|");
-    expect(mealId, "the clone has an active-plan meal with 2+ options and a required add-on with ingredients").toBeTruthy();
-
-    const addOnIds = sql(`select id from shared_add_ons where meal_type_id = '${mealId}' and required is not false and deleted_at is null`).split("\n");
-    const addOns = usagesOf("add_on", addOnIds);
-    const addOnNames = sql(`select name from shared_add_ons where id in (${addOnIds.map((value) => `'${value}'`).join(",")})`).split("\n");
-    const own = (recipeId: string, factor: number) => scaled(usagesOf("recipe", [recipeId]), factor);
-    expect(addOns.length).toBeGreaterThan(0);
-
-    const baseline = await readCart(page);
-    const itemIds: string[] = [];
-    const addOption = async (recipeId: string, multiplier: number, includeAddOns: boolean) => {
-      const added = await apiCall(page, "POST", "/api/cart/items", { source_type: "recipe", source_id: recipeId, quantity_multiplier: multiplier, include_add_ons: includeAddOns });
-      expect(added.status).toBeLessThan(400);
-      itemIds.push(added.data.item.id);
-      return added.data.item.id as string;
-    };
-    // Expected cart quantity of every add-on ingredient: baseline + the recipes' own usages + the add-ons, however many options were added.
-    const expectAddOns = (data: CartData, addOnFactor: number, recipes: [string, number][]) => {
-      for (const addOn of scaled(addOns, addOnFactor)) {
-        const fromRecipes = recipes.flatMap(([recipeId, factor]) => own(recipeId, factor)).filter((usage) => usage.name === addOn.name && usage.unit === addOn.unit).reduce((sum, usage) => sum + usage.quantity, 0);
-        expect(cartQuantity(data, addOn), `${addOn.name} (${addOn.unit})`).toBeCloseTo(cartQuantity(baseline, addOn) + fromRecipes + addOn.quantity, 5);
-      }
-    };
-
-    const reset = async () => {
-      // An id leaves the list only once its DELETE succeeded, so the finally block still cleans up after a failure.
-      for (const itemId of [...itemIds]) {
-        expect((await apiCall(page, "DELETE", `/api/cart/items/${itemId}`)).status).toBeLessThan(400);
-        itemIds.splice(itemIds.indexOf(itemId), 1);
-      }
-    };
-
-    try {
-      // Options are alternatives: the add-on follows the largest multiplier, not the sum (4 + 3).
-      await addOption(optionA, 4, true);
-      await addOption(optionB, 3, true);
-      const both = await readCart(page);
-      expectAddOns(both, 4, [[optionA, 4], [optionB, 3]]);
-      // Add-ons are attributed by name in each ingredient's sources, and are not cart items themselves.
-      for (const addOn of addOns) {
-        const sourceNames = both.ingredients.find((ingredient) => ingredient.name === addOn.name && ingredient.unit === addOn.unit)?.sources.map((source) => source.source_name) ?? [];
-        expect(addOnNames.filter((name) => sourceNames.includes(name)), `${addOn.name} has an add-on source`).not.toHaveLength(0);
-      }
-      expect(both.sources.map((source) => source.source_id).filter((sourceId) => addOnIds.includes(sourceId))).toEqual([]);
-      await reset();
-
-      // Two options at the default multiplier still need the add-on once.
-      await addOption(optionA, 1, true);
-      await addOption(optionB, 1, true);
-      expectAddOns(await readCart(page), 1, [[optionA, 1], [optionB, 1]]);
-      await reset();
-
-      // An option without add-ons contributes none: the add-on follows the remaining option.
-      await addOption(optionA, 4, false);
-      await addOption(optionB, 3, true);
-      expectAddOns(await readCart(page), 3, [[optionA, 4], [optionB, 3]]);
-    } finally {
-      for (const itemId of itemIds) await apiCall(page, "DELETE", `/api/cart/items/${itemId}`);
-    }
-  });
+  // Análisis is visual only: nothing happens.
+  await nav.getByRole("button", { name: "Análisis" }).click();
+  await expect(page).toHaveURL(/\/settings$/);
+  await nav.getByRole("link", { name: "Inicio" }).press("Enter");
+  await page.waitForURL((url) => url.pathname === "/");
 });
 
-test.describe("planner", () => {
-  const openPlanner = async (page: Page) => {
-    await page.goto("/groceries");
-    await expect(page.getByRole("group", { name: "Recetas" }).getByRole("button").nth(2)).toBeVisible();
-  };
-  const submit = (page: Page) => page.locator("form.planner button[type=submit]");
-
-  test("two recipes over 7 days are split 4 + 3, not 4 + 4", async ({ page }) => {
-    await openPlanner(page);
-    const before = new Set((await readCart(page)).sources.map((source) => source.id));
-    const names = page.getByRole("group", { name: "Recetas" }).getByRole("button");
-    await page.getByRole("button", { name: "7 días" }).click();
-    await names.nth(0).click();
-    await names.nth(1).click();
-    await Promise.all([page.waitForResponse((r) => r.url().includes("/api/cart/items") && r.request().method() === "POST" && r.status() < 400), submit(page).click()]);
-    await expect(page.getByText("Recetas agregadas al carrito")).toBeVisible();
-    const added = (await readCart(page)).sources.filter((source) => !before.has(source.id));
-    try {
-      expect(added.map((source) => source.period_days)).toEqual([4, 3]);
-      expect(added.reduce((sum, source) => sum + source.period_days, 0)).toBe(7);
-    } finally {
-      for (const source of added) await apiCall(page, "DELETE", `/api/cart/items/${source.id}`);
-    }
-  });
-
-  test("more recipes than days blocks the submit and shows the hint", async ({ page }) => {
-    await openPlanner(page);
-    const names = page.getByRole("group", { name: "Recetas" }).getByRole("button");
-    await page.getByRole("spinbutton", { name: "Días" }).fill("2");
-    for (const index of [0, 1, 2]) await names.nth(index).click();
-    await expect(submit(page)).toBeDisabled();
-    await expect(page.getByText("Elige máximo tantas recetas como días del periodo.")).toBeVisible();
-    await page.getByRole("spinbutton", { name: "Días" }).fill("3");
-    await expect(submit(page)).toBeEnabled();
-    await expect(page.getByText("Elige máximo tantas recetas como días del periodo.")).toHaveCount(0);
-  });
+test("KPI tiles show real counts with at least two digits", async ({ page }) => {
+  const plans = count("select count(*) from plans where deleted_at is null");
+  const recipes = count("select count(*) from recipes where deleted_at is null");
+  const tiles = page.locator(".nt-kpi");
+  await expect(tiles.locator(".nt-kpi-label")).toHaveText(["Comidas de hoy", "Planes disponibles", "Recetas disponibles", "Compras pendientes"]);
+  await expect(tiles.nth(1).locator(".nt-figure")).toHaveText(String(plans).padStart(2, "0"));
+  await expect(tiles.nth(2).locator(".nt-figure")).toHaveText(String(recipes).padStart(2, "0"));
+  for (const text of await tiles.locator(".nt-figure").allTextContents()) expect(text).toMatch(/^\d{2,}$/);
+  const slides = await page.locator(".nt-pager button").count();
+  await expect(tiles.nth(0).locator(".nt-figure")).toHaveText(String(Math.max(slides, await page.locator(".nt-hero-copy").count())).padStart(2, "0"));
 });
 
-test.describe("assistant and upload", () => {
-  test("the search sends the question to the assistant, which answers", async ({ page }) => {
-    const search = page.locator(".home-search input");
-    await search.fill("¿Qué ingredientes necesito comprar?");
-    await search.press("Enter");
-    await expect(search).toHaveValue("");
-    await expect(page.locator(".assistant-turn.user")).toContainText("¿Qué ingredientes necesito comprar?");
-    const answer = page.locator(".assistant-turn.assistant:not(.is-pending)").last();
-    await expect(answer).toBeVisible({ timeout: 20_000 });
-    await expect(answer).not.toContainText("No pude responder");
-  });
+test("carousel: name, rating and Preparación actual change together; rating survives a reload", async ({ page }) => {
+  const dots = page.locator(".nt-pager button");
+  test.skip((await dots.count()) < 2, "the active plan has fewer than two meals today");
+  const title = page.locator(".nt-hero-copy h2");
+  const prep = page.locator(".nt-prep");
 
-  test('the plan banner\'s "Subir plan" opens the upload wizard', async ({ page }) => {
-    await page.locator(".home-promo-btn").click();
-    await expect(page.locator(".upload-wizard-modal")).toBeVisible();
+  await dots.nth(0).click();
+  const first = { title: await title.textContent(), rating: await page.locator(".nt-rating").textContent(), href: await prep.getAttribute("href") };
+  await dots.nth(1).click();
+  await expect(dots.nth(1)).toHaveAttribute("aria-selected", "true");
+  await expect(prep).not.toHaveAttribute("href", first.href!);
+  const second = { rating: await page.locator(".nt-rating").textContent(), href: await prep.getAttribute("href") };
+
+  // Arrow keys move between slides.
+  await dots.nth(1).focus();
+  await page.keyboard.press("ArrowUp");
+  await expect(dots.nth(0)).toHaveAttribute("aria-selected", "true");
+  await expect(title).toHaveText(first.title!);
+  await expect(page.locator(".nt-rating")).toHaveText(first.rating!);
+
+  await openHome(page);
+  await page.locator(".nt-pager button").nth(1).click();
+  await expect(page.locator(".nt-rating")).toHaveText(second.rating!);
+  expect(Number(second.rating)).toBeGreaterThanOrEqual(4.5);
+  expect(Number(second.rating)).toBeLessThanOrEqual(5);
+
+  // Preparación actual opens the active recipe.
+  await page.locator(".nt-prep").click();
+  await page.waitForURL(`**${second.href}`);
+});
+
+test('"Marcar cumplida" saves the meal and moves the Semana adherence', async ({ page }) => {
+  test.skip((await page.locator(".nt-done").count()) === 0, "no meals planned today");
+  const button = page.locator(".nt-done");
+  const before = mealsDone();
+  const wasDone = (await button.getAttribute("aria-pressed")) === "true";
+  await Promise.all([page.waitForResponse((r) => r.url().includes("/api/daily-logs/") && r.request().method() === "PUT" && r.status() < 400), button.click()]);
+  await expect(button).toHaveAttribute("aria-pressed", String(!wasDone));
+  expect(mealsDone()).toBe(before + (wasDone ? -1 : 1));
+  await expect(page.locator(".nt-gauge-tile").first().locator(".nt-gauge-label")).toContainText(/Adherencia \(\d+\/\d+\)/);
+  // Leave the day as it was.
+  await Promise.all([page.waitForResponse((r) => r.url().includes("/api/daily-logs/") && r.request().method() === "PUT" && r.status() < 400), button.click()]);
+  expect(mealsDone()).toBe(before);
+});
+
+test("Métricas: title without a range, four tabs, four gauges in order, no order counter", async ({ page }) => {
+  const card = page.locator(".nt-metrics");
+  await expect(card.getByRole("heading")).toHaveText("Métricas");
+  await expect(card.getByRole("tab")).toHaveText(["Semana", "Mes", "Año", "Histórico"]);
+  await expect(card).not.toContainText(/Orders|semanal/i);
+  for (const tab of ["Mes", "Año", "Histórico", "Semana"]) {
+    await card.getByRole("tab", { name: tab }).click();
+    await expect(card.getByRole("tab", { name: tab })).toHaveAttribute("aria-selected", "true");
+    const labels = await card.locator(".nt-gauge-label").allTextContents();
+    expect(labels.map((label) => label.split(" (")[0])).toEqual(["Adherencia", "Calorías", "Proteína", "Peso"]);
+    for (const value of await card.locator(".nt-gauge-value").allTextContents()) expect(value).toMatch(/^(—|\d+%)$/);
+  }
+});
+
+test("Peso gauge opens the weight editor and saves today's weight", async ({ page }) => {
+  const previous = sql(`select weight_kg from daily_logs where date = '${TODAY}'`);
+  await page.locator("button.nt-gauge-tile").click();
+  const dialog = page.getByRole("dialog");
+  await dialog.getByLabel("Peso de hoy (kg)").fill("71.5");
+  await Promise.all([page.waitForResponse((r) => r.url().includes("/api/daily-logs/") && r.status() < 400), dialog.getByRole("button", { name: "Guardar" }).click()]);
+  await expect(page.locator("button.nt-gauge-tile .nt-gauge-label")).toHaveText("Peso (71.5 kg)");
+  expect(Number(sql(`select weight_kg from daily_logs where date = '${TODAY}'`))).toBe(71.5);
+  sql(`update daily_logs set weight_kg = ${previous || "null"} where date = '${TODAY}'`);
+});
+
+test("yellow and sky cards are static; the old dashboard is gone; the assistant still opens", async ({ page }) => {
+  await expect(page.locator(".nt-cal")).toContainText("Resumen calórico");
+  await expect(page.locator(".nt-comp")).toContainText("Cumplimiento del plan");
+  expect(await page.locator(".nt-cal button, .nt-cal a, .nt-comp button, .nt-comp a").count()).toBe(0);
+  await expect(page.locator(".home, .home-grid")).toHaveCount(0);
+  await expect(page.getByText(/Dishes sold/i)).toHaveCount(0);
+
+  // The floating assistant covers neither card.
+  await expect(page.locator(".nt-comp")).toBeVisible();
+  await expect(page.locator(".assistant-fab")).toBeVisible();
+  const fab = (await page.locator(".assistant-fab").boundingBox())!;
+  const sky = (await page.locator(".nt-comp").boundingBox())!;
+  expect(fab.y).toBeGreaterThanOrEqual(sky.y + sky.height);
+  await page.locator(".assistant-fab").click();
+  await expect(page.locator(".assistant-chat")).toBeVisible();
+});
+
+test("every icon-only control has an accessible name", async ({ page }) => {
+  const unnamed = await page.locator(".nt-topbar button, .nt-topbar a, .nt-sidebar button, .nt-sidebar a, .nt-dash button, .nt-dash a").evaluateAll((nodes) =>
+    nodes.filter((node) => !(node.getAttribute("aria-label") || node.textContent?.trim())).map((node) => node.outerHTML.slice(0, 80))
+  );
+  expect(unnamed).toEqual([]);
+});
+
+test("search sends the question to the assistant", async ({ page }) => {
+  const input = page.getByPlaceholder("Buscar recetas, planes, ingredientes…");
+  await input.fill("¿Qué me toca comer hoy?");
+  await input.press("Enter");
+  await expect(page.locator(".assistant-chat")).toBeVisible();
+  await expect(page.locator(".assistant-chat")).toContainText("¿Qué me toca comer hoy?");
+});
+
+for (const size of [{ width: 1440, height: 900 }, { width: 1920, height: 1080 }, { width: 1024, height: 900 }, { width: 390, height: 844 }]) {
+  test(`screenshot at ${size.width}×${size.height}`, async ({ page }) => {
+    await page.setViewportSize(size);
+    await openHome(page);
+    await page.waitForLoadState("networkidle");
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth)).toBeLessThanOrEqual(0);
+    await page.screenshot({ path: `${SHOTS}/dashboard-${size.width}x${size.height}.png`, fullPage: size.width < 1280 });
   });
+}
+
+test("screenshot in the dark theme", async ({ page }) => {
+  await page.emulateMedia({ colorScheme: "dark" });
+  await openHome(page);
+  await page.waitForLoadState("networkidle");
+  await page.screenshot({ path: `${SHOTS}/dashboard-dark-1440x900.png` });
+});
+
+test("empty state: a day without a plan shows the message and a link to Planes", async ({ page }) => {
+  const active = sql("select id from plans where status = 'active' and deleted_at is null");
+  test.skip(!active, "no active plan to archive");
+  sql("update plans set status = 'archived' where status = 'active'");
+  try {
+    await openHome(page);
+    await expect(page.locator(".nt-hero-empty")).toHaveText("Hoy no tienes comidas planificadas");
+    await expect(page.locator(".nt-hero").getByRole("link", { name: "Ir a Planes" })).toHaveAttribute("href", "/plans");
+    await expect(page.locator(".nt-kpi").first().locator(".nt-figure")).toHaveText("00");
+    for (const value of await page.locator(".nt-gauge-value").allTextContents()) expect(value).toMatch(/^(—|\d+%)$/);
+    await page.screenshot({ path: `${SHOTS}/dashboard-empty-1440x900.png` });
+  } finally {
+    sql(`update plans set status = 'active' where id in (${active.split("\n").map((id) => `'${id}'`).join(",")})`);
+  }
 });

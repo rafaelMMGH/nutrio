@@ -134,9 +134,10 @@ html.dark:not(:has([data-theme-lock])) .app-shell.nt { background: var(--nt-bg);
 }
 @media (max-width: 767px) {
   .app-shell.nt { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
-  .nt-topbar { flex-wrap: wrap; row-gap: 8px; padding: 12px 16px; }
-  .nt-brand { margin-right: auto; }
-  .nt-cta { margin-left: 0; height: 44px; padding: 0 16px; order: 2; }
+  .nt-topbar { flex-wrap: wrap; gap: 8px; padding: 12px 16px; }
+  .nt-brand { margin-right: auto; gap: 8px; }
+  .nt-brand span { font-size: 17px; letter-spacing: 0.16em; }
+  .nt-cta { margin-left: 0; height: 44px; padding: 0 14px; gap: 6px; font-size: 13px; order: 2; }
   .nt-profile { order: 3; }
   .nt-search { order: 4; flex-basis: 100%; max-width: none; }
   .nt-sidebar {
