@@ -212,3 +212,20 @@ test("empty state: a day without a plan shows the message and a link to Planes",
     sql(`update plans set status = 'active' where id in (${active.split("\n").map((id) => `'${id}'`).join(",")})`);
   }
 });
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`account menu in glass, ${scheme}: header, Papelera and a red sign-out`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await openHome(page);
+    await page.locator(".nt-profile-btn").click();
+    const menu = page.getByRole("menu", { name: "Cuenta" });
+    await expect(menu.locator(".nt-menu-head strong")).not.toBeEmpty();
+    await expect(menu.getByRole("menuitem")).toHaveText(["Papelera", "Cerrar sesión"]);
+    expect(await menu.evaluate((node) => getComputedStyle(node).backdropFilter)).toContain("blur");
+    // Sign-out is the only red entry.
+    const hue = (name: string) => menu.getByRole("menuitem", { name }).evaluate((node) => getComputedStyle(node).color);
+    expect(await hue("Cerrar sesión")).not.toBe(await hue("Papelera"));
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `${SHOTS}/account-menu-${scheme}.png`, clip: { x: 1040, y: 0, width: 400, height: 280 } });
+  });
+}

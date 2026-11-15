@@ -38,6 +38,13 @@
   --nt-glass-on-b: #0e0e10;
   --nt-glass-on-shine: rgb(255 255 255 / 0.28);
   --nt-glass-on-ink: #ffffff;
+  /* Glass surfaces that hold text (the account menu): more opaque than the buttons so the text keeps its contrast. */
+  --nt-glass-menu-a: rgb(255 255 255 / 0.9);
+  --nt-glass-menu-b: rgb(246 247 249 / 0.86);
+  --nt-glass-line: rgb(14 14 16 / 0.08);
+  --nt-glass-hover: rgb(14 14 16 / 0.055);
+  --nt-danger: #b3261e;
+  --nt-danger-bg: rgb(179 38 30 / 0.09);
   color: var(--nt-ink);
 }
 /* The geometric sans only applies to the new frame and the dashboard; inner pages keep their own typeface. */
@@ -64,4 +71,10 @@ html.dark:not(:has([data-theme-lock])) .nt {
   --nt-glass-on-b: #dfe0e5;
   --nt-glass-on-shine: rgb(255 255 255 / 0.9);
   --nt-glass-on-ink: #0e0e10;
+  --nt-glass-menu-a: rgb(48 50 58 / 0.78);
+  --nt-glass-menu-b: rgb(28 29 34 / 0.7);
+  --nt-glass-line: rgb(255 255 255 / 0.1);
+  --nt-glass-hover: rgb(255 255 255 / 0.08);
+  --nt-danger: #ff8f82;
+  --nt-danger-bg: rgb(255 143 130 / 0.12);
 }

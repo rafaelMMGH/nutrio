@@ -93,7 +93,12 @@ function ProfileMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
         <ChevronDown size={16} aria-hidden />
       </button>
       {open && (
-        <div className="popover nt-profile-menu" role="menu" aria-label="Cuenta">
+        <div className="nt-profile-menu" role="menu" aria-label="Cuenta">
+          <div className="nt-menu-head" role="presentation">
+            <strong>{user.name}</strong>
+            <small>{user.email}</small>
+          </div>
+          <hr />
           {accountNav.map((item) => {
             const Icon = item.icon;
             return (
@@ -103,7 +108,7 @@ function ProfileMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
             );
           })}
           <hr />
-          <button type="button" role="menuitem" className="danger" onClick={() => { setOpen(false); onLogout(); }}>
+          <button type="button" role="menuitem" className="is-danger" onClick={() => { setOpen(false); onLogout(); }}>
             <LogOut size={17} /> Cerrar sesión
           </button>
         </div>
