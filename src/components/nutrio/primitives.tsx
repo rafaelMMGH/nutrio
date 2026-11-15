@@ -7,10 +7,10 @@ import "./primitives.css";
 
 /* Base pieces of the redesigned layout (alt-dashboard Fase 1). Colours and radii come only from tokens.css. */
 
-type IconButtonProps = { label: string; children: ReactNode; active?: boolean; badge?: string | number; href?: string; dark?: boolean } & Omit<ComponentPropsWithoutRef<"button">, "children">;
+type IconButtonProps = { label: string; children: ReactNode; active?: boolean; badge?: string | number; href?: string; dark?: boolean; hideTitle?: boolean } & Omit<ComponentPropsWithoutRef<"button">, "children">;
 
-// 44 px circular icon-only button; `label` becomes aria-label and tooltip. With `href` it renders a link.
-export function IconButton({ label, children, active, badge, href, dark, className = "", ...rest }: IconButtonProps) {
+// 44 px circular icon-only button; `label` becomes aria-label and tooltip (`hideTitle` drops the tooltip). With `href` it renders a link.
+export function IconButton({ label, children, active, badge, href, dark, hideTitle, className = "", ...rest }: IconButtonProps) {
   const cls = `nt-icon-btn${active ? " is-active" : ""}${dark ? " is-dark" : ""} ${className}`.trim();
   const inner = (
     <>
@@ -20,12 +20,12 @@ export function IconButton({ label, children, active, badge, href, dark, classNa
   );
   if (href)
     return (
-      <Link href={href} className={cls} aria-label={label} title={label} aria-current={active ? "page" : undefined}>
+      <Link href={href} className={cls} aria-label={label} title={hideTitle ? undefined : label} aria-current={active ? "page" : undefined}>
         {inner}
       </Link>
     );
   return (
-    <button type="button" className={cls} aria-label={label} title={label} {...rest}>
+    <button type="button" className={cls} aria-label={label} title={hideTitle ? undefined : label} {...rest}>
       {inner}
     </button>
   );

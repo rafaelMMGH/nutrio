@@ -1,5 +1,6 @@
 "use client";
 
+import type { ReactNode } from "react";
 import { Moon, Sun } from "lucide-react";
 import { switchTheme, useTheme } from "@/lib/client/theme";
 
@@ -8,7 +9,7 @@ import { switchTheme, useTheme } from "@/lib/client/theme";
 // hydrates. data-icon follows React for tests. The name and title stay React-driven: the server cannot know the
 // theme, so a dark user's button is named for light until hydration (a few ms); a second, CSS-hidden label would
 // break the single accessible name.
-export function ThemeToggle({ className = "" }: { className?: string }) {
+export function ThemeToggle({ className = "", children }: { className?: string; children?: ReactNode }) {
   const theme = useTheme();
   const next = theme === "dark" ? "light" : "dark";
   const label = next === "dark" ? "Cambiar a tema oscuro" : "Cambiar a tema claro";
@@ -16,6 +17,7 @@ export function ThemeToggle({ className = "" }: { className?: string }) {
     <button type="button" className={`theme-toggle ${className}`.trim()} aria-label={label} title={label} onClick={(event) => switchTheme(next, event.currentTarget)}>
       <Sun className="theme-icon-sun" size={20} aria-hidden data-icon={theme === "light" ? "sun" : undefined} />
       <Moon className="theme-icon-moon" size={20} aria-hidden data-icon={theme === "dark" ? "moon" : undefined} />
+      {children}
     </button>
   );
 }

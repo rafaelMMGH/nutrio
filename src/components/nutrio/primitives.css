@@ -46,8 +46,10 @@
 }
 .nt-icon-btn svg { width: 20px; height: 20px; stroke-width: 1.6; }
 
-/* The same glass for elements that are not icon buttons (search pill, its sparkle circle, the avatar). */
-.nt-glass {
+/* The same glass for elements that are not icon buttons (search pill, its sparkle circle, the avatar) and for the
+   sidebar menu's panels (shell.css), so the panel and the buttons on it cannot drift apart. */
+.nt-glass,
+.nt-sidebar :is(.nt-side-main, .nt-side-foot)::before {
   border: 1px solid var(--nt-glass-edge);
   background: linear-gradient(180deg, var(--nt-glass-a), var(--nt-glass-b));
   -webkit-backdrop-filter: blur(16px) saturate(140%);
@@ -68,6 +70,7 @@
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .nt-icon-btn,
   .nt-glass,
+  .nt-sidebar :is(.nt-side-main, .nt-side-foot)::before,
   .nt-sidebar .theme-toggle { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--nt-surface); border-color: var(--nt-muted); color: var(--nt-ink); }
   .nt-icon-btn.is-active,
   .nt-icon-btn.is-dark,

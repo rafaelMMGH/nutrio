@@ -180,6 +180,101 @@ html.dark:not(:has([data-theme-lock])) .app-shell.nt { background: var(--nt-bg);
 /* The theme switch takes the glass look of the other sidebar buttons (primitives.css). */
 .nt-sidebar .theme-toggle:focus-visible { outline: none; }
 
+/* Hover/focus menu. Hovering or keyboard-focusing a sidebar control opens its own group (the top one or the bottom one,
+   never both) as a menu: one glass panel grows to the right behind the group and every control of it shows its title in
+   a row. The controls keep their own glass exactly as primitives.css gives it; nothing here sets their background,
+   border, shadow, filter or transform. Nothing in the layout moves: panel, titles and row fills are absolutely
+   positioned, so every control keeps its 44 px box and the icons stay where they are.
+   Everything of a group hangs on its --nt-open (0 closed, 1 open), a number the group transitions: a delayed spring on
+   the way in, a quick ease on the way out. The delays are the hover intent (120 ms to open, 150 ms to close). Touch
+   devices and the bottom bar (up to 937 px) keep the plain icon buttons: the title and fill spans are rendered but display: none there. */
+@property --nt-open { syntax: "<number>"; inherits: true; initial-value: 0; }
+.nt-sidebar .nt-row-fill, .nt-sidebar .nt-row-title { display: none; }
+@media (min-width: 938px) and (hover: hover) and (pointer: fine) {
+  /* Above the page content and the hero (z-index up to 5), below the top bar (30) so its menus are never covered,
+     and far below the drawer (45), dialogs (50) and the assistant (60). */
+  .nt-sidebar { z-index: 20; }
+  .nt-sidebar :is(.nt-side-main, .nt-side-foot) {
+    --nt-open: 0;
+    position: relative;
+    z-index: 0;
+    /* Closed, only a control opens its group: the gaps between the icons do not. Once open, the panel (which does
+       take the pointer) keeps it open, gaps and margins included. */
+    pointer-events: none;
+    transition: --nt-open 180ms cubic-bezier(0.4, 0, 0.2, 1) 150ms;
+  }
+  .nt-sidebar :is(.nt-side-main, .nt-side-foot) :is(a, button) { pointer-events: auto; }
+  .nt-sidebar :is(.nt-side-main, .nt-side-foot):is(:hover, :has(:focus-visible)):not([data-dismissed]) {
+    --nt-open: 1;
+    /* Damped spring (zeta 0.7, about 5% overshoot), sampled every 35 ms. */
+    transition: --nt-open 560ms linear(0, 0.095, 0.297, 0.518, 0.712, 0.858, 0.956, 1.013, 1.039, 1.046, 1.041, 1.032, 1.022, 1.013, 1.006, 1.002, 1) 120ms;
+  }
+
+  /* Panel, row fills and titles are invisible, and so inert, until the group opens. The delays keep them hit-testable
+     only while the group is (or is about to be) open: 120 ms in, 150 + 180 ms out. */
+  .nt-sidebar :is(.nt-side-main, .nt-side-foot)::before, .nt-sidebar .nt-row-fill, .nt-sidebar .nt-row-title { visibility: hidden; transition: visibility 0s linear 330ms; }
+  .nt-sidebar :is(.nt-side-main, .nt-side-foot):is(:hover, :has(:focus-visible)):not([data-dismissed])::before,
+  .nt-sidebar :is(.nt-side-main, .nt-side-foot):is(:hover, :has(:focus-visible)):not([data-dismissed]) .nt-row-title { visibility: visible; transition-delay: 120ms; }
+  .nt-sidebar :is(.nt-side-main, .nt-side-foot):is(:hover, :has(:focus-visible)):not([data-dismissed]) .nt-row-fill { visibility: visible; transition-delay: 120ms, 0s; }
+
+  /* The panel's material (background, blur, border, shadow) comes from primitives.css, shared with the buttons. */
+  .nt-sidebar :is(.nt-side-main, .nt-side-foot)::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    left: -14px;
+    top: -6px;
+    box-sizing: border-box;
+    width: calc(var(--nt-open) * 200px);
+    height: calc(100% + 12px);
+    border-radius: 22px;
+    pointer-events: auto;
+    opacity: min(1, calc(var(--nt-open) * 4));
+  }
+
+  /* Row fill: the faint hover tint, spanning the panel's inner width. It is a descendant of the control, which has
+     its own background and so paints below it; a mask cuts the control's circle (and its 1 px ring) out of the fill,
+     so the circle is never tinted and the fill reads as one row behind it. The row is still the control's click area. */
+  .nt-sidebar .nt-row-fill {
+    display: block;
+    position: absolute;
+    top: -1px;
+    left: calc(-1px - var(--nt-open) * 8px);
+    width: calc(44px + var(--nt-open) * 144px);
+    height: 44px;
+    border-radius: var(--nt-radius-pill);
+    -webkit-mask-image: radial-gradient(circle at calc(22px + var(--nt-open) * 8px) 22px, transparent 23px, #000 23.5px);
+    mask-image: radial-gradient(circle at calc(22px + var(--nt-open) * 8px) 22px, transparent 23px, #000 23.5px);
+    transition-property: visibility, background-color;
+    transition-duration: 0s, 160ms;
+    transition-delay: 330ms, 0s;
+  }
+  .nt-sidebar .nt-icon-btn:not(.is-soon):is(:hover, :focus-visible) .nt-row-fill { background-color: var(--nt-glass-hover); }
+
+  /* Title: fades in just behind the panel's moving edge and is clipped to it, so no text ever shows outside the panel
+     (the edge, less a 6 px margin, sits at 200 px * open - 76 px from the title's left). */
+  .nt-sidebar .nt-row-title {
+    --nt-show: clamp(0, calc((var(--nt-open) - 0.4) * 3), 1);
+    display: flex;
+    align-items: center;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 55px;
+    font: inherit;
+    font-size: 14px;
+    line-height: 1;
+    white-space: nowrap;
+    /* Not inherited: the current page's button has light ink for its dark circle. */
+    color: var(--nt-glass-ink);
+    clip-path: inset(0 calc(100% - (var(--nt-open) * 200px - 76px)) 0 0);
+    opacity: var(--nt-show);
+    transform: translateX(calc((1 - var(--nt-show)) * -8px));
+  }
+  .nt-sidebar .nt-icon-btn.is-soon .nt-row-title { color: var(--nt-muted); }
+  .nt-sidebar .nt-row-soon { margin-left: 8px; padding: 3px 8px; border: 1px solid var(--nt-glass-line); border-radius: var(--nt-radius-pill); font-size: 11px; color: var(--nt-muted); }
+}
+
 .app-shell.nt > .content { grid-column: 2; grid-row: 2; width: 100%; box-sizing: border-box; padding-right: 32px; padding-top: 0; }
 
 @media (max-width: 1279px) {
