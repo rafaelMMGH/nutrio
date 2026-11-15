@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { LandingPlainPage } from "@/components/landing/LandingChrome";
 
-export const metadata: Metadata = { title: "Página no encontrada · Nutritional Manager" };
+export const metadata: Metadata = { title: "Página no encontrada · NUTRIO" };
 
 export default function NotFound() {
   return (

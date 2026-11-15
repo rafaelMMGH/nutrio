@@ -6,7 +6,7 @@ import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Nutritional Manager",
+  title: "NUTRIO",
   description: "Private nutritional plan manager"
 };
 

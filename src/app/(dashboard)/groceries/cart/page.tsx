@@ -5,7 +5,7 @@ import { consolidateCart } from "@/lib/domain/cart";
 import { loadFor } from "@/lib/domain/queries";
 import { getPageSession } from "@/lib/server/session";
 
-export const metadata: Metadata = { title: "Carrito · Nutritional Manager" };
+export const metadata: Metadata = { title: "Carrito · NUTRIO" };
 
 export default async function CartPage() {
   const { user } = await getPageSession();

@@ -4,7 +4,7 @@ import { listRecipes } from "@/lib/domain/plans";
 import { loadFor } from "@/lib/domain/queries";
 import { getPageSession } from "@/lib/server/session";
 
-export const metadata: Metadata = { title: "Recetario · Nutritional Manager" };
+export const metadata: Metadata = { title: "Recetario · NUTRIO" };
 
 export default async function RecipesPage() {
   const { user } = await getPageSession();

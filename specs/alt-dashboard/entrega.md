@@ -30,6 +30,7 @@ Otras decisiones menores:
 - **Asistente y tarjeta celeste:** la columna de datos termina antes del borde inferior para que el botón flotante no tape ninguna tarjeta.
 - **Icono de «Métricas»:** `gauge` (P8).
 - **Emblema:** brote de trazo fino sobre círculo celeste (`src/components/nutrio/Emblem.tsx`), aprobado el 14 nov 2026. El favicon (`src/app/icon.svg`), la marca de la página pública (landing, login, páginas legales y 404) y la imagen para redes usan el mismo dibujo; la «N» verde queda en el historial de git.
+- **Nombre:** «Nutritional Manager» pasó a «NUTRIO» en toda la interfaz (landing, login, páginas legales, títulos de pestaña e imagen para redes), a petición del 14 nov 2026. El paquete, el repositorio y la app heredada (`src/server.js`, `public/index.html`) conservan el nombre anterior.
 
 ## Preguntas abiertas para la siguiente iteración
 

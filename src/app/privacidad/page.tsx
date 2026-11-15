@@ -1,14 +1,14 @@
 import type { Metadata } from "next";
 import { LandingPlainPage } from "@/components/landing/LandingChrome";
 
-export const metadata: Metadata = { title: "Privacidad · Nutritional Manager", description: "Qué datos guarda Nutritional Manager y cómo los usa." };
+export const metadata: Metadata = { title: "Privacidad · NUTRIO", description: "Qué datos guarda NUTRIO y cómo los usa." };
 
 export default function PrivacyPage() {
   return (
     <LandingPlainPage>
       <p className="lp-meta">Actualizado el 17 de octubre de 2026</p>
       <h1>Privacidad</h1>
-      <p>Nutritional Manager es una aplicación privada para seguir tu plan de alimentación. Esta página explica qué guardamos y para qué.</p>
+      <p>NUTRIO es una aplicación privada para seguir tu plan de alimentación. Esta página explica qué guardamos y para qué.</p>
       <h2>Qué datos guardamos</h2>
       <ul>
         <li>Tu nombre y correo, para identificar tu cuenta.</li>

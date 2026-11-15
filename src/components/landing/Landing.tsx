@@ -78,7 +78,7 @@ const FAQS = [
   },
   {
     q: "¿Sustituye a mi nutriólogo?",
-    a: "No. Tu nutriólogo diseña el plan; Nutritional Manager solo te ayuda a seguirlo. No cambia porciones ni hace recomendaciones médicas."
+    a: "No. Tu nutriólogo diseña el plan; NUTRIO solo te ayuda a seguirlo. No cambia porciones ni hace recomendaciones médicas."
   },
   {
     q: "¿Puedo cambiar de plan o recuperar algo que borré?",
@@ -199,9 +199,9 @@ function IslandNav({ active }: { active: string | null }) {
   return (
     <>
       <nav className="lp-island" aria-label="Principal">
-        <Link href="/" className="lp-brand" aria-label="Nutritional Manager, inicio" onClick={() => setOpen(false)}>
+        <Link href="/" className="lp-brand" aria-label="NUTRIO, inicio" onClick={() => setOpen(false)}>
           <LandingMark />
-          <span>Nutritional Manager</span>
+          <span>NUTRIO</span>
         </Link>
         <div className="lp-island-tabs" ref={tabs}>
           <ul className="lp-island-links">
@@ -327,7 +327,7 @@ function HeroVisual() {
   const count = done.filter(Boolean).length;
 
   return (
-    <figure className="lp-hero-visual" aria-label="Demostración del inicio de Nutritional Manager: marca comidas y vasos de agua">
+    <figure className="lp-hero-visual" aria-label="Demostración del inicio de NUTRIO: marca comidas y vasos de agua">
       <div className="lp-frame">
         <div className="lp-mock lp-mock-day">
           <div className="lp-mock-head">
@@ -419,7 +419,7 @@ function Problem() {
           <li className="lp-pains-answer">
             <Sparkle size={20} weight="fill" aria-hidden />
             <span>
-              Nutritional Manager lee el PDF una vez y te entrega el plan ordenado por hora, por receta y por ingrediente.
+              NUTRIO lee el PDF una vez y te entrega el plan ordenado por hora, por receta y por ingrediente.
             </span>
           </li>
         </ul>

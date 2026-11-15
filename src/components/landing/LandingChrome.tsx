@@ -23,7 +23,7 @@ export function LandingFooter() {
       <div className="lp-wrap lp-footer-row">
         <Link href="/" className="lp-brand">
           <LandingMark />
-          <span>Nutritional Manager</span>
+          <span>NUTRIO</span>
         </Link>
         <nav aria-label="Legal">
           <ul>
@@ -38,7 +38,7 @@ export function LandingFooter() {
             </li>
           </ul>
         </nav>
-        <p>© 2026 Nutritional Manager</p>
+        <p>© 2026 NUTRIO</p>
       </div>
     </footer>
   );
@@ -55,7 +55,7 @@ export function LandingPlainPage({ children }: { children: React.ReactNode }) {
       <nav className="lp-island" aria-label="Principal">
         <Link href="/" className="lp-brand">
           <LandingMark />
-          <span>Nutritional Manager</span>
+          <span>NUTRIO</span>
         </Link>
         <Link href="/login" className="lp-btn lp-btn-sm">
           Entrar

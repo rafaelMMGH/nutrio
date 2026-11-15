@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { listTrash, loadFor } from "@/lib/domain/queries";
 import { getPageSession } from "@/lib/server/session";
 
-export const metadata: Metadata = { title: "Papelera · Nutritional Manager" };
+export const metadata: Metadata = { title: "Papelera · NUTRIO" };
 
 export default async function TrashPage() {
   const { user } = await getPageSession();

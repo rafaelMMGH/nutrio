@@ -1,6 +1,6 @@
 import { ImageResponse } from "next/og";
 
-export const alt = "Nutritional Manager: sigue tu plan de alimentación sin volver a abrir el PDF";
+export const alt = "NUTRIO: sigue tu plan de alimentación sin volver a abrir el PDF";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -17,7 +17,7 @@ export default function OpengraphImage() {
               <path d="M15.5 28h9" />
             </svg>
           </div>
-          Nutritional Manager
+          NUTRIO
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
           <div style={{ fontSize: 72, fontWeight: 700, lineHeight: 1, letterSpacing: "-0.03em" }}>Sigue tu plan de alimentación sin volver a abrir el PDF</div>

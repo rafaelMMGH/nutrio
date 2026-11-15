@@ -4,7 +4,7 @@ import { consolidateCart } from "@/lib/domain/cart";
 import { listTemplates, loadFor } from "@/lib/domain/queries";
 import { getPageSession } from "@/lib/server/session";
 
-export const metadata: Metadata = { title: "Plantillas · Nutritional Manager" };
+export const metadata: Metadata = { title: "Plantillas · NUTRIO" };
 
 export default async function TemplatesPage() {
   const { user } = await getPageSession();
