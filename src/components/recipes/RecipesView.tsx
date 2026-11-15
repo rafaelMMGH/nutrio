@@ -5,6 +5,7 @@ import { CircleCheck, Leaf, Search, X } from "lucide-react";
 import { normalize } from "@/components/dashboard/food";
 import { useShell } from "@/components/app/AppShell";
 import { UploadPlanButton } from "@/components/shared/UploadPlanButton";
+import { isDish } from "@/lib/recipes";
 import { RecipeCard } from "./RecipeCard";
 import { useRecipeActions } from "./useRecipeActions";
 import { MEAL_CATEGORIES, recipeMeta, RecipeMeta } from "./recipe-meta";
@@ -21,12 +22,12 @@ export function RecipesView({ recipes }: Props) {
   const [category, setCategory] = useState<string | null>(null);
   const search = normalize(useDeferredValue(query));
 
-  // Only dishes from the plans: a single-ingredient option ("Plátano", "Mango picado") is an ingredient, not a meal.
+  // Only dishes from the plans (see isDish).
   const entries: Entry[] = useMemo(
     () =>
       recipes
         .map((recipe) => ({ recipe, meta: recipeMeta(recipe), haystack: normalize([recipe.name, ...(recipe.ingredients ?? []).map((item: any) => item.name)].join(" ")) }))
-        .filter((entry) => entry.meta.ingredientCount > 1),
+        .filter((entry) => isDish(entry.meta.ingredientCount)),
     [recipes]
   );
 

@@ -1,6 +1,6 @@
 import type { AppDb, AppUser } from "@/lib/types";
 import { consolidateCart } from "@/lib/domain/cart";
-import { activePlan, activeSchedule, listRecipes } from "@/lib/domain/plans";
+import { activePlan, activeSchedule, dishRecipes, listRecipes } from "@/lib/domain/plans";
 import { ingredientKey } from "@/lib/domain/nutrition";
 import { cartCollections, loadDb, recipeCollections, union, type Collection } from "@/lib/storage/store";
 
@@ -10,7 +10,7 @@ import { cartCollections, loadDb, recipeCollections, union, type Collection } fr
 export const needs = {
   activePlan: ["plans", "planVersions"],
   cart: cartCollections,
-  chef: ["recipes"],
+  chef: ["recipes", "ingredientUsages"],
   chat: union(cartCollections, recipeCollections, ["mealTypes", "mealOptions", "dailyLogs"]),
   dashboard: union(cartCollections, recipeCollections, ["mealTypes", "mealOptions", "dailyLogs"]),
   plans: ["plans", "planVersions"],
@@ -33,7 +33,7 @@ export function listPlans(db: AppDb, userId: string) {
 
 // Newest recipes for the top bar's "Chef's selection": the three latest and how many more there are.
 export function chefSelection(db: AppDb, userId: string) {
-  const recipes = db.recipes.filter((item) => item.user_id === userId && !item.deleted_at);
+  const recipes = dishRecipes(db, userId);
   const latest = recipes.slice(-3).reverse().map(({ id, name }) => ({ id, name }));
   return { latest, rest: Math.max(0, recipes.length - latest.length) };
 }
@@ -68,14 +68,13 @@ export function getSettings(db: AppDb, userId: string) {
 export function dashboardSummary(db: AppDb, userId: string) {
   const cart = consolidateCart(db, userId);
   const lists = db.shoppingLists.filter((item) => item.user_id === userId && !item.deleted_at);
-  const recipes = db.recipes.filter((item) => item.user_id === userId && !item.deleted_at);
   return {
     activePlan: activePlan(db, userId),
     cartCount: cart.sources.length,
     cartIngredients: cart.ingredients.length,
     lastList: lists.at(-1) || null,
     listsCount: lists.length,
-    recipesCount: recipes.length,
+    recipesCount: dishRecipes(db, userId).length,
     plannedDays: cart.sources.reduce((sum, item) => sum + Number(item.period_days || 0), 0),
     schedule: activeSchedule(db, userId),
     dailyLogs: db.dailyLogs

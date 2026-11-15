@@ -4,6 +4,7 @@ import type { AppDb, Plan, PlanVersion, Recipe, StructuredPlan } from "@/lib/typ
 import { storageDir } from "@/lib/storage/db";
 import { canonicalHash, ensureIngredientUsage, id, now } from "@/lib/domain/nutrition";
 import { extractPlanFromPdf } from "@/lib/domain/pdf-plan";
+import { isDish } from "@/lib/recipes";
 
 export function activePlan(db: AppDb, userId: string) {
   const plan = db.plans.find((item) => item.user_id === userId && item.status === "active" && !item.deleted_at);
@@ -152,6 +153,15 @@ export function recipeDetails(db: AppDb, recipe: Recipe) {
 // Recipes the user can see in the Recetario, with ingredients and plan appearances.
 export function listRecipes(db: AppDb, userId: string) {
   return db.recipes.filter((item) => item.user_id === userId && !item.deleted_at).map((recipe) => recipeDetails(db, recipe));
+}
+
+// The user's recipes that pass `isDish`, in order. Counts the same live ingredient rows as `recipeDetails`; needs only recipes and ingredientUsages.
+export function dishRecipes(db: AppDb, userId: string) {
+  const counts = new Map<string, number>();
+  for (const usage of db.ingredientUsages) {
+    if (usage.source_type === "recipe" && !usage.deleted_at) counts.set(usage.source_id, (counts.get(usage.source_id) ?? 0) + 1);
+  }
+  return db.recipes.filter((item) => item.user_id === userId && !item.deleted_at && isDish(counts.get(item.id) ?? 0));
 }
 
 export function findRecipe(db: AppDb, userId: string, recipeId: string) {

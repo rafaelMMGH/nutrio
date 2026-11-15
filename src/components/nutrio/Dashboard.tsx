@@ -20,7 +20,7 @@ export type DashboardProps = {
   weightGoal: number | null;
   counts: { plans: number; recipes: number; pendingGroceries: number };
   /** What the KPI tiles say under their numbers; computed on the server so both renders agree. */
-  kpiContext: { planName: string | null; newRecipes: number; groceries: GroceriesSource };
+  kpiContext: { plan: string; planName: string | null; newRecipes: number; groceries: GroceriesSource };
 };
 
 // Redesigned dashboard (specs/alt-dashboard/plan.md): hero carousel on the left, data column on the right.
@@ -62,7 +62,11 @@ export function Dashboard({ meals, dailyLogs, kcalGoal, proteinPct, weightGoal: 
     <div className="nt-dash">
       <Hero meals={meals} doneIds={todayLog.meals_done} onToggle={toggleMeal} />
       <div className="nt-data">
-        <KpiRow kpis={{ mealsDone: countDoneToday(slotIds, todayLog.meals_done), ...counts }} contexts={kpiContexts({ planned: meals.length, ...kpiContext })} />
+        <KpiRow
+          kpis={{ mealsDone: countDoneToday(slotIds, todayLog.meals_done), ...counts }}
+          contexts={kpiContexts({ planned: meals.length, plan: kpiContext.plan, newRecipes: kpiContext.newRecipes, recipes: counts.recipes, pending: counts.pendingGroceries, groceries: kpiContext.groceries })}
+          planName={kpiContext.planName}
+        />
         <MetricsCard period={period} onPeriod={setPeriod} metrics={metrics} weightToday={todayLog.weight_kg ?? null} weightGoal={weightGoal} onSaveWeight={saveWeight} />
         <div className="nt-pair">
           <CaloriesCard />

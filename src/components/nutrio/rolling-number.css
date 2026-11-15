@@ -18,3 +18,6 @@
 }
 .nt-roll-strip i { display: block; height: 1em; text-align: center; font-style: normal; }
 .nt-roll-strip i::before { content: attr(data-glyph); }
+/* Zero with dashForZero: one dash in a digit-sized cell (one cell instead of two for a two-digit number), so the height and line box do not change. */
+.nt-roll-dash { flex: none; width: 0.62em; height: 1em; text-align: center; }
+.nt-roll-dash::before { content: attr(data-glyph); }

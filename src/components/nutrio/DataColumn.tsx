@@ -14,10 +14,11 @@ import { RollingNumber } from "./RollingNumber";
 export type Kpis = { mealsDone: number; plans: number; recipes: number; pendingGroceries: number };
 export type KpiContexts = ReturnType<typeof kpiContexts>;
 
-export function KpiRow({ kpis, contexts }: { kpis: Kpis; contexts: KpiContexts }) {
-  const tiles: { label: string; value: number; context: string; icon: ReactNode }[] = [
+/** `planName` is the full name of the active plan, shown on hover of the Planes line (which only says since when it exists). */
+export function KpiRow({ kpis, contexts, planName }: { kpis: Kpis; contexts: KpiContexts; planName: string | null }) {
+  const tiles: { label: string; value: number; context: string; title?: string; icon: ReactNode }[] = [
     { label: "Comidas", value: kpis.mealsDone, context: contexts.meals, icon: <HandPlatter /> },
-    { label: "Planes", value: kpis.plans, context: contexts.plan, icon: <ClipboardList /> },
+    { label: "Planes", value: kpis.plans, context: contexts.plan, title: planName ?? undefined, icon: <ClipboardList /> },
     { label: "Recetas", value: kpis.recipes, context: contexts.recipes, icon: <ConciergeBell /> },
     { label: "Compras", value: kpis.pendingGroceries, context: contexts.groceries, icon: <Package /> }
   ];
@@ -29,8 +30,8 @@ export function KpiRow({ kpis, contexts }: { kpis: Kpis; contexts: KpiContexts }
           <span className="nt-kpi-text">
             <span className="nt-kpi-label">{tile.label}</span>
             {/* The number rolls once its own tile has landed (450 ms entrance). */}
-            <RollingNumber value={tile.value} minDigits={2} delay={index * 60 + 450} />
-            <span className="nt-kpi-context" title={tile.context}>{tile.context}</span>
+            <RollingNumber value={tile.value} minDigits={2} delay={index * 60 + 450} dashForZero />
+            <span className="nt-kpi-context" title={tile.title ?? tile.context}>{tile.context}</span>
           </span>
         </Card>
       ))}
