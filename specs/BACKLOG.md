@@ -2,13 +2,19 @@
 
 Open work for future sessions. The orchestrator should read this at session start and offer the top open item. Tick items when done; move finished items to "Done" with the date.
 
-_Last updated: 2026-11-14 (guard merged as PR #8; Escape PR #9 open; period planner fixed on its branch)_
+_Last updated: 2026-11-15 (alt-dashboard: KPI motion, scrollbar fix, 937px breakpoint rule; e2e work paused by the user)_
 
 ## In progress
 
 - [ ] **Dashboard redesign (`alt-dashboard`, pushed, no PR until the user reviews).** Plan, reference, screenshots and the delivery summary with default decisions and open questions are in `specs/alt-dashboard/` (`entrega.md`). Built outside the spec route at the user's request: the plan is the spec. Left to do:
   - Old e2e specs written for the previous shell and home (theme-palette, theme-switch, a-theme-visual snapshots, assistant-parity/look and others) still reference removed elements (`.home-*`, "Editar horarios", weight popover). Shell selectors were updated mechanically; the rest need a rewrite or removal per test.
   - Open questions in `entrega.md` (emblem approval, real photos, real calories/protein, visual-only cards).
+  - **E2E debt from 2026-11-15** (the user said no e2e work until they say so; only the 1920×800 "fits" size was allowed):
+    - `dashboard.spec.ts` screenshots can catch the KPI entrance mid-flight: pass `animations: "disabled"` to the `page.screenshot` calls, make the `settle` helper tolerate cancelled animations, then regenerate `specs/alt-dashboard/screenshots/` (the PNGs in the tree are stale and uncommitted).
+    - The top-bar test (first in the serial file, so it skips the rest) still expects the old centring and a "Notas" button.
+    - Nothing covers 768–937px wide (the new compact range) or 860–899px tall.
+  - **Calories card clipped between 860 and 899px tall** (up to about 40px at 860; older than `05e2f46`). Option on the table: keep the compact card layout up to about 916px tall, which changes the look at 1440×900. Needs the user. See `specs/bugs/dashboard-fit-scroll.md`.
+  - **Not yet seen in a browser by an agent:** the 768–937px look (bottom bar, 2×2 KPI grid, single-column page grids, `.page-head` as a grid), and the plate's cut edge at short heights.
 
 ## Needs the user
 
@@ -47,6 +53,8 @@ Findings, with file:line references: `specs/bugs/shopping-list-findings.md`.
 - [ ] Optional: in `src/lib/client/theme.ts`, after a real reveal-update failure, call `applyTheme(next)` as a fallback so the stored choice and the page agree.
 
 ## Done
+
+- 2026-11-15: **`alt-dashboard` session** (all on the branch, not pushed): KPI tiles in glass (`05e2f46`); the `prefers-reduced-motion` rule removed from `CLAUDE.md` at the user's request (`2046b9c`); playful KPI tile motion, CSS only, with three e2e tests (`1caee72`); hairline on the profile pill (`c0ffcd2`); dashboard fits wide, short windows without a page scrollbar (`a2560ec`, note `specs/bugs/dashboard-fit-scroll.md`); "Notas" button removed (`e6e7708`); compact breakpoint moved from 767px to 937px project-wide with a `CLAUDE.md` rule and Tailwind `md` at 938px (`f3a71b7`).
 
 - 2026-11-14: **E2E run guard** merged as PR #8 (`tests/e2e/run-lock.ts`, lock at config load, 10 unit tests; known limits in `specs/bugs/e2e-run-guard.md`). `stash@{0}` still holds the user's own unrelated changes (the `src/server.js` deletion and `package.json` dropping `legacy:dev`): never pop or drop it without the user.
 - 2026-11-14: **Escape in popups** (`fix/escape-popups`, PR #9 open): an open popup takes Escape first. Note: `specs/bugs/escape-popups.md`.
