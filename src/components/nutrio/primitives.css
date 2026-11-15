@@ -45,11 +45,33 @@
   color: var(--nt-glass-on-ink);
 }
 .nt-icon-btn svg { width: 20px; height: 20px; stroke-width: 1.6; }
+
+/* The same glass for elements that are not icon buttons (search pill, its sparkle circle, the avatar). */
+.nt-glass {
+  border: 1px solid var(--nt-glass-edge);
+  background: linear-gradient(180deg, var(--nt-glass-a), var(--nt-glass-b));
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+  box-shadow:
+    inset 0 1px 0 var(--nt-glass-shine),
+    inset 0 -6px 8px -6px var(--nt-glass-glow),
+    0 0 0 1px var(--nt-glass-ring),
+    0 8px 16px -10px var(--nt-glass-shadow);
+  color: var(--nt-glass-ink);
+}
+.nt-glass.is-ink {
+  border-color: transparent;
+  background: linear-gradient(180deg, var(--nt-glass-on-a), var(--nt-glass-on-b));
+  box-shadow: inset 0 1px 0 var(--nt-glass-on-shine), 0 0 0 1px var(--nt-glass-ring), 0 8px 16px -10px var(--nt-glass-shadow);
+  color: var(--nt-glass-on-ink);
+}
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more) {
   .nt-icon-btn,
+  .nt-glass,
   .nt-sidebar .theme-toggle { -webkit-backdrop-filter: none; backdrop-filter: none; background: var(--nt-surface); border-color: var(--nt-muted); color: var(--nt-ink); }
   .nt-icon-btn.is-active,
-  .nt-icon-btn.is-dark { background: var(--nt-ink); border-color: var(--nt-ink); color: var(--nt-on-ink); }
+  .nt-icon-btn.is-dark,
+  .nt-glass.is-ink { background: var(--nt-ink); border-color: var(--nt-ink); color: var(--nt-on-ink); }
 }
 .nt-badge {
   position: absolute;

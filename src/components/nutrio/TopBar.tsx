@@ -9,6 +9,7 @@ import { useDismiss } from "@/components/useDismiss";
 import { MAX_MESSAGE, messageLength } from "@/lib/assistant";
 import { Emblem } from "./Emblem";
 import { IconButton } from "./primitives";
+import "./primitives.css";
 import "./shell.css";
 
 export type Chef = { latest: { id: string; name: string }[]; rest: number };
@@ -66,8 +67,8 @@ function AiSearch({ busy, onAsk }: { busy: boolean; onAsk: (message: string) => 
     await onAsk(message);
   }
   return (
-    <form className="nt-search" role="search" onSubmit={submit}>
-      <span className="nt-search-icon" aria-hidden>
+    <form className="nt-search nt-glass" role="search" onSubmit={submit}>
+      <span className="nt-search-icon nt-glass is-ink" aria-hidden>
         <Sparkles size={16} fill="currentColor" />
       </span>
       <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar recetas, planes, ingredientes…" aria-label="Preguntar al asistente" enterKeyHint="send" disabled={busy} />
@@ -82,7 +83,7 @@ function ProfileMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
   return (
     <div className="nt-profile" ref={ref}>
       <button type="button" className="nt-profile-btn" aria-haspopup="menu" aria-expanded={open} aria-label={`Cuenta de ${user.name}`} onClick={() => setOpen(!open)}>
-        <span className="nt-avatar" aria-hidden>
+        <span className="nt-avatar nt-glass" aria-hidden>
           {String(user.name || "U").charAt(0).toUpperCase()}
         </span>
         <span className="nt-profile-text">
