@@ -10,6 +10,7 @@ import { cartCollections, loadDb, recipeCollections, union, type Collection } fr
 export const needs = {
   activePlan: ["plans", "planVersions"],
   cart: cartCollections,
+  chef: ["recipes"],
   chat: union(cartCollections, recipeCollections, ["mealTypes", "mealOptions", "dailyLogs"]),
   dashboard: union(cartCollections, recipeCollections, ["mealTypes", "mealOptions", "dailyLogs"]),
   plans: ["plans", "planVersions"],
@@ -28,6 +29,13 @@ export function listPlans(db: AppDb, userId: string) {
   return db.plans
     .filter((item) => item.user_id === userId && !item.deleted_at)
     .map((plan) => ({ ...plan, current_version: db.planVersions.find((entry) => entry.plan_id === plan.id && entry.is_current && !entry.deleted_at) || null }));
+}
+
+// Newest recipes for the top bar's "Chef's selection": the three latest and how many more there are.
+export function chefSelection(db: AppDb, userId: string) {
+  const recipes = db.recipes.filter((item) => item.user_id === userId && !item.deleted_at);
+  const latest = recipes.slice(-3).reverse().map(({ id, name }) => ({ id, name }));
+  return { latest, rest: Math.max(0, recipes.length - latest.length) };
 }
 
 export function listShoppingLists(db: AppDb, userId: string) {

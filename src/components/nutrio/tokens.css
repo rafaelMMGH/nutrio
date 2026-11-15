@@ -24,9 +24,10 @@
   --nt-gap: 16px;
   --nt-gap-lg: 20px;
   --nt-focus: 0 0 0 3px color-mix(in srgb, var(--nt-sky-deep) 45%, transparent);
-  font-family: var(--font-nt), system-ui, sans-serif;
   color: var(--nt-ink);
 }
+/* The geometric sans only applies to the new frame and the dashboard; inner pages keep their own typeface. */
+.nt-topbar, .nt-sidebar, .nt-dash { font-family: var(--font-nt), system-ui, sans-serif; }
 
 /* Dark theme: a basic inversion of the neutrals; the coloured cards keep their light ink. */
 html.dark:not(:has([data-theme-lock])) .nt {

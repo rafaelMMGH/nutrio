@@ -1,4 +1,4 @@
-import { CalendarCheck, ClipboardList, Settings, ShoppingCart, Trash2, Utensils } from "lucide-react";
+import { ChartColumn, CalendarDays, CookingPot, LayoutGrid, Settings, ShoppingBasket, Trash2 } from "lucide-react";
 
 export type ViewKey = "dashboard" | "plans" | "recipes" | "groceries" | "settings" | "trash";
 
@@ -15,17 +15,18 @@ export function hrefFor(view: ViewKey) {
   return ROUTES[view];
 }
 
-export const mainNav: { key: ViewKey; label: string; icon: any }[] = [
-  { key: "dashboard", label: "Hoy", icon: CalendarCheck },
-  { key: "plans", label: "Planes", icon: ClipboardList },
-  { key: "recipes", label: "Recetario", icon: Utensils },
-  { key: "groceries", label: "Compras", icon: ShoppingCart }
+// Sidebar order (alt-dashboard §5.2). Análisis has no destination yet (`key: null`).
+export const sidebarNav: { key: ViewKey | null; label: string; icon: any; bottom?: boolean }[] = [
+  { key: "dashboard", label: "Inicio", icon: LayoutGrid },
+  { key: "plans", label: "Planes", icon: CalendarDays },
+  { key: "recipes", label: "Recetario", icon: CookingPot },
+  { key: "groceries", label: "Compras", icon: ShoppingBasket },
+  { key: null, label: "Análisis", icon: ChartColumn },
+  { key: "settings", label: "Configuración", icon: Settings, bottom: true }
 ];
 
-export const accountNav: { key: ViewKey; label: string; icon: any }[] = [
-  { key: "settings", label: "Configuración", icon: Settings },
-  { key: "trash", label: "Papelera", icon: Trash2 }
-];
+// Account menu entries that are not in the sidebar.
+export const accountNav: { key: ViewKey; label: string; icon: any }[] = [{ key: "trash", label: "Papelera", icon: Trash2 }];
 
 // Which nav item a URL belongs to, e.g. "/recipes/abc" -> recipes.
 export function activeView(pathname: string): ViewKey {

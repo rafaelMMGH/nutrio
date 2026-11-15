@@ -41,7 +41,18 @@ export function activeSchedule(db: AppDb, userId: string) {
       };
     });
   const water = version.structured_data.nutrition_summary?.water_liters as { min?: number } | undefined;
-  return { plan_id: plan.id, plan_name: plan.name, plan_version_id: version.id, water_goal_liters: water?.min ?? null, meals };
+  const summary = version.structured_data.nutrition_summary ?? {};
+  const kcal = Number(summary.kcal);
+  const proteinPct = Number((summary.macros as { proteinas?: number } | undefined)?.proteinas);
+  return {
+    plan_id: plan.id,
+    plan_name: plan.name,
+    plan_version_id: version.id,
+    water_goal_liters: water?.min ?? null,
+    kcal_goal: kcal > 0 ? kcal : null,
+    protein_pct: proteinPct > 0 ? proteinPct : null,
+    meals
+  };
 }
 
 export function materializePlan(db: AppDb, userId: string, plan: Plan, structuredData: StructuredPlan, pdf: AppDb["uploadedPdfs"][number]) {

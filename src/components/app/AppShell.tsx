@@ -1,19 +1,18 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { createContext, FormEvent, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createContext, FormEvent, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { CheckCircle2, ChevronDown, LogOut, X } from "lucide-react";
+import { CheckCircle2, X } from "lucide-react";
+import { TopBar, type Chef } from "@/components/nutrio/TopBar";
+import { Sidebar } from "@/components/nutrio/Sidebar";
+import "@/components/nutrio/tokens.css";
 import { Button } from "@/components/ui/button";
 import { Stepper12 } from "@/components/ui/stepper-12";
 import { formatTime, mealLabel, plural, qty } from "@/components/dashboard/food";
-import { useDismiss } from "@/components/useDismiss";
 import { Badge, ConfirmationDialogHost, Empty } from "@/components/app/feedback";
-import { accountNav, activeView, hrefFor, mainNav } from "@/components/app/navigation";
 import { AssistantPageProvider, useAssistantState } from "@/components/app/assistant";
 import { AssistantChat, SHEET_QUERY } from "@/components/shared/AssistantChat";
-import { ThemeToggle } from "@/components/app/ThemeToggle";
 import "./shell.css";
 import { api, getErrorMessage } from "@/lib/client/api";
 import { useMediaQuery } from "@/lib/client/useMediaQuery";
@@ -37,10 +36,10 @@ export function useShell() {
   return shell;
 }
 
-type Props = { user: ShellUser; children: ReactNode };
+type Props = { user: ShellUser; chef: Chef; children: ReactNode };
 
 // Frame shared by every signed-in page: top bar, floating assistant and the PDF upload wizard.
-export function AppShell({ user, children }: Props) {
+export function AppShell({ user, chef, children }: Props) {
   const router = useRouter();
   const [wizard, setWizard] = useState<{ step: number; data: any } | null>(null);
   const assistant = useAssistantState();
@@ -82,16 +81,9 @@ export function AppShell({ user, children }: Props) {
 
   return (
     <ShellContext.Provider value={shell}>
-      <div className="app-shell">
-        <header className="topbar" inert={sheet}>
-          <div className="topbar-account">
-            <UserMenu user={user} onLogout={logout} />
-            <ThemeToggle />
-          </div>
-          <div className="topbar-island">
-            <RoutedNav />
-          </div>
-        </header>
+      <div className="app-shell nt">
+        <TopBar user={user} chef={chef} busy={assistantBusy} onAsk={askAssistant} onUpload={shell.openUpload} onLogout={logout} inert={sheet} />
+        <Sidebar inert={sheet} />
         <AssistantPageProvider value={assistant.setPage}>
           <main className="content" inert={sheet}>{children}</main>
         </AssistantPageProvider>
@@ -111,64 +103,6 @@ export function AppShell({ user, children }: Props) {
         <ConfirmationDialogHost />
       </div>
     </ShellContext.Provider>
-  );
-}
-
-// Highlights the section the current URL belongs to.
-function RoutedNav() {
-  return <MainNav active={activeView(usePathname())} />;
-}
-
-function MainNav({ active }: { active: string | null }) {
-  return (
-    <nav className="nav" aria-label="Principal">
-      {mainNav.map((item) => {
-        const Icon = item.icon;
-        const current = active === item.key;
-        return (
-          <Link key={item.key} href={hrefFor(item.key)} className={current ? "pill active" : "pill"} aria-current={current ? "page" : undefined}>
-            <Icon size={18} />
-            <span>{item.label}</span>
-          </Link>
-        );
-      })}
-    </nav>
-  );
-}
-
-function UserMenu({ user, onLogout }: { user: ShellUser; onLogout: () => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useDismiss(open, () => setOpen(false), ref);
-  return (
-    <div className="user-menu" ref={ref}>
-      <button type="button" className="user-chip" aria-haspopup="menu" aria-expanded={open} aria-label={`Cuenta de ${user.name}`} onClick={() => setOpen(!open)}>
-        <span className="avatar" aria-hidden>
-          {String(user.name || "U").charAt(0).toUpperCase()}
-        </span>
-        <span className="user-text">
-          <strong>{user.name}</strong>
-          <small>{user.email}</small>
-        </span>
-        <ChevronDown size={16} className="user-caret" aria-hidden />
-      </button>
-      {open && (
-        <div className="popover user-popover" role="menu" aria-label="Cuenta">
-          {accountNav.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link role="menuitem" key={item.key} href={hrefFor(item.key)} onClick={() => setOpen(false)}>
-                <Icon size={17} /> {item.label}
-              </Link>
-            );
-          })}
-          <hr />
-          <button type="button" role="menuitem" className="danger" onClick={() => { setOpen(false); onLogout(); }}>
-            <LogOut size={17} /> Cerrar sesión
-          </button>
-        </div>
-      )}
-    </div>
   );
 }
 
