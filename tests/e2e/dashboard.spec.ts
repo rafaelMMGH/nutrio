@@ -78,12 +78,15 @@ test("KPI tiles show real counts with at least two digits", async ({ page }) => 
   const plans = count("select count(*) from plans where deleted_at is null");
   const recipes = count("select count(*) from recipes where deleted_at is null");
   const tiles = page.locator(".nt-kpi");
-  await expect(tiles.locator(".nt-kpi-label")).toHaveText(["Comidas de hoy", "Planes disponibles", "Recetas disponibles", "Compras pendientes"]);
-  await expect(tiles.nth(1).locator(".nt-figure")).toHaveText(String(plans).padStart(2, "0"));
-  await expect(tiles.nth(2).locator(".nt-figure")).toHaveText(String(recipes).padStart(2, "0"));
-  for (const text of await tiles.locator(".nt-figure").allTextContents()) expect(text).toMatch(/^\d{2,}$/);
-  const slides = await page.locator(".nt-pager button").count();
-  await expect(tiles.nth(0).locator(".nt-figure")).toHaveText(String(Math.max(slides, await page.locator(".nt-hero-copy").count())).padStart(2, "0"));
+  await expect(tiles.locator(".nt-kpi-label")).toHaveText(["Comidas", "Planes", "Recetas", "Compras"]);
+  await expect(tiles.nth(1).locator(".nt-roll")).toHaveText(String(plans).padStart(2, "0"));
+  await expect(tiles.nth(2).locator(".nt-roll")).toHaveText(String(recipes).padStart(2, "0"));
+  // The accessible text is the padded number, not the glyphs of the digit columns.
+  for (const text of await tiles.locator(".nt-roll").allTextContents()) expect(text).toMatch(/^\d{2,}$/);
+  // Comidas is how many of today's meals are marked done.
+  const doneIds = sql(`select array_to_string(meals_done, ',') from daily_logs where date = '${TODAY}'`).split(",");
+  await expect(tiles.nth(0).locator(".nt-roll")).toHaveText(String(slotIds().filter((id) => doneIds.includes(id)).length).padStart(2, "0"));
+  for (const context of await tiles.locator(".nt-kpi-context").allTextContents()) expect(context.length).toBeGreaterThan(0);
 });
 
 const settle = (page: Page) => page.evaluate(() => Promise.all(document.getAnimations().map((animation) => animation.finished)).then(() => undefined));
@@ -108,12 +111,13 @@ test("KPI tiles pop in one after another, then rest fully visible", async ({ pag
   delays.forEach((delay, index) => index && expect(delay).toBeGreaterThan(delays[index - 1]));
   expect(delays[3] + declared[3].duration).toBeLessThan(700);
 
-  // The number pops after its own tile has landed, and its text is never rewritten.
-  const figures = await tiles.locator(".nt-figure").evaluateAll((nodes) => nodes.map((node) => ({ name: getComputedStyle(node).animationName, delay: parseFloat(getComputedStyle(node).animationDelay) * 1000 })));
-  figures.forEach((figure, index) => {
-    expect(figure.name).toBe("nt-kpi-pop");
-    expect(figure.delay).toBeGreaterThanOrEqual(declared[index].delay + declared[index].duration);
-  });
+  // The digits roll from zero once their own tile has landed, and the text is the real padded value.
+  const rolls = await tiles.locator(".nt-roll-strip").evaluateAll((nodes) => nodes.map((node) => ({ name: getComputedStyle(node).animationName, delay: parseFloat(getComputedStyle(node).animationDelay) * 1000, tile: [...document.querySelectorAll(".nt-kpi")].indexOf(node.closest(".nt-kpi")!) })));
+  expect(rolls.length).toBeGreaterThanOrEqual(8);
+  for (const roll of rolls) {
+    expect(roll.name).toBe("nt-roll-in");
+    expect(roll.delay).toBeGreaterThanOrEqual(declared[roll.tile].delay + declared[roll.tile].duration);
+  }
 
   await settle(page);
   for (const index of [0, 1, 2, 3]) {
@@ -124,6 +128,15 @@ test("KPI tiles pop in one after another, then rest fully visible", async ({ pag
   }
   const tops = await tiles.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().top));
   expect(new Set(tops).size).toBe(1);
+  // At rest every digit column sits on its digit, and the hidden text equals the padded value.
+  const resting = await tiles.locator(".nt-roll").evaluateAll((nodes) =>
+    nodes.map((node) => ({ text: node.textContent, digits: [...node.querySelectorAll(".nt-roll-digit")].map((digit) => ({ wanted: getComputedStyle(digit).getPropertyValue("--nt-roll-d"), top: digit.getBoundingClientRect().top, glyphTop: digit.querySelector(`i[data-glyph="${getComputedStyle(digit).getPropertyValue("--nt-roll-d").trim()}"]`)!.getBoundingClientRect().top })) }))
+  );
+  for (const roll of resting) {
+    expect(roll.text).toMatch(/^\d{2,}$/);
+    expect(roll.digits.map((digit) => digit.wanted.trim()).join("")).toBe(roll.text);
+    for (const digit of roll.digits) expect(Math.abs(digit.glyphTop - digit.top)).toBeLessThan(1);
+  }
 });
 
 // A product decision by the user: the KPI motion plays for everyone, even with reduced motion on the OS. Do not "fix" this.
@@ -132,7 +145,7 @@ test("KPI tiles still animate when the OS asks for reduced motion", async ({ pag
   await openHome(page);
   const tile = page.locator(".nt-kpi").first();
   expect(await style(tile, null, "animation-name")).toBe("nt-kpi-in");
-  expect(await style(tile, ".nt-figure", "animation-name")).toBe("nt-kpi-pop");
+  expect(await style(tile, ".nt-roll-strip >> nth=0", "animation-name")).toBe("nt-roll-in");
 });
 
 test("KPI tile lifts 3px and wiggles its icon on hover, squashes on press", async ({ page }) => {
@@ -257,6 +270,23 @@ test('"Marcar cumplida" on the last pending meal stays on that slide', async ({ 
   }
 });
 
+test('"Marcar cumplida" makes the Comidas number go up by one', async ({ page }) => {
+  const slots = slotIds();
+  test.skip(slots.length < 2, "the active plan has fewer than two meals today");
+  const original = sql(`select array_to_string(meals_done, ',') from daily_logs where date = '${TODAY}'`);
+  try {
+    setDone([]);
+    await openHome(page);
+    const comidas = page.locator(".nt-kpi").first().locator(".nt-roll");
+    await expect(comidas).toHaveText("00");
+    await Promise.all([saved(page), page.locator(".nt-done").click()]);
+    await expect(comidas).toHaveText("01");
+    await expect(page.locator(".nt-kpi-context").first()).toHaveText(`de ${slots.length} hoy`);
+  } finally {
+    setDone(original ? original.split(",") : []);
+  }
+});
+
 test("Métricas: title without a range, four tabs, four gauges in order, no order counter", async ({ page }) => {
   const card = page.locator(".nt-metrics");
   await expect(card.getByRole("heading")).toHaveText("Métricas");
@@ -358,7 +388,8 @@ test("empty state: a day without a plan shows the message and a link to Planes",
     await openHome(page);
     await expect(page.locator(".nt-hero-empty")).toHaveText("Hoy no tienes comidas planificadas");
     await expect(page.locator(".nt-hero").getByRole("link", { name: "Ir a Planes" })).toHaveAttribute("href", "/plans");
-    await expect(page.locator(".nt-kpi").first().locator(".nt-figure")).toHaveText("00");
+    await expect(page.locator(".nt-kpi").first().locator(".nt-roll")).toHaveText("00");
+    await expect(page.locator(".nt-kpi-context").first()).toHaveText("sin plan hoy");
     for (const value of await page.locator(".nt-gauge-value").allTextContents()) expect(value).toMatch(/^(—|\d+%)$/);
     await page.screenshot({ path: `${SHOTS}/dashboard-empty-1440x900.png` });
   } finally {

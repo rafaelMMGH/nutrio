@@ -5,20 +5,21 @@ import { ArrowUp, ArrowUpRight, ChevronDown, ClipboardList, ConciergeBell, Flame
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import type { Metrics, Period } from "@/lib/metrics";
+import { kpiContexts } from "@/lib/kpis";
 import { Card, Figure, IconBadge, Pill, RadialGauge, SegmentedTabs } from "./primitives";
-
-const two = (value: number) => String(Math.max(0, Math.round(value))).padStart(2, "0");
+import { RollingNumber } from "./RollingNumber";
 
 /* ---------- KPI tiles (§5.4) ---------- */
 
-export type Kpis = { mealsToday: number; plans: number; recipes: number; pendingGroceries: number };
+export type Kpis = { mealsDone: number; plans: number; recipes: number; pendingGroceries: number };
+export type KpiContexts = ReturnType<typeof kpiContexts>;
 
-export function KpiRow({ kpis }: { kpis: Kpis }) {
-  const tiles: { label: string; value: number; icon: ReactNode }[] = [
-    { label: "Comidas de hoy", value: kpis.mealsToday, icon: <HandPlatter /> },
-    { label: "Planes disponibles", value: kpis.plans, icon: <ClipboardList /> },
-    { label: "Recetas disponibles", value: kpis.recipes, icon: <ConciergeBell /> },
-    { label: "Compras pendientes", value: kpis.pendingGroceries, icon: <Package /> }
+export function KpiRow({ kpis, contexts }: { kpis: Kpis; contexts: KpiContexts }) {
+  const tiles: { label: string; value: number; context: string; icon: ReactNode }[] = [
+    { label: "Comidas", value: kpis.mealsDone, context: contexts.meals, icon: <HandPlatter /> },
+    { label: "Planes", value: kpis.plans, context: contexts.plan, icon: <ClipboardList /> },
+    { label: "Recetas", value: kpis.recipes, context: contexts.recipes, icon: <ConciergeBell /> },
+    { label: "Compras", value: kpis.pendingGroceries, context: contexts.groceries, icon: <Package /> }
   ];
   return (
     <div className="nt-kpis" role="list" aria-label="Resumen">
@@ -27,7 +28,9 @@ export function KpiRow({ kpis }: { kpis: Kpis }) {
           <IconBadge>{tile.icon}</IconBadge>
           <span className="nt-kpi-text">
             <span className="nt-kpi-label">{tile.label}</span>
-            <Figure className="text-center" value={two(tile.value)} />
+            {/* The number rolls once its own tile has landed (450 ms entrance). */}
+            <RollingNumber value={tile.value} minDigits={2} delay={index * 60 + 450} />
+            <span className="nt-kpi-context" title={tile.context}>{tile.context}</span>
           </span>
         </Card>
       ))}

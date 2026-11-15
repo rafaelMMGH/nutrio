@@ -1,0 +1,20 @@
+/* RollingNumber: each digit is a clipped column holding 0-9, moved to the digit's position. Size comes from the parent's font-size. */
+.nt-roll { position: relative; display: inline-block; font-weight: 400; line-height: 1; }
+.nt-roll-digits { display: flex; justify-content: center; height: 1em; }
+/* Fixed cell width: does not depend on the font having tabular figures. */
+.nt-roll-digit { flex: none; width: 0.62em; height: 1em; overflow: clip; }
+/* The strip is 10em tall, so -10 % per step is exactly one digit. */
+.nt-roll-strip {
+  display: block;
+  height: 10em;
+  translate: 0 calc(var(--nt-roll-d, 0) * -10%);
+  /* A later change rolls from the old digit to the new one: up when the digit grows, down when it falls. */
+  transition: translate 650ms cubic-bezier(0.23, 1, 0.32, 1);
+  /* First view: roll up from 0. Backwards fill only, so the resting style is the real digit and the transition above takes over afterwards. */
+  animation: nt-roll-in 650ms cubic-bezier(0.23, 1, 0.32, 1) var(--nt-roll-delay, 0ms) backwards;
+}
+@keyframes nt-roll-in {
+  from { translate: 0 0; }
+}
+.nt-roll-strip i { display: block; height: 1em; text-align: center; font-style: normal; }
+.nt-roll-strip i::before { content: attr(data-glyph); }

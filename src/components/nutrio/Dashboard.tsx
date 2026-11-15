@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useShell } from "@/components/app/AppShell";
 import { dateKey, type Meal } from "@/components/dashboard/food";
+import { countDoneToday, kpiContexts, type GroceriesSource } from "@/lib/kpis";
 import { dashboardMetrics, type Period } from "@/lib/metrics";
 import { CaloriesCard, ComplianceCard, KpiRow, MetricsCard } from "./DataColumn";
 import { Hero } from "./Hero";
@@ -18,10 +19,12 @@ export type DashboardProps = {
   proteinPct: number | null;
   weightGoal: number | null;
   counts: { plans: number; recipes: number; pendingGroceries: number };
+  /** What the KPI tiles say under their numbers; computed on the server so both renders agree. */
+  kpiContext: { planName: string | null; newRecipes: number; groceries: GroceriesSource };
 };
 
 // Redesigned dashboard (specs/alt-dashboard/plan.md): hero carousel on the left, data column on the right.
-export function Dashboard({ meals, dailyLogs, kcalGoal, proteinPct, weightGoal: serverGoal, counts }: DashboardProps) {
+export function Dashboard({ meals, dailyLogs, kcalGoal, proteinPct, weightGoal: serverGoal, counts, kpiContext }: DashboardProps) {
   const { refresh } = useShell();
   const today = dateKey(new Date());
   const logs = useDailyLogs(dailyLogs, refresh);
@@ -59,7 +62,7 @@ export function Dashboard({ meals, dailyLogs, kcalGoal, proteinPct, weightGoal: 
     <div className="nt-dash">
       <Hero meals={meals} doneIds={todayLog.meals_done} onToggle={toggleMeal} />
       <div className="nt-data">
-        <KpiRow kpis={{ mealsToday: meals.length, ...counts }} />
+        <KpiRow kpis={{ mealsDone: countDoneToday(slotIds, todayLog.meals_done), ...counts }} contexts={kpiContexts({ planned: meals.length, ...kpiContext })} />
         <MetricsCard period={period} onPeriod={setPeriod} metrics={metrics} weightToday={todayLog.weight_kg ?? null} weightGoal={weightGoal} onSaveWeight={saveWeight} />
         <div className="nt-pair">
           <CaloriesCard />

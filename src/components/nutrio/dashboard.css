@@ -150,11 +150,6 @@ html.dark:not(:has([data-theme-lock])) .nt-plate-dish { background: radial-gradi
 @keyframes nt-kpi-in {
   from { opacity: 0; translate: 0 10px; scale: 0.94; }
 }
-/* The number pops once its own tile has landed (450 ms entrance + 100 ms). The text itself never changes. */
-.nt-kpi .nt-figure { animation: nt-kpi-pop 300ms cubic-bezier(0.34, 1.56, 0.64, 1) calc(var(--i, 0) * 60ms + 550ms); }
-@keyframes nt-kpi-pop {
-  40% { scale: 1.15; }
-}
 @keyframes nt-kpi-wiggle {
   25% { rotate: -9deg; }
   60% { rotate: 6deg; }
@@ -164,8 +159,12 @@ html.dark:not(:has([data-theme-lock])) .nt-plate-dish { background: radial-gradi
   .nt-kpi:hover { translate: 0 -3px; }
   .nt-kpi:hover .nt-icon-badge { animation: nt-kpi-wiggle 500ms ease-in-out 1; }
 }
-.nt-kpi-text { display: grid; gap: 6px; min-width: 0; }
-.nt-kpi-label { min-height: 36px; display: flex; align-items: center; font-size: 14.5px; line-height: 1.25; }
+/* Label, rolling number and context, each on one line; the label and the context clip with an ellipsis. */
+.nt-kpi-text { display: grid; gap: 4px; min-width: 0; justify-items: center; text-align: center; }
+.nt-kpi-label, .nt-kpi-context { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt-kpi-label { font-size: 14.5px; line-height: 18px; }
+.nt-kpi-context { font-size: 12px; line-height: 16px; color: var(--nt-muted); }
+.nt-kpi .nt-roll { font-size: 40px; }
 
 .nt-metrics { display: grid; gap: 16px; padding: 20px 22px; }
 .nt-metrics .nt-tabs { margin-left: auto; }
@@ -242,8 +241,7 @@ button.nt-gauge-tile:hover { background: #202024; }
   .nt-hero-copy { margin-top: 24px; gap: 10px; }
   .nt-hero-copy h2 { font-size: 32px; }
   .nt-kpi { padding: 10px 14px; }
-  .nt-kpi-label { min-height: 32px; }
-  .nt-kpi .nt-figure { font-size: 32px; }
+  .nt-kpi .nt-roll { font-size: 32px; }
   .nt-metrics { gap: 12px; padding: 16px 20px; }
   .nt-gauge-tile { gap: 4px; padding: 10px 8px; }
   .nt-gauge-value { font-size: 26px; }
