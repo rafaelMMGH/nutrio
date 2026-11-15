@@ -23,11 +23,11 @@ export function KpiRow({ kpis }: { kpis: Kpis }) {
   return (
     <div className="nt-kpis" role="list" aria-label="Resumen">
       {tiles.map((tile) => (
-        <Card as="div" key={tile.label} className="nt-kpi" role="listitem">
+        <Card as="div" tone="glass" key={tile.label} className="nt-kpi" role="listitem">
           <IconBadge>{tile.icon}</IconBadge>
           <span className="nt-kpi-text">
             <span className="nt-kpi-label">{tile.label}</span>
-            <Figure value={two(tile.value)} />
+            <Figure className="text-center" value={two(tile.value)} />
           </span>
         </Card>
       ))}

@@ -127,7 +127,7 @@ html.dark:not(:has([data-theme-lock])) .nt-plate-dish { background: radial-gradi
   grid-template-rows: auto auto minmax(0, 1fr);
   gap: var(--nt-gap);
   min-width: 0;
-  padding: 8px 0 76px;
+  padding: 25px 0 76px;
 }
 .nt-card-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .nt-card-head h2 { font-size: 16px; white-space: nowrap; }
@@ -136,7 +136,7 @@ html.dark:not(:has([data-theme-lock])) .nt-plate-dish { background: radial-gradi
 .nt-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--nt-gap); margin: 0; padding: 0; }
 .nt-kpi { display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px; border-radius: 24px; }
 .nt-kpi-text { display: grid; gap: 6px; min-width: 0; }
-.nt-kpi-label { min-height: 36px; display: flex; align-items: center; font-size: 14px; line-height: 1.25; }
+.nt-kpi-label { min-height: 36px; display: flex; align-items: center; font-size: 14.5px; line-height: 1.25; }
 
 .nt-metrics { display: grid; gap: 16px; padding: 20px 22px; }
 .nt-metrics .nt-tabs { margin-left: auto; }

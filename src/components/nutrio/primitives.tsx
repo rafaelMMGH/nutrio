@@ -40,10 +40,11 @@ export function Pill({ tone = "outline", children, className = "", ...rest }: { 
   );
 }
 
-type CardTone = "white" | "black" | "yellow" | "sky";
+// "glass" is the frosted material of the icon buttons (.nt-glass) on a card.
+type CardTone = "white" | "black" | "yellow" | "sky" | "glass";
 export function Card({ tone = "white", as: Tag = "section", className = "", children, ...rest }: { tone?: CardTone; as?: "section" | "div" | "article"; children: ReactNode } & ComponentPropsWithoutRef<"section">) {
   return (
-    <Tag className={`nt-card tone-${tone} ${className}`.trim()} {...rest}>
+    <Tag className={`nt-card ${tone === "glass" ? "nt-glass" : `tone-${tone}`} ${className}`.trim()} {...rest}>
       {children}
     </Tag>
   );
