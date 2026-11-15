@@ -50,6 +50,8 @@
 .nt-hero.is-empty > .nt-pill { margin-top: 40px; align-self: flex-start; position: relative; z-index: 2; }
 .nt-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 16px; align-self: flex-start; color: var(--nt-ink); font-size: 14px; position: relative; z-index: 2; border-radius: 6px; }
 
+/* Same box as the hero so the plate's percentages resolve as before; no z-index, so it forms no stacking context. */
+.nt-plate-clip { position: absolute; inset: 0; pointer-events: none; }
 /* The plate stands in for the dish photo and runs behind the left edge of the data column, like the reference. */
 .nt-plate {
   position: absolute;
@@ -226,6 +228,12 @@ button.nt-gauge-tile:hover { background: #202024; }
 @media (min-width: 1280px) {
   /* The frame's usual bottom padding would push the page past the viewport: the dashboard already ends 24 px above it. */
   .app-shell.nt > .content:has(> .nt-dash) { padding-bottom: 24px; }
+  /* The plate is taller than the hero and its lower part would add page height. Clip only the plate (through its wrapper, which has the
+     hero's box), so nothing else is cut: the prep card's shadow hangs below the box. x stays visible so the plate still runs behind the
+     data column. overflow-clip-margin does not apply with a single clipped axis, so it is not used. */
+  .nt-plate-clip { overflow-y: clip; }
+  /* 25 px of air above the KPIs when the screen is tall enough (about 917 px); it gives the 17 px back to the card row as the window shrinks, so the calories card is never cut. */
+  .nt-data { padding-top: clamp(8px, calc(100dvh - 892px), 25px); }
 }
 /* Short screens (laptops with browser chrome): tighter cards so everything still fits without scrolling, down to ~768 px. */
 @media (min-width: 1280px) and (max-height: 859px) {

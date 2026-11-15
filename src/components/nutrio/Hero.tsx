@@ -70,8 +70,10 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
         <Link href="/plans" className="nt-link">
           Ir a Planes <ArrowUpRight size={16} aria-hidden />
         </Link>
-        <div className="nt-plate" aria-hidden>
-          <div className="nt-plate-dish" />
+        <div className="nt-plate-clip" aria-hidden>
+          <div className="nt-plate">
+            <div className="nt-plate-dish" />
+          </div>
         </div>
       </section>
     );
@@ -109,16 +111,18 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
       </div>
 
       {/* Plate drawn in CSS with the recipe's ingredient icons: the recipes have no photos yet (ronda 2, R1). */}
-      <div className="nt-plate" aria-hidden key={meal.id}>
-        <div className="nt-plate-dish" />
-        {icons.length ? (
-          icons.map((src, i) => <img key={src} src={src} alt="" className="nt-plate-food" style={{ left: `${SPOTS[i].x}%`, top: `${SPOTS[i].y}%`, width: `${SPOTS[i].size / 6.4}%` }} fetchPriority={index === 0 && i === 0 ? "high" : undefined} />)
-        ) : (
-          <img src="/food/plate.png" alt="" className="nt-plate-food" style={{ left: "50%", top: "48%", width: "26%" }} />
-        )}
-        {DOTS.map((dot) => (
-          <i key={`${dot.x}-${dot.y}`} className="nt-plate-dot" style={{ left: `${dot.x}%`, top: `${dot.y}%` }} />
-        ))}
+      <div className="nt-plate-clip" aria-hidden>
+        <div className="nt-plate" key={meal.id}>
+          <div className="nt-plate-dish" />
+          {icons.length ? (
+            icons.map((src, i) => <img key={src} src={src} alt="" className="nt-plate-food" style={{ left: `${SPOTS[i].x}%`, top: `${SPOTS[i].y}%`, width: `${SPOTS[i].size / 6.4}%` }} fetchPriority={index === 0 && i === 0 ? "high" : undefined} />)
+          ) : (
+            <img src="/food/plate.png" alt="" className="nt-plate-food" style={{ left: "50%", top: "48%", width: "26%" }} />
+          )}
+          {DOTS.map((dot) => (
+            <i key={`${dot.x}-${dot.y}`} className="nt-plate-dot" style={{ left: `${dot.x}%`, top: `${dot.y}%` }} />
+          ))}
+        </div>
       </div>
 
       {meals.length > 1 && (

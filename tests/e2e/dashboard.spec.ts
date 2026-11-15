@@ -315,7 +315,7 @@ test("search sends the question to the assistant", async ({ page }) => {
 });
 
 // The whole dashboard fits the screen: no page scrollbar, nothing clipped inside the cards, the assistant over no card.
-for (const size of [{ width: 1440, height: 900 }, { width: 1440, height: 780 }, { width: 1280, height: 768 }, { width: 1920, height: 1080 }]) {
+for (const size of [{ width: 1440, height: 900 }, { width: 1440, height: 780 }, { width: 1280, height: 768 }, { width: 1920, height: 1080 }, { width: 1920, height: 800 }]) {
   test(`fits ${size.width}×${size.height} without scrolling`, async ({ page }) => {
     await page.setViewportSize(size);
     await openHome(page);
