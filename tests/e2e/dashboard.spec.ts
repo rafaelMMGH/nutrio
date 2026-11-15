@@ -22,11 +22,8 @@ test.beforeEach(async ({ page }) => openHome(page));
 
 test("top bar: order of §5.1, visual-only buttons labelled, profile at the right end", async ({ page }) => {
   const bar = page.locator(".nt-topbar");
-  const order = await bar.evaluate((node) => [...node.children].flatMap((group) => [...group.children]).map((child) => child.className.split(" ")[0]));
+  const order = await bar.evaluate((node) => [...node.children].map((child) => child.className.split(" ")[0]));
   expect(order).toEqual(["nt-brand", "nt-search", "nt-chef", "nt-cta", "nt-tools", "nt-profile"]);
-  // Chef's selection + "Procesar plan" sit in the middle of the bar.
-  const [barBox, middle] = [(await bar.boundingBox())!, (await bar.locator(".nt-top-center").boundingBox())!];
-  expect(Math.abs(middle.x + middle.width / 2 - (barBox.x + barBox.width / 2))).toBeLessThanOrEqual(4);
   await expect(bar.locator(".nt-brand")).toContainText("NUTRIO");
   await expect(bar.getByPlaceholder("Buscar recetas, planes, ingredientes…")).toBeVisible();
   await expect(bar.locator(".nt-chef")).toContainText("Chef's selection");

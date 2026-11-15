@@ -14,18 +14,14 @@ html.dark:not(:has([data-theme-lock])) .app-shell.nt { background: var(--nt-bg);
   position: sticky;
   top: 0;
   z-index: 30;
-  /* Equal side columns keep the middle group (Chef's selection + "Procesar plan") centred in the bar. */
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  display: flex;
   align-items: center;
-  gap: 24px;
+  gap: 16px;
   min-height: var(--nt-top-h);
   padding: 0 32px 0 28px;
   background: var(--nt-bg);
   view-transition-name: site-header;
 }
-.nt-top-left, .nt-top-center, .nt-top-right { display: flex; align-items: center; gap: 16px; min-width: 0; }
-.nt-top-right { justify-content: flex-end; }
 .nt-brand { display: flex; align-items: center; gap: 12px; flex: none; margin-right: 12px; color: var(--nt-ink); text-decoration: none; }
 .nt-brand span { font-size: 20px; font-weight: 400; letter-spacing: 0.2em; }
 
@@ -37,6 +33,7 @@ html.dark:not(:has([data-theme-lock])) .app-shell.nt { background: var(--nt-bg);
   max-width: 440px;
   min-width: 160px;
   height: 48px;
+  margin-right: 12px;
   padding: 0 14px 0 6px;
   border-radius: var(--nt-radius-pill);
 }
@@ -51,6 +48,8 @@ html.dark:not(:has([data-theme-lock])) .app-shell.nt { background: var(--nt-bg);
   align-items: center;
   gap: 12px;
   flex: none;
+  /* Extra air on the right so search · Chef's selection · CTA · tools read as evenly spaced groups, like the reference. */
+  margin: 0 12px 0 auto;
   height: 52px;
   padding: 0 8px 0 16px;
   box-sizing: border-box;
@@ -81,6 +80,7 @@ html.dark:not(:has([data-theme-lock])) .app-shell.nt { background: var(--nt-bg);
   gap: 8px;
   flex: none;
   height: 48px;
+  margin-right: 12px;
   padding: 0 24px;
   border: 0;
   border-radius: var(--nt-radius-pill);
@@ -188,17 +188,16 @@ html.dark:not(:has([data-theme-lock])) .app-shell.nt { background: var(--nt-bg);
 @media (max-width: 1023px) {
   .nt-chef { display: none; }
   .nt-tools { display: none; }
+  .nt-cta { margin: 0 0 0 auto; }
 }
 @media (max-width: 767px) {
   .app-shell.nt { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
-  /* The three groups dissolve so brand, CTA and avatar share the first row and the search takes the second. */
-  .nt-topbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 12px 16px; }
-  .nt-top-left, .nt-top-center, .nt-top-right { display: contents; }
+  .nt-topbar { flex-wrap: wrap; gap: 8px; padding: 12px 16px; }
   .nt-brand { margin-right: auto; gap: 8px; }
   .nt-brand span { font-size: 17px; letter-spacing: 0.16em; }
-  .nt-cta { height: 44px; padding: 0 14px; gap: 6px; font-size: 13px; order: 2; }
+  .nt-cta { margin: 0; height: 44px; padding: 0 14px; gap: 6px; font-size: 13px; order: 2; }
   .nt-profile { order: 3; }
-  .nt-search { order: 4; flex-basis: 100%; max-width: none; }
+  .nt-search { order: 4; flex-basis: 100%; max-width: none; margin-right: 0; }
   .nt-sidebar {
     position: fixed;
     inset: auto 0 0 0;
