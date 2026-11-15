@@ -1,4 +1,4 @@
-import type { Page } from "@playwright/test";
+import type { Locator, Page } from "@playwright/test";
 import { sql } from "./database";
 import { expect, test } from "./fixtures";
 
@@ -84,6 +84,75 @@ test("KPI tiles show real counts with at least two digits", async ({ page }) => 
   for (const text of await tiles.locator(".nt-figure").allTextContents()) expect(text).toMatch(/^\d{2,}$/);
   const slides = await page.locator(".nt-pager button").count();
   await expect(tiles.nth(0).locator(".nt-figure")).toHaveText(String(Math.max(slides, await page.locator(".nt-hero-copy").count())).padStart(2, "0"));
+});
+
+const settle = (page: Page) => page.evaluate(() => Promise.all(document.getAnimations().map((animation) => animation.finished)).then(() => undefined));
+const style = (tile: Locator, selector: string | null, property: string) =>
+  (selector ? tile.locator(selector) : tile).evaluate((node, name) => getComputedStyle(node).getPropertyValue(name), property);
+
+test("KPI tiles pop in one after another, then rest fully visible", async ({ page }) => {
+  const tiles = page.locator(".nt-kpi");
+  await expect(tiles).toHaveCount(4);
+  const declared = await tiles.evaluateAll((nodes) =>
+    nodes.map((node) => {
+      const css = getComputedStyle(node);
+      return { name: css.animationName, delay: parseFloat(css.animationDelay) * 1000, duration: parseFloat(css.animationDuration) * 1000 };
+    })
+  );
+  for (const tile of declared) {
+    expect(tile.name).toBe("nt-kpi-in");
+    expect(tile.duration).toBeGreaterThanOrEqual(400);
+    expect(tile.duration).toBeLessThanOrEqual(500);
+  }
+  const delays = declared.map((tile) => tile.delay);
+  delays.forEach((delay, index) => index && expect(delay).toBeGreaterThan(delays[index - 1]));
+  expect(delays[3] + declared[3].duration).toBeLessThan(700);
+
+  // The number pops after its own tile has landed, and its text is never rewritten.
+  const figures = await tiles.locator(".nt-figure").evaluateAll((nodes) => nodes.map((node) => ({ name: getComputedStyle(node).animationName, delay: parseFloat(getComputedStyle(node).animationDelay) * 1000 })));
+  figures.forEach((figure, index) => {
+    expect(figure.name).toBe("nt-kpi-pop");
+    expect(figure.delay).toBeGreaterThanOrEqual(declared[index].delay + declared[index].duration);
+  });
+
+  await settle(page);
+  for (const index of [0, 1, 2, 3]) {
+    const tile = tiles.nth(index);
+    expect(await style(tile, null, "opacity")).toBe("1");
+    expect(await style(tile, null, "translate")).toBe("none");
+    expect(await style(tile, null, "scale")).toBe("none");
+  }
+  const tops = await tiles.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().top));
+  expect(new Set(tops).size).toBe(1);
+});
+
+// A product decision by the user: the KPI motion plays for everyone, even with reduced motion on the OS. Do not "fix" this.
+test("KPI tiles still animate when the OS asks for reduced motion", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await openHome(page);
+  const tile = page.locator(".nt-kpi").first();
+  expect(await style(tile, null, "animation-name")).toBe("nt-kpi-in");
+  expect(await style(tile, ".nt-figure", "animation-name")).toBe("nt-kpi-pop");
+});
+
+test("KPI tile lifts 3px and wiggles its icon on hover, squashes on press", async ({ page }) => {
+  await settle(page);
+  const tile = page.locator(".nt-kpi").nth(1);
+  const badge = tile.locator(".nt-icon-badge");
+  expect(await style(tile, ".nt-icon-badge", "animation-name")).toBe("none");
+  const rest = (await tile.boundingBox())!.y;
+
+  await tile.hover();
+  await expect.poll(async () => rest - (await tile.boundingBox())!.y).toBeCloseTo(3, 0);
+  expect(await style(tile, ".nt-icon-badge", "animation-name")).toBe("nt-kpi-wiggle");
+  expect(await style(tile, ".nt-icon-badge", "animation-iteration-count")).toBe("1");
+  await expect(badge).toBeVisible();
+
+  await page.mouse.down();
+  await expect.poll(() => style(tile, null, "scale")).toBe("0.97");
+  await page.mouse.up();
+  await page.mouse.move(0, 0);
+  await expect.poll(async () => Math.abs((await tile.boundingBox())!.y - rest)).toBeLessThan(0.5);
 });
 
 test("carousel: name, rating and Preparación actual change together; rating survives a reload", async ({ page }) => {

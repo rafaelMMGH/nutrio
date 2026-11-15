@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { ArrowUp, ArrowUpRight, ChevronDown, ClipboardList, ConciergeBell, Flame, Gauge, HandPlatter, Package, Utensils } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -22,8 +22,8 @@ export function KpiRow({ kpis }: { kpis: Kpis }) {
   ];
   return (
     <div className="nt-kpis" role="list" aria-label="Resumen">
-      {tiles.map((tile) => (
-        <Card as="div" tone="glass" key={tile.label} className="nt-kpi" role="listitem">
+      {tiles.map((tile, index) => (
+        <Card as="div" tone="glass" key={tile.label} className="nt-kpi" role="listitem" style={{ "--i": index } as CSSProperties}>
           <IconBadge>{tile.icon}</IconBadge>
           <span className="nt-kpi-text">
             <span className="nt-kpi-label">{tile.label}</span>

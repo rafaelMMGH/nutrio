@@ -134,7 +134,34 @@ html.dark:not(:has([data-theme-lock])) .nt-plate-dish { background: radial-gradi
 .nt-push { margin-left: auto; }
 
 .nt-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--nt-gap); margin: 0; padding: 0; }
-.nt-kpi { display: flex; align-items: flex-start; gap: 10px; padding: 14px 16px; border-radius: 24px; }
+.nt-kpi {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: 24px;
+  /* Pop in left to right (--i is the tile's position). Backwards fill only: the resting style stays the final state, so hover and press compose after the entrance and a tile is never stuck hidden. */
+  animation: nt-kpi-in 450ms cubic-bezier(0.34, 1.4, 0.64, 1) calc(var(--i, 0) * 60ms) backwards;
+  transition: translate 200ms cubic-bezier(0.23, 1, 0.32, 1), scale 120ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.nt-kpi:active { scale: 0.97; }
+@keyframes nt-kpi-in {
+  from { opacity: 0; translate: 0 10px; scale: 0.94; }
+}
+/* The number pops once its own tile has landed (450 ms entrance + 100 ms). The text itself never changes. */
+.nt-kpi .nt-figure { animation: nt-kpi-pop 300ms cubic-bezier(0.34, 1.56, 0.64, 1) calc(var(--i, 0) * 60ms + 550ms); }
+@keyframes nt-kpi-pop {
+  40% { scale: 1.15; }
+}
+@keyframes nt-kpi-wiggle {
+  25% { rotate: -9deg; }
+  60% { rotate: 6deg; }
+  85% { rotate: -2deg; }
+}
+@media (hover: hover) {
+  .nt-kpi:hover { translate: 0 -3px; }
+  .nt-kpi:hover .nt-icon-badge { animation: nt-kpi-wiggle 500ms ease-in-out 1; }
+}
 .nt-kpi-text { display: grid; gap: 6px; min-width: 0; }
 .nt-kpi-label { min-height: 36px; display: flex; align-items: center; font-size: 14.5px; line-height: 1.25; }
 
