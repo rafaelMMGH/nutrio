@@ -245,6 +245,25 @@ test("search sends the question to the assistant", async ({ page }) => {
   await expect(page.locator(".assistant-chat")).toContainText("¿Qué me toca comer hoy?");
 });
 
+// The whole dashboard fits the screen: no page scrollbar, nothing clipped inside the cards, the assistant over no card.
+for (const size of [{ width: 1440, height: 900 }, { width: 1440, height: 780 }, { width: 1280, height: 768 }, { width: 1920, height: 1080 }]) {
+  test(`fits ${size.width}×${size.height} without scrolling`, async ({ page }) => {
+    await page.setViewportSize(size);
+    await openHome(page);
+    await page.waitForLoadState("networkidle");
+    expect(await page.evaluate(() => document.documentElement.scrollHeight - innerHeight), "vertical page scroll").toBeLessThanOrEqual(0);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), "horizontal page scroll").toBeLessThanOrEqual(0);
+    const clipped = await page.locator(".nt-kpi, .nt-metrics, .nt-gauge-tile, .nt-cal, .nt-comp, .nt-prep").evaluateAll((nodes) =>
+      nodes.filter((node) => node.scrollHeight > node.clientHeight + 1).map((node) => `${node.className}: ${node.scrollHeight} > ${node.clientHeight}`)
+    );
+    expect(clipped, "cards whose content is cut").toEqual([]);
+    const [fab, sky, prep] = await Promise.all([".assistant-fab", ".nt-comp", ".nt-prep"].map(async (selector) => (await page.locator(selector).boundingBox())!));
+    expect(sky.y + sky.height).toBeLessThanOrEqual(fab.y);
+    expect(prep.y + prep.height).toBeLessThanOrEqual(size.height);
+    if (size.height === 780) await page.screenshot({ path: `${SHOTS}/dashboard-1440x780.png` });
+  });
+}
+
 for (const size of [{ width: 1440, height: 900 }, { width: 1920, height: 1080 }, { width: 1024, height: 900 }, { width: 390, height: 844 }]) {
   test(`screenshot at ${size.width}×${size.height}`, async ({ page }) => {
     await page.setViewportSize(size);
