@@ -115,12 +115,13 @@ html.dark:not(:has([data-theme-lock])) .app-shell.nt { background: var(--nt-bg);
   display: flex;
   flex-direction: column;
   align-items: center;
+  /* One group centred in the column, like the reference; the theme switch and Configuración close it. */
+  justify-content: center;
   gap: 12px;
   height: calc(100dvh - var(--nt-top-h));
   padding: 12px 0 28px;
   box-sizing: border-box;
 }
-.nt-side-bottom { margin-top: auto; }
 /* The theme switch takes the look of the other sidebar buttons. */
 .nt-sidebar .theme-toggle { border: 1px solid var(--nt-border); background: var(--nt-surface); color: var(--nt-ink); }
 .nt-sidebar .theme-toggle:hover { background: var(--nt-surface); border-color: color-mix(in srgb, var(--nt-ink) 25%, var(--nt-border)); }
@@ -158,7 +159,6 @@ html.dark:not(:has([data-theme-lock])) .app-shell.nt { background: var(--nt-bg);
     background: var(--nt-bg);
     border-top: 1px solid var(--nt-border);
   }
-  .nt-side-bottom { margin-top: 0; }
   .app-shell.nt > .content { grid-column: 1; padding: 0 16px 96px; }
   .nt-topbar { position: static; }
   /* The floating assistant clears the bottom bar. */

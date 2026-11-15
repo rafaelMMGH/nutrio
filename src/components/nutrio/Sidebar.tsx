@@ -7,7 +7,7 @@ import { IconButton } from "./primitives";
 import "./shell.css";
 
 // Icon-only column (alt-dashboard §5.2); a bottom bar under 768 px. Análisis has no destination yet.
-// The theme switch sits right above Configuración, at the bottom of the column.
+// The buttons form one group centred vertically; the theme switch sits right above Configuración.
 export function Sidebar({ inert }: { inert?: boolean }) {
   const active = activeView(usePathname());
   return (
@@ -26,7 +26,7 @@ export function Sidebar({ inert }: { inert?: boolean }) {
             <Icon />
           </IconButton>
         );
-        return item.bottom ? [<ThemeToggle key="theme" className="nt-icon-btn nt-side-bottom" />, link] : link;
+        return item.bottom ? [<ThemeToggle key="theme" className="nt-icon-btn" />, link] : link;
       })}
     </nav>
   );
