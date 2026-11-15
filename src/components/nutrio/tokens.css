@@ -1,0 +1,41 @@
+/* Design tokens of the redesigned layout (specs/alt-dashboard/plan.md §4), scoped to .nt so other screens keep theirs. */
+.nt {
+  --nt-bg: #f5f6f8;
+  --nt-surface: #ffffff;
+  --nt-border: #e6e7ea;
+  --nt-ink: #0e0e10;
+  --nt-ink-card: #050505;
+  --nt-ink-sub: #171717;
+  --nt-on-ink: #ffffff;
+  --nt-muted: #6b6e76;
+  --nt-muted-on-ink: #a3a5ad;
+  --nt-yellow: #f6e7a6;
+  --nt-yellow-accent: #f2d678;
+  --nt-sky: #c8d9ef;
+  --nt-sky-accent: #9db6d8;
+  --nt-sky-deep: #2f4e8c;
+  --nt-orange: #e8744a;
+  --nt-success: #3ba55c;
+  --nt-success-bg: #ddf3e3;
+  --nt-radius-card: 28px;
+  --nt-radius-inner: 22px;
+  --nt-radius-pill: 999px;
+  --nt-icon-btn: 44px;
+  --nt-gap: 16px;
+  --nt-gap-lg: 20px;
+  --nt-focus: 0 0 0 3px color-mix(in srgb, var(--nt-sky-deep) 45%, transparent);
+  font-family: var(--font-nt), system-ui, sans-serif;
+  color: var(--nt-ink);
+}
+
+/* Dark theme: a basic inversion of the neutrals; the coloured cards keep their light ink. */
+html.dark:not(:has([data-theme-lock])) .nt {
+  --nt-bg: #0f1013;
+  --nt-surface: #1a1b20;
+  --nt-border: #2c2e35;
+  --nt-ink: #f3f4f6;
+  --nt-ink-card: #000000;
+  --nt-ink-sub: #15161a;
+  --nt-on-ink: #0e0e10;
+  --nt-muted: #a3a5ad;
+}

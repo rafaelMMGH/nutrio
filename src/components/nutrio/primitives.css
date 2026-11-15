@@ -1,0 +1,115 @@
+/* Primitives of the redesigned layout. Class names use the nt- prefix so they never match a Tailwind utility. */
+.nt-icon-btn {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+  width: var(--nt-icon-btn);
+  height: var(--nt-icon-btn);
+  flex: none;
+  border-radius: var(--nt-radius-pill);
+  border: 1px solid var(--nt-border);
+  background: var(--nt-surface);
+  color: var(--nt-ink);
+  cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 160ms ease;
+}
+.nt-icon-btn:hover { border-color: color-mix(in srgb, var(--nt-ink) 25%, var(--nt-border)); }
+.nt-icon-btn:active { transform: scale(0.96); }
+.nt-icon-btn.is-active,
+.nt-icon-btn.is-dark { background: var(--nt-ink); border-color: var(--nt-ink); color: var(--nt-on-ink); }
+.nt-icon-btn svg { width: 20px; height: 20px; stroke-width: 1.6; }
+.nt-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--nt-radius-pill);
+  background: var(--nt-ink);
+  color: var(--nt-on-ink);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 18px;
+  text-align: center;
+  border: 2px solid var(--nt-bg);
+  box-sizing: content-box;
+}
+
+.nt :is(a, button, [tabindex]):focus-visible { outline: none; box-shadow: var(--nt-focus); }
+
+.nt-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: var(--nt-radius-pill);
+  font-size: 14px;
+  white-space: nowrap;
+}
+.nt-pill.tone-outline { border: 1px solid var(--nt-border); }
+.nt-pill.tone-surface { background: var(--nt-surface); border: 1px solid var(--nt-border); }
+.nt-pill.tone-yellow { background: var(--nt-yellow); color: #0e0e10; }
+.nt-pill.tone-ink { background: var(--nt-ink); color: var(--nt-on-ink); }
+.nt-pill.tone-success { height: 22px; padding: 0 8px; gap: 3px; font-size: 12px; background: var(--nt-success-bg); color: #1f7a3c; }
+
+.nt-card {
+  position: relative;
+  border-radius: var(--nt-radius-card);
+  padding: 20px;
+  min-width: 0;
+}
+.nt-card.tone-white { background: var(--nt-surface); border: 1px solid var(--nt-border); }
+.nt-card.tone-black { background: var(--nt-ink-card); color: #fff; }
+.nt-card.tone-yellow { background: var(--nt-yellow); color: #0e0e10; }
+.nt-card.tone-sky { background: var(--nt-sky); color: #0e0e10; }
+
+.nt-icon-badge {
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  border-radius: var(--nt-radius-pill);
+  border: 1px solid color-mix(in srgb, currentColor 22%, transparent);
+}
+.nt-icon-badge svg { width: 18px; height: 18px; stroke-width: 1.6; }
+
+.nt-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.nt-tabs button {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: var(--nt-radius-pill);
+  border: 1px solid var(--nt-border);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+.nt-tabs.on-ink button { border-color: #3a3b40; color: #fff; }
+.nt-tabs button.is-active { background: var(--nt-ink); color: var(--nt-on-ink); border-color: var(--nt-ink); }
+.nt-tabs.on-ink button.is-active { background: #fff; color: #0e0e10; border-color: #fff; }
+
+.nt-gauge { display: block; }
+.nt-gauge-tick { stroke: #6b6e76; stroke-width: 1.4; stroke-linecap: round; }
+.nt-gauge-ring { fill: none; stroke: #3a3b40; stroke-width: 0.8; stroke-dasharray: 1.5 2.5; }
+.nt-gauge-disc { fill: #232428; }
+.nt-gauge-needle { stroke: #6b6e76; stroke-width: 1; stroke-dasharray: 2 2; }
+.nt-gauge-hub { fill: #fff; }
+
+.nt-dots { display: inline-flex; gap: 6px; }
+.nt-dots-group { display: inline-flex; gap: 2px; }
+.nt-dots-col { display: inline-grid; grid-template-rows: repeat(var(--rows), 3px); gap: 2px; }
+.nt-dots-col i { width: 3px; height: 3px; border-radius: 50%; background: color-mix(in srgb, var(--nt-ink) 14%, transparent); }
+.nt-dots-col.is-on i { background: var(--nt-ink); }
+
+.nt-figure { font-size: 40px; font-weight: 400; line-height: 1; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.nt-figure small { font-size: 14px; margin-left: 2px; letter-spacing: 0; }
+
+@media (prefers-reduced-motion: reduce) {
+  .nt-icon-btn, .nt-tabs button { transition: none; }
+  .nt-icon-btn:active { transform: none; }
+}
