@@ -50,6 +50,10 @@ test("sidebar: six buttons in the order of §5.2, routes work, HOY is gone", asy
   // The theme switch sits right above Configuración.
   expect(labels.map((label) => (label?.startsWith("Cambiar a tema") ? "Tema" : label))).toEqual(["Inicio", "Planes", "Recetario", "Compras", "Análisis", "Tema", "Configuración"]);
   await expect(nav.locator(".theme-toggle")).toBeVisible();
+  // Navigation is centred vertically; the theme switch and Configuración sit at the bottom of the column.
+  const [column, main, foot] = await Promise.all([".nt-sidebar", ".nt-side-main", ".nt-side-foot"].map(async (selector) => (await page.locator(selector).boundingBox())!));
+  expect(column.y + column.height - (foot.y + foot.height)).toBeLessThanOrEqual(40);
+  expect(main.y + main.height).toBeLessThan(foot.y);
   await expect(nav.getByRole("link", { name: "Inicio" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByText("HOY", { exact: true })).toHaveCount(0);
 

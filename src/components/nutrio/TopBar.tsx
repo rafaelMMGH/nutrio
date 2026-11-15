@@ -37,7 +37,7 @@ export function TopBar({ user, chef, busy, onAsk, onUpload, onLogout, inert }: {
           {chef.rest > 0 && <b>+{chef.rest}</b>}
         </span>
       </Link>
-      <button type="button" className="nt-cta" onClick={onUpload}>
+      <button type="button" className="nt-cta nt-glass is-ink" onClick={onUpload}>
         <Plus size={18} aria-hidden /> Procesar plan
       </button>
       <div className="nt-tools">

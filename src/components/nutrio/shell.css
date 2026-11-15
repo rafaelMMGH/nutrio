@@ -82,10 +82,9 @@ html.dark:not(:has([data-theme-lock])) .app-shell.nt { background: var(--nt-bg);
   height: 48px;
   margin-right: 12px;
   padding: 0 24px;
-  border: 0;
+  box-sizing: border-box;
   border-radius: var(--nt-radius-pill);
-  background: var(--nt-ink);
-  color: var(--nt-on-ink);
+  /* Fill, rim and shadow come from .nt-glass.is-ink (primitives.css): the ink glass of the active sidebar button. */
   font: inherit;
   font-size: 14px;
   cursor: pointer;
@@ -165,16 +164,17 @@ html.dark:not(:has([data-theme-lock])) .app-shell.nt { background: var(--nt-bg);
   position: sticky;
   top: var(--nt-top-h);
   align-self: start;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  /* One group centred in the column, like the reference; the theme switch and Configuración close it. */
-  justify-content: center;
-  gap: 12px;
+  /* Equal rows above and below keep the navigation group centred; the theme switch and Configuración sit at the bottom. */
+  display: grid;
+  grid-template-rows: 1fr auto 1fr;
+  justify-items: center;
   height: calc(100dvh - var(--nt-top-h));
   padding: 12px 0 28px;
   box-sizing: border-box;
 }
+.nt-side-main, .nt-side-foot { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.nt-side-main { grid-row: 2; }
+.nt-side-foot { grid-row: 3; align-self: end; }
 /* The theme switch takes the glass look of the other sidebar buttons (primitives.css). */
 .nt-sidebar .theme-toggle:focus-visible { outline: none; }
 
@@ -203,6 +203,7 @@ html.dark:not(:has([data-theme-lock])) .app-shell.nt { background: var(--nt-bg);
     inset: auto 0 0 0;
     top: auto;
     z-index: 40;
+    display: flex;
     flex-direction: row;
     justify-content: space-around;
     height: auto;
@@ -210,6 +211,7 @@ html.dark:not(:has([data-theme-lock])) .app-shell.nt { background: var(--nt-bg);
     background: var(--nt-bg);
     border-top: 1px solid var(--nt-border);
   }
+  .nt-side-main, .nt-side-foot { display: contents; }
   .app-shell.nt > .content { grid-column: 1; padding: 0 16px 96px; }
   .nt-topbar { position: static; }
   /* The floating assistant clears the bottom bar. */
