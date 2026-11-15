@@ -84,7 +84,7 @@ export function SegmentedTabs<T extends string>({ tabs, value, onChange, label, 
 }
 
 // Dial like the reference: tick marks around a dark disc with a coloured wedge for `ratio` (0–1, clamped). null = empty dial.
-export function RadialGauge({ ratio, color, size = 96 }: { ratio: number | null; color: string; size?: number }) {
+export function RadialGauge({ ratio, color, size = 84 }: { ratio: number | null; color: string; size?: number }) {
   const r = 30;
   const value = ratio === null ? 0 : Math.max(0, Math.min(1, ratio));
   const angle = value * 2 * Math.PI;
