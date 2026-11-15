@@ -34,6 +34,7 @@ test("top bar: order of §5.1, visual-only buttons labelled, profile at the righ
   const menu = page.getByRole("menu", { name: "Cuenta" });
   await expect(menu.getByRole("menuitem", { name: "Papelera" })).toBeVisible();
   await expect(menu.getByRole("menuitem", { name: "Cerrar sesión" })).toBeVisible();
+  await expect(menu.locator(".theme-toggle")).toHaveCount(0);
   await page.keyboard.press("Escape");
 });
 
@@ -46,7 +47,9 @@ test('"Procesar plan" opens the upload wizard', async ({ page }) => {
 test("sidebar: six buttons in the order of §5.2, routes work, HOY is gone", async ({ page }) => {
   const nav = page.getByRole("navigation", { name: "Principal" });
   const labels = await nav.locator(".nt-icon-btn").evaluateAll((nodes) => nodes.map((node) => node.getAttribute("aria-label")));
-  expect(labels).toEqual(["Inicio", "Planes", "Recetario", "Compras", "Análisis", "Configuración"]);
+  // The theme switch sits right above Configuración.
+  expect(labels.map((label) => (label?.startsWith("Cambiar a tema") ? "Tema" : label))).toEqual(["Inicio", "Planes", "Recetario", "Compras", "Análisis", "Tema", "Configuración"]);
+  await expect(nav.locator(".theme-toggle")).toBeVisible();
   await expect(nav.getByRole("link", { name: "Inicio" })).toHaveAttribute("aria-current", "page");
   await expect(page.getByText("HOY", { exact: true })).toHaveCount(0);
 

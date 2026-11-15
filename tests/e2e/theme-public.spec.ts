@@ -10,7 +10,7 @@ const NOT_FOUND = [/Failed to load resource.*404/]; // an unmatched URL answers 
 const stored = (page: Page) => page.evaluate((key) => localStorage.getItem(key), THEME_KEY);
 const colorScheme = (page: Page) => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme);
 const appIs = async (page: Page, theme: Theme) => {
-  await expect(page.locator(".topbar .theme-toggle")).toBeVisible();
+  await expect(page.locator(".nt-sidebar .theme-toggle")).toBeVisible();
   await expectThemeMeta(page, theme);
 };
 
@@ -99,7 +99,7 @@ test.describe("moving between the app and locked pages without a reload", () => 
       await appIs(page, "dark");
 
       await context.clearCookies();
-      await page.locator(".topbar .pill", { hasText: "Hoy" }).click();
+      await page.locator('.nt-sidebar a[aria-label="Inicio"]').click();
       // The same-URL click may be served from the router cache; the documented fallback is a fresh URL.
       if (!(await page.locator(LOCK).count())) await page.evaluate(() => (window.location.href = `/?_=${Date.now()}`));
       await expect(page.locator(LOCK)).toHaveCount(1);

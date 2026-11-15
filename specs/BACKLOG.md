@@ -6,7 +6,9 @@ _Last updated: 2026-11-14 (guard merged as PR #8; Escape PR #9 open; period plan
 
 ## In progress
 
-_Nothing in progress._
+- [ ] **Dashboard redesign (`alt-dashboard`, pushed, no PR until the user reviews).** Plan, reference, screenshots and the delivery summary with default decisions and open questions are in `specs/alt-dashboard/` (`entrega.md`). Built outside the spec route at the user's request: the plan is the spec. Left to do:
+  - Old e2e specs written for the previous shell and home (theme-palette, theme-switch, a-theme-visual snapshots, assistant-parity/look and others) still reference removed elements (`.home-*`, "Editar horarios", weight popover). Shell selectors were updated mechanically; the rest need a rewrite or removal per test.
+  - Open questions in `entrega.md` (emblem approval, real photos, real calories/protein, visual-only cards).
 
 ## Needs the user
 

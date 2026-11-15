@@ -167,5 +167,5 @@ export const lightLockedPages = [
 
 /** Dates, times and counters that change between runs (the groceries nav counts come from real recipes and templates), plus the topbar area that holds the switch. */
 export function dynamicMasks(page: Page): Locator[] {
-  return [".topbar-account", "time", ".home-hello", ".home-strip-days", ".home-timeline", ".home-count", ".home-tiles", ".home-intake-list", ".home-water", ".groceries-nav em"].map((selector) => page.locator(selector));
+  return [".nt-sidebar .theme-toggle", "time", ".home-hello", ".home-strip-days", ".home-timeline", ".home-count", ".home-tiles", ".home-intake-list", ".home-water", ".groceries-nav em"].map((selector) => page.locator(selector));
 }

@@ -74,9 +74,9 @@ const sharedUi: SharedUi[] = [
     path: "/",
     sweep: true,
     open: async (page) => {
-      await page.locator(".user-chip").click();
-      await expect(page.locator(".user-popover")).toBeVisible();
-      return ".user-popover";
+      await page.locator(".nt-profile-btn").click();
+      await expect(page.locator(".nt-profile-menu")).toBeVisible();
+      return ".nt-profile-menu";
     }
   },
   {
@@ -467,7 +467,7 @@ test.describe("REQ-9: toggles and the active nav pill are near white", () => {
 
   test("the active pill, the schedule toggle and the shopping button on home", async ({ page }) => {
     await visit(page, "/", "dark");
-    await expectNearWhite(page, ".pill.active");
+    await expectNearWhite(page, ".nt-icon-btn.is-active");
     await expectNearWhite(page, ".home-icon-btn.is-dark");
     await page.getByRole("button", { name: "Editar horarios" }).click();
     await expectNearWhite(page, ".home-icon-btn.is-on");

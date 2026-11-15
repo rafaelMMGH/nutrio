@@ -8,7 +8,7 @@ import { seedTheme, THEME_KEY } from "./theme-helpers";
 // html.theme-vt is set, not a live animation (it reads the same with no transition running). So the tests also count
 // document.startViewTransition calls: a real reveal is one call per click. Duration is checked as configured.
 
-const toggleOf = (page: Page) => page.locator(".topbar .topbar-account").getByRole("button", { name: /^Cambiar a tema (oscuro|claro)$/ });
+const toggleOf = (page: Page) => page.locator(".nt-sidebar").getByRole("button", { name: /^Cambiar a tema (oscuro|claro)$/ });
 const colorScheme = (page: Page) => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme);
 const stored = (page: Page) => page.evaluate((key) => localStorage.getItem(key), THEME_KEY);
 
@@ -201,7 +201,7 @@ test.describe("REQ-12: the theme change is revealed from the switch", () => {
     await open(page, "/recipes");
     // One task: the recipe is opened while the reveal's marker class is certainly still on <html>.
     const duringReveal = await page.evaluate(() => {
-      document.querySelector<HTMLElement>(".topbar .theme-toggle")!.click();
+      document.querySelector<HTMLElement>(".nt-sidebar .theme-toggle")!.click();
       const revealing = document.documentElement.classList.contains("theme-vt");
       document.querySelector<HTMLElement>(".rx-open")!.click();
       return revealing;

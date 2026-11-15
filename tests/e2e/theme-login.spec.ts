@@ -208,7 +208,7 @@ test.describe("moving into and out of /login without a reload", () => {
     const marker = await softNavMarker(page);
     await page.locator(".login-submit").click();
     await page.waitForURL((url) => url.pathname === "/");
-    await expect(page.locator(".topbar .theme-toggle")).toBeVisible();
+    await expect(page.locator(".nt-sidebar .theme-toggle")).toBeVisible();
     await expectThemeMeta(page, "dark");
     await marker.expectSoft();
   });

@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
 import { Bell, ChefHat, ChevronDown, Inbox, LogOut, NotebookPen, Plus, Sparkles } from "lucide-react";
 import { foodIcon } from "@/components/dashboard/food";
-import { ThemeToggle } from "@/components/app/ThemeToggle";
 import { accountNav, hrefFor } from "@/components/app/navigation";
 import { useDismiss } from "@/components/useDismiss";
 import { MAX_MESSAGE, messageLength } from "@/lib/assistant";
@@ -102,10 +101,6 @@ function ProfileMenu({ user, onLogout }: { user: User; onLogout: () => void }) {
               </Link>
             );
           })}
-          <div className="nt-profile-theme">
-            <span>Tema</span>
-            <ThemeToggle />
-          </div>
           <hr />
           <button type="button" role="menuitem" className="danger" onClick={() => { setOpen(false); onLogout(); }}>
             <LogOut size={17} /> Cerrar sesión

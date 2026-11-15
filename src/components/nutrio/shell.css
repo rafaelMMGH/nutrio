@@ -105,7 +105,6 @@ html.dark:not(:has([data-theme-lock])) .app-shell.nt { background: var(--nt-bg);
 .nt-profile-text strong { font-size: 14px; font-weight: 500; }
 .nt-profile-text small { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--nt-muted); }
 .nt-profile-menu { top: calc(100% + 12px); right: 0; left: auto; transform-origin: top right; min-width: 220px; }
-.nt-profile-theme { display: flex; align-items: center; justify-content: space-between; padding: 4px 12px; font-size: 14px; }
 
 .nt-sidebar {
   grid-column: 1;
@@ -122,6 +121,10 @@ html.dark:not(:has([data-theme-lock])) .app-shell.nt { background: var(--nt-bg);
   box-sizing: border-box;
 }
 .nt-side-bottom { margin-top: auto; }
+/* The theme switch takes the look of the other sidebar buttons. */
+.nt-sidebar .theme-toggle { border: 1px solid var(--nt-border); background: var(--nt-surface); color: var(--nt-ink); }
+.nt-sidebar .theme-toggle:hover { background: var(--nt-surface); border-color: color-mix(in srgb, var(--nt-ink) 25%, var(--nt-border)); }
+.nt-sidebar .theme-toggle:focus-visible { outline: none; }
 
 .app-shell.nt > .content { grid-column: 2; grid-row: 2; width: 100%; box-sizing: border-box; padding-right: 32px; padding-top: 0; }
 
