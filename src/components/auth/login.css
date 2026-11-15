@@ -210,7 +210,8 @@
   }
   /* --lp-ink is now a light text color, so white-on-ink would vanish: use the inverted toggle pair. */
   html.dark:not(:has([data-theme-lock])) .login-page .lp-skip { background: var(--toggle-bg); color: var(--toggle-fg) !important; }
-  html.dark:not(:has([data-theme-lock])) .login-page .lp-mark { background: var(--btn); color: var(--on-brand); }
+  /* The emblem inverts in dark: deep-blue circle, sky sprout. */
+  html.dark:not(:has([data-theme-lock])) .login-page .lp-mark { background: #2f4e8c; color: #c8d9ef; }
   html.dark:not(:has([data-theme-lock])) .login-page .lp-btn { background: var(--btn); color: var(--on-brand); }
   @media (hover: hover) and (pointer: fine) {
     html.dark:not(:has([data-theme-lock])) .login-page .lp-btn:hover { background: var(--btn-hover); box-shadow: 0 12px 24px -12px rgb(var(--shadow-rgb) / 0.55); }

@@ -29,7 +29,7 @@ Otras decisiones menores:
 - **Perfil:** la app no tiene «rol», así que la segunda línea es el correo.
 - **Asistente y tarjeta celeste:** la columna de datos termina antes del borde inferior para que el botón flotante no tape ninguna tarjeta.
 - **Icono de «Métricas»:** `gauge` (P8).
-- **Emblema:** brote de trazo fino sobre círculo celeste (`src/components/nutrio/Emblem.tsx`), aprobado el 14 nov 2026. El favicon (`src/app/icon.svg`) usa el mismo dibujo; el icono anterior (la «N» verde) queda en el historial de git.
+- **Emblema:** brote de trazo fino sobre círculo celeste (`src/components/nutrio/Emblem.tsx`), aprobado el 14 nov 2026. El favicon (`src/app/icon.svg`), la marca de la página pública (landing, login, páginas legales y 404) y la imagen para redes usan el mismo dibujo; la «N» verde queda en el historial de git.
 
 ## Preguntas abiertas para la siguiente iteración
 
@@ -39,4 +39,3 @@ Otras decisiones menores:
 4. Análisis, alertas, notas y bandeja siguen sin acción.
 5. ¿Deben volver al dashboard el registro de agua y ejercicio y la edición de horarios?
 6. El carrusel muestra la primera opción de cada comida (lo mismo que el calendario anterior). ¿Debe mostrar todas las opciones?
-7. La página pública (landing, login e imagen para redes) sigue usando la «N» verde. ¿Se cambia también al emblema nuevo?

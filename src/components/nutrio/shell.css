@@ -122,9 +122,7 @@ html.dark:not(:has([data-theme-lock])) .app-shell.nt { background: var(--nt-bg);
   padding: 12px 0 28px;
   box-sizing: border-box;
 }
-/* The theme switch takes the look of the other sidebar buttons. */
-.nt-sidebar .theme-toggle { border: 1px solid var(--nt-border); background: var(--nt-surface); color: var(--nt-ink); }
-.nt-sidebar .theme-toggle:hover { background: var(--nt-surface); border-color: color-mix(in srgb, var(--nt-ink) 25%, var(--nt-border)); }
+/* The theme switch takes the glass look of the other sidebar buttons (primitives.css). */
 .nt-sidebar .theme-toggle:focus-visible { outline: none; }
 
 .app-shell.nt > .content { grid-column: 2; grid-row: 2; width: 100%; box-sizing: border-box; padding-right: 32px; padding-top: 0; }

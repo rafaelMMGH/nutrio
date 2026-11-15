@@ -24,6 +24,18 @@
   --nt-gap: 16px;
   --nt-gap-lg: 20px;
   --nt-focus: 0 0 0 3px color-mix(in srgb, var(--nt-sky-deep) 45%, transparent);
+  /* Liquid-glass icon buttons: frosted mint-to-sky glass, soft light from the top left, tinted (never black) shadow. */
+  --nt-glass-a: rgb(206 236 226 / 0.74);
+  --nt-glass-b: rgb(200 220 245 / 0.74);
+  --nt-glass-shine: rgb(255 255 255 / 0.95);
+  --nt-glass-edge: rgb(255 255 255 / 0.85);
+  --nt-glass-ring: rgb(92 140 160 / 0.3);
+  --nt-glass-glow: rgb(86 160 170 / 0.4);
+  --nt-glass-shadow: rgb(70 120 150 / 0.38);
+  --nt-glass-ink: #17323a;
+  --nt-glass-on-a: #2c8576;
+  --nt-glass-on-b: #33619f;
+  --nt-glass-on-ink: #ffffff;
   color: var(--nt-ink);
 }
 /* The geometric sans only applies to the new frame and the dashboard; inner pages keep their own typeface. */
@@ -39,4 +51,14 @@ html.dark:not(:has([data-theme-lock])) .nt {
   --nt-ink-sub: #15161a;
   --nt-on-ink: #0e0e10;
   --nt-muted: #a3a5ad;
+  --nt-glass-a: rgb(72 128 116 / 0.38);
+  --nt-glass-b: rgb(70 104 160 / 0.38);
+  --nt-glass-shine: rgb(255 255 255 / 0.22);
+  --nt-glass-edge: rgb(255 255 255 / 0.2);
+  --nt-glass-ring: rgb(150 200 215 / 0.18);
+  --nt-glass-glow: rgb(110 190 200 / 0.3);
+  --nt-glass-shadow: rgb(0 20 30 / 0.45);
+  --nt-glass-ink: #e6f3f2;
+  --nt-glass-on-a: #3fa391;
+  --nt-glass-on-b: #4a7fc4;
 }
