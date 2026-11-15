@@ -29,14 +29,14 @@ Otras decisiones menores:
 - **Perfil:** la app no tiene «rol», así que la segunda línea es el correo.
 - **Asistente y tarjeta celeste:** la columna de datos termina antes del borde inferior para que el botón flotante no tape ninguna tarjeta.
 - **Icono de «Métricas»:** `gauge` (P8).
-- **Emblema:** propuesta nueva (brote de trazo fino sobre círculo celeste) en `src/components/nutrio/Emblem.tsx`. El icono anterior sigue en `src/app/icon.svg` como respaldo y favicon.
+- **Emblema:** brote de trazo fino sobre círculo celeste (`src/components/nutrio/Emblem.tsx`), aprobado el 14 nov 2026. El favicon (`src/app/icon.svg`) usa el mismo dibujo; el icono anterior (la «N» verde) queda en el historial de git.
 
 ## Preguntas abiertas para la siguiente iteración
 
-1. ¿Apruebas el emblema nuevo? Si sí, se cambia también el favicon.
-2. Fotos reales de platillos (API de imágenes, R1): hoy el plato muestra iconos.
-3. Calorías y proteína reales: requieren kcal y macros por receta o un registro de consumo.
-4. Lógica real de las tarjetas amarilla y celeste y del 68 % de «Preparación actual» (marcadas `TODO: solo visual`).
-5. Análisis, alertas, notas y bandeja siguen sin acción.
-6. ¿Deben volver al dashboard el registro de agua y ejercicio y la edición de horarios?
-7. El carrusel muestra la primera opción de cada comida (lo mismo que el calendario anterior). ¿Debe mostrar todas las opciones?
+1. Fotos reales de platillos (API de imágenes, R1): hoy el plato muestra iconos.
+2. Calorías y proteína reales: requieren kcal y macros por receta o un registro de consumo.
+3. Lógica real de las tarjetas amarilla y celeste y del 68 % de «Preparación actual» (marcadas `TODO: solo visual`).
+4. Análisis, alertas, notas y bandeja siguen sin acción.
+5. ¿Deben volver al dashboard el registro de agua y ejercicio y la edición de horarios?
+6. El carrusel muestra la primera opción de cada comida (lo mismo que el calendario anterior). ¿Debe mostrar todas las opciones?
+7. La página pública (landing, login e imagen para redes) sigue usando la «N» verde. ¿Se cambia también al emblema nuevo?

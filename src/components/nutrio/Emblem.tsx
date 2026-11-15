@@ -1,4 +1,4 @@
-// New NUTRIO emblem (proposal, alt-dashboard P14): a thin-stroke sprout on a sky circle. The old icon stays in src/app/icon.svg.
+// NUTRIO emblem (alt-dashboard P14, approved 2026-11-14): a thin-stroke sprout on a sky circle. src/app/icon.svg is the same drawing for the favicon.
 export function Emblem({ size = 40 }: { size?: number }) {
   return (
     <svg className="nt-emblem" width={size} height={size} viewBox="0 0 40 40" aria-hidden>
