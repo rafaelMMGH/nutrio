@@ -568,7 +568,7 @@
   .lp-tagline p { font-size: 36px; line-height: 40px; }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 937px) {
   .lp-wrap { padding: 0 16px; }
   .lp-island { gap: 12px; }
   .lp-island-links { display: none; }
@@ -589,7 +589,7 @@
   .lp-plain h1 { font-size: 36px; line-height: 40px; }
 }
 
-@media (min-width: 768px) {
+@media (min-width: 938px) {
   .lp-menu { display: none; }
 }
 

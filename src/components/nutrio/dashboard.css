@@ -265,7 +265,7 @@ button.nt-gauge-tile:hover { background: #202024; }
   .nt-plate { left: 30%; width: 78%; }
   .nt-data { grid-template-rows: none; padding-bottom: 0; }
 }
-@media (max-width: 767px) {
+@media (max-width: 937px) {
   .nt-dash h1 { font-size: 44px; }
   .nt-hero { min-height: 600px; padding-left: 0; }
   .nt-hero-copy h2 { font-size: 30px; }

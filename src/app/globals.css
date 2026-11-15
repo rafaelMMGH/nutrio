@@ -674,7 +674,7 @@ td select { min-width: 170px; }
   .content { padding: 6px 20px 32px; }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 937px) {
   .split, .two, .metric-grid, .manual-form { grid-template-columns: 1fr; }
   .page-head { display: grid; }
 }
@@ -684,6 +684,8 @@ td select { min-width: 170px; }
 }
 
 @theme inline {
+  /* 938px; matches the plain-CSS `min-width: 938px` rule (compact layout ends at 937px). */
+  --breakpoint-md: 58.625rem;
   --font-heading: var(--font-sans);
   --font-sans: var(--font-body), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);

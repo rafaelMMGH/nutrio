@@ -50,6 +50,8 @@ Typical mutating route (`src/app/api/**/route.ts`): `requireSession()` → zod-p
 
 **UI**: route group `src/app/(dashboard)` holds the signed-in pages inside `AppShell` (top bar + icon sidebar from `src/components/nutrio/`, which also holds the redesigned dashboard, its `--nt-*` tokens in `tokens.css` and the Urbanist font; see `specs/alt-dashboard/`); feature components live in `src/components/<feature>/` with a plain CSS file per feature, alongside Tailwind v4 and shadcn primitives in `src/components/ui`. Don't name CSS classes after Tailwind utilities (e.g. `.ring`): Tailwind v4 generates the utility for any matching class name in source. Recipe list ↔ detail navigation uses React `<ViewTransition>` (`experimental.viewTransition` in `next.config.mjs`).
 
+**Breakpoints.** The compact layout applies up to 937px: write `@media (max-width: 937px)` and, for the counterpart, `@media (min-width: 938px)`. Tailwind's `md` is set to 938px to match. Do not introduce 760, 767 or 768. Wider tiers (1023, 1279/1280) and component-specific breakpoints stay as written.
+
 
 ## Principles
 

@@ -192,7 +192,7 @@ html.dark:not(:has([data-theme-lock])) .app-shell.nt { background: var(--nt-bg);
   .nt-tools { display: none; }
   .nt-cta { margin: 0 0 0 auto; }
 }
-@media (max-width: 767px) {
+@media (max-width: 937px) {
   .app-shell.nt { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
   .nt-topbar { flex-wrap: wrap; gap: 8px; padding: 12px 16px; }
   .nt-brand { margin-right: auto; gap: 8px; }

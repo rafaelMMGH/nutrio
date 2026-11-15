@@ -41,7 +41,7 @@
 @media (prefers-reduced-motion: reduce) {
   .upload-plan-btn, .upload-plan-icon, .upload-plan-arrow { transform: none !important; }
 }
-@media (max-width: 760px) {
+@media (max-width: 937px) {
   .upload-plan-btn { width: 100%; }
   .upload-plan-arrow { margin-left: auto; }
 }
