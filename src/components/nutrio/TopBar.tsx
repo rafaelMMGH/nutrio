@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRef, useState, type FormEvent } from "react";
-import { Bell, ChefHat, ChevronDown, Inbox, LogOut, NotebookPen, Plus, Sparkles } from "lucide-react";
+import { Bell, ChefHat, ChevronDown, Inbox, LogOut, Plus, Sparkles } from "lucide-react";
 import { foodIcon } from "@/components/dashboard/food";
 import { accountNav, hrefFor } from "@/components/app/navigation";
 import { useDismiss } from "@/components/useDismiss";
@@ -43,9 +43,6 @@ export function TopBar({ user, chef, busy, onAsk, onUpload, onLogout, inert }: {
       <div className="nt-tools">
         <IconButton label="Alertas">
           <Bell />
-        </IconButton>
-        <IconButton label="Notas">
-          <NotebookPen />
         </IconButton>
         <IconButton label="Bandeja de entrada" badge={12}>
           <Inbox />
