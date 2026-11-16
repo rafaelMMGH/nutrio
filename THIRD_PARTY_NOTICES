@@ -45,3 +45,20 @@ NOTE: The registry JSON fetched from prompt-kit.com carries no license or
 author fields. The copyright line above is taken from the repository's
 pre-existing attribution headers in the files listed and should be verified
 against the upstream repository's LICENSE when convenient.
+
+--------------------------------------------------------------------------------
+Kokonut UI (https://kokonutui.com, https://github.com/kokonut-labs/kokonutui)
+MIT License
+Author: Dorian Baffier (@dorianbaffier)
+
+Adapted files and what was adapted in each:
+
+  src/components/nutrio/DetentDial.tsx
+    The Detent Dial component (detent-dial 1.0.0, 2026-10-13), vendored
+    unchanged; later edits for the dashboard are made in this file.
+
+The MIT License text is the one reproduced above.
+
+NOTE: The registry JSON fetched from kokonutui.com carries no copyright line,
+only the author and license in the file header. The copyright holder should be
+verified against the upstream repository's LICENSE when convenient.
