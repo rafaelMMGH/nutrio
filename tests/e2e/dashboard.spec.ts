@@ -227,6 +227,14 @@ test("carousel: name, rating and Preparación actual change together; rating sur
 });
 
 const saved = (page: Page) => page.waitForResponse((r) => r.url().includes("/api/daily-logs/") && r.request().method() === "PUT" && r.status() < 400);
+// "Marcar cumplida" is held to confirm (800 ms); the extra 100 ms leaves the fill room to finish under load.
+const holdToConfirm = async (button: Locator) => {
+  const box = (await button.boundingBox())!;
+  await button.page().mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await button.page().mouse.down();
+  await button.page().waitForTimeout(900);
+  await button.page().mouse.up();
+};
 const slotIds = () =>
   sql("select id from meal_types where deleted_at is null and plan_version_id in (select v.id from plan_versions v join plans p on p.id = v.plan_id where v.is_current and p.status = 'active' and p.deleted_at is null) order by display_order").split("\n").filter(Boolean);
 const setDone = (ids: string[]) =>
@@ -246,7 +254,7 @@ test('"Marcar cumplida" saves the meal, moves the adherence and slides to the ne
     await expect(dots.nth(0)).toHaveAttribute("aria-selected", "true");
     const firstTitle = await title.textContent();
 
-    await Promise.all([saved(page), button.click()]);
+    await Promise.all([saved(page), holdToConfirm(button)]);
     expect(mealsDone()).toBe(1);
     // The carousel moves on to the next pending meal, whose button is not pressed.
     await expect(dots.nth(1)).toHaveAttribute("aria-selected", "true");
@@ -265,7 +273,7 @@ test('"Marcar cumplida" saves the meal, moves the adherence and slides to the ne
 
     // From the last meal the search wraps around to the first pending one.
     await dots.last().click();
-    await Promise.all([saved(page), button.click()]);
+    await Promise.all([saved(page), holdToConfirm(button)]);
     await expect(dots.nth(0)).toHaveAttribute("aria-selected", "true");
   } finally {
     setDone(original ? original.split(",") : []);
@@ -286,9 +294,9 @@ test('"Marcar cumplida" on the last pending meal stays on that slide', async ({ 
     await expect(dots.nth(pending)).toHaveAttribute("aria-selected", "true");
     const title = await page.locator(".nt-hero-copy h2").textContent();
 
-    await Promise.all([saved(page), button.click()]);
+    await Promise.all([saved(page), holdToConfirm(button)]);
     await expect(button).toHaveAttribute("aria-pressed", "true");
-    await page.waitForTimeout(700);
+    await page.waitForTimeout(1200);
     await expect(dots.nth(pending)).toHaveAttribute("aria-selected", "true");
     await expect(page.locator(".nt-hero-copy h2")).toHaveText(title!);
     expect(mealsDone()).toBe(slots.length);
@@ -319,7 +327,7 @@ test('"Marcar cumplida" makes the Comidas number go up by one', async ({ page })
         if (target.matches(".nt-roll-strip")) started.push({ name: (event as AnimationEvent).animationName, delay: getComputedStyle(target).animationDelay });
       });
     });
-    await Promise.all([saved(page), page.locator(".nt-done").click()]);
+    await Promise.all([saved(page), holdToConfirm(page.locator(".nt-done"))]);
     await expect(comidas).toHaveText("01");
     // Both new columns rolled in with nt-roll-in and no first-view delay (a later-mounted column must not wait).
     const started = await page.evaluate(() => (window as unknown as { __rollStarts: { name: string; delay: string }[] }).__rollStarts);
@@ -458,7 +466,9 @@ for (const scheme of ["light", "dark"] as const) {
     await openHome(page);
     await page.locator(".nt-profile-btn").click();
     const menu = page.getByRole("menu", { name: "Cuenta" });
-    await expect(menu.locator(".nt-menu-head strong")).not.toBeEmpty();
+    // At 1440 px the pill already shows the name and email, so the menu has no header of its own (it has one below 1280 px).
+    await expect(page.locator(".nt-profile-btn strong")).not.toBeEmpty();
+    await expect(menu.locator(".nt-menu-head")).toBeHidden();
     await expect(menu.getByRole("menuitem")).toHaveText(["Papelera", "Cerrar sesión"]);
     expect(await menu.evaluate((node) => getComputedStyle(node).backdropFilter)).toContain("blur");
     // Sign-out is the only red entry.

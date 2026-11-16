@@ -17,7 +17,7 @@
 /* ---------- Hero ---------- */
 .nt-hero { position: relative; display: flex; flex-direction: column; min-width: 0; padding: 20px 0 24px 12px; }
 .nt-hero > h1, .nt-hero-copy, .nt-prep, .nt-pager { position: relative; z-index: 2; }
-.nt-hero-copy { display: grid; justify-items: start; gap: 14px; max-width: 300px; margin-top: 40px; }
+.nt-hero-copy { display: grid; justify-items: start; gap: 14px; margin-top: 40px; }
 .nt-hero-copy h2 {
   font-size: 36px;
   font-weight: 300;
@@ -29,7 +29,7 @@
 }
 .nt-hero-meal { margin-top: -8px; font-size: 14px; color: var(--nt-muted); }
 .nt-hero-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
-.nt-rating { height: 40px; font-size: 18px; }
+.nt-rating { height: 40px; font-size: 15px; }
 .nt-done {
   display: inline-flex;
   align-items: center;
@@ -43,9 +43,9 @@
   font: inherit;
   font-size: 14px;
   cursor: pointer;
-  transition: background-color 160ms ease, color 160ms ease;
 }
-.nt-done.is-done { background: var(--nt-ink); border-color: var(--nt-ink); color: var(--nt-on-ink); }
+/* The ink inside comes from the hold fill (hold-to-confirm.css); only the border is left to colour. */
+.nt-done.is-done { border-color: var(--nt-ink); }
 .nt-hero-empty { margin-top: 20px; font-size: 28px; font-weight: 300; max-width: 320px; position: relative; z-index: 2; }
 .nt-hero.is-empty > .nt-pill { margin-top: 40px; align-self: flex-start; position: relative; z-index: 2; }
 .nt-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 16px; align-self: flex-start; color: var(--nt-ink); font-size: 14px; position: relative; z-index: 2; border-radius: 6px; }
@@ -139,7 +139,6 @@ html.dark:not(:has([data-theme-lock])) .nt-plate-dish { background: radial-gradi
 .nt-kpi {
   display: flex;
   align-items: flex-start;
-  gap: 10px;
   padding: 14px 16px;
   border-radius: 24px;
   /* Pop in left to right (--i is the tile's position). Backwards fill only: the resting style stays the final state, so hover and press compose after the entrance and a tile is never stuck hidden. */
@@ -160,7 +159,7 @@ html.dark:not(:has([data-theme-lock])) .nt-plate-dish { background: radial-gradi
   .nt-kpi:hover .nt-icon-badge { animation: nt-kpi-wiggle 500ms ease-in-out 1; }
 }
 /* Label, rolling number and context, each on one line; the label and the context clip with an ellipsis. */
-.nt-kpi-text { display: grid; gap: 4px; min-width: 0; justify-items: center; text-align: center; }
+.nt-kpi-text { display: grid; gap: 4px; min-width: 0; justify-items: center; text-align: center; width: 100% }
 .nt-kpi-label, .nt-kpi-context { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nt-kpi-label { font-size: 14.5px; line-height: 18px; }
 .nt-kpi-context { font-size: 12px; line-height: 16px; color: var(--nt-muted); }
@@ -275,6 +274,6 @@ button.nt-gauge-tile:hover { background: #202024; }
 }
 @media (prefers-reduced-motion: reduce) {
   .nt-plate { animation: none; }
-  .nt-prep, .nt-done, button.nt-gauge-tile { transition: none; }
+  .nt-prep, button.nt-gauge-tile { transition: none; }
   .nt-prep:hover { translate: none; }
 }

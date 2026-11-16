@@ -23,6 +23,8 @@
   --nt-icon-btn: 44px;
   --nt-gap: 16px;
   --nt-gap-lg: 20px;
+  /* Damped spring (zeta 0.7, about 5% overshoot), sampled every 35 ms: how the sidebar and account menus open. */
+  --nt-spring: linear(0, 0.095, 0.297, 0.518, 0.712, 0.858, 0.956, 1.013, 1.039, 1.046, 1.041, 1.032, 1.022, 1.013, 1.006, 1.002, 1);
   --nt-focus: 0 0 0 3px color-mix(in srgb, var(--nt-sky-deep) 45%, transparent);
   /* Liquid-glass icon buttons, monochrome like the rest of the dashboard: frosted neutral glass, a thin highlight on
      the rim and a soft shadow. Selected = the same glass in ink, as the black cards and the "Procesar plan" button. */
@@ -38,9 +40,6 @@
   --nt-glass-on-b: #0e0e10;
   --nt-glass-on-shine: rgb(255 255 255 / 0.28);
   --nt-glass-on-ink: #ffffff;
-  /* Glass surfaces that hold text (the account menu): more opaque than the buttons so the text keeps its contrast. */
-  --nt-glass-menu-a: rgb(255 255 255 / 0.92);
-  --nt-glass-menu-b: rgb(246 247 249 / 0.89);
   --nt-glass-line: rgb(14 14 16 / 0.08);
   --nt-glass-hover: rgb(14 14 16 / 0.055);
   --nt-danger: #b3261e;
@@ -71,8 +70,6 @@ html.dark:not(:has([data-theme-lock])) .nt {
   --nt-glass-on-b: #dfe0e5;
   --nt-glass-on-shine: rgb(255 255 255 / 0.9);
   --nt-glass-on-ink: #0e0e10;
-  --nt-glass-menu-a: rgb(48 50 58 / 0.82);
-  --nt-glass-menu-b: rgb(28 29 34 / 0.76);
   --nt-glass-line: rgb(255 255 255 / 0.1);
   --nt-glass-hover: rgb(255 255 255 / 0.08);
   --nt-danger: #ff8f82;

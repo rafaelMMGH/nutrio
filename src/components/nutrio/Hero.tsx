@@ -5,10 +5,13 @@ import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { ArrowUpRight, Check, Clock, CookingPot, Star } from "lucide-react";
 import { foodIcon, mealLabel, mealTitle, type Meal } from "@/components/dashboard/food";
 import { prepMinutes, recipeRating } from "@/lib/metrics";
+import { HoldToConfirm } from "./HoldToConfirm";
 import { DottedProgress, Figure, IconBadge, Pill } from "./primitives";
 
-// How long "Cumplida" stays on screen before the carousel moves to the next pending meal.
-const ADVANCE_DELAY = 450;
+// How long after the hold completes the carousel waits before moving to the next pending meal, so the drawn check and "Cumplida" are seen first.
+const ADVANCE_DELAY = 900;
+// How long "Marcar cumplida" must be held.
+const HOLD_MS = 800;
 
 // Fixed until the real logic exists (alt-dashboard P9).
 const PREP_PROGRESS = 0.68;
@@ -104,9 +107,17 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
           <Pill tone="surface" className="nt-rating" aria-label={`Puntuación ${rating} de 5`}>
             <Star size={16} fill="var(--nt-yellow-accent)" stroke="var(--nt-yellow-accent)" aria-hidden /> {rating}
           </Pill>
-          <button type="button" className={`nt-done${done ? " is-done" : ""}`} aria-pressed={done} onClick={() => toggle(meal.id, !done)}>
-            <Check size={16} aria-hidden /> {done ? "Cumplida" : "Marcar cumplida"}
-          </button>
+          <HoldToConfirm
+            key={meal.id}
+            className={`nt-done${done ? " is-done" : ""}`}
+            label="Marcar cumplida"
+            confirmedLabel="Cumplida"
+            duration={HOLD_MS}
+            icon={<Check size={16} aria-hidden />}
+            confirmed={done}
+            onConfirm={() => toggle(meal.id, true)}
+            onUndo={() => toggle(meal.id, false)}
+          />
         </div>
       </div>
 
@@ -141,7 +152,7 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
           <span className="nt-prep-text">
             <strong>Preparación actual</strong>
             <small>
-              <Clock size={13} aria-hidden /> ETA aprox.: {eta} min
+              <Clock size={13} aria-hidden /> Tiempo estimado: {eta} min
             </small>
           </span>
           <span className="nt-arrow" aria-hidden>
