@@ -26,14 +26,8 @@ const SPOTS = [
   { x: 36, y: 32, size: 96 },
   { x: 52, y: 76, size: 88 }
 ];
-const DOTS = [
-  { x: 58, y: 28 },
-  { x: 71, y: 44 },
-  { x: 44, y: 55 },
-  { x: 38, y: 74 }
-];
-/** The dot closest to the plate's centre: it is the Modo Cocina link. */
-const COOK_DOT = DOTS[2];
+/** Where the Modo Cocina dot sits, near the plate's centre (% of the plate). */
+const COOK_DOT = { x: 44, y: 55 };
 
 function plateIcons(meal: Meal) {
   const icons = (meal.recipe?.ingredients ?? []).map((item) => foodIcon(item.name, item.category));
@@ -133,17 +127,13 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
           ) : (
             <img src="/food/plate.png" alt="" className="nt-plate-food" style={{ left: "50%", top: "48%", width: "26%" }} aria-hidden />
           )}
-          {DOTS.map((dot) =>
-            // The dot nearest the middle of the plate opens Modo Cocina for the meal on screen (specs/cooking-mode REQ-4).
-            dot === COOK_DOT && meal.recipe ? (
-              <Link key="cook" href={`/recipes/${meal.recipe.id}/cook`} className="nt-plate-dot nt-cook-dot" style={{ left: `${dot.x}%`, top: `${dot.y}%` }} aria-label={`Modo Cocina: ${title}`}>
-                <span className="nt-cook-tip" aria-hidden>
-                  <CookingModeIcon size={14} /> Modo Cocina
-                </span>
-              </Link>
-            ) : (
-              <i key={`${dot.x}-${dot.y}`} className="nt-plate-dot" style={{ left: `${dot.x}%`, top: `${dot.y}%` }} aria-hidden />
-            )
+          {/* The only dot on the plate opens Modo Cocina for the meal on screen (specs/cooking-mode REQ-4). */}
+          {meal.recipe && (
+            <Link href={`/recipes/${meal.recipe.id}/cook`} className="nt-plate-dot nt-cook-dot" style={{ left: `${COOK_DOT.x}%`, top: `${COOK_DOT.y}%` }} aria-label={`Modo Cocina: ${title}`}>
+              <span className="nt-cook-tip" aria-hidden>
+                <CookingModeIcon size={14} /> Modo Cocina
+              </span>
+            </Link>
           )}
         </div>
       </div>

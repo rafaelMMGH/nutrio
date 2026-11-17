@@ -334,6 +334,12 @@ button.nt-gauge-tile:hover { background: #202024; }
   .nt-dash h1 { font-size: 44px; }
   .nt-hero { min-height: 600px; padding-left: 0; }
   .nt-hero-copy h2 { font-size: 30px; }
+  /* The h1 stays for assistive tech (it labels the hero) but is visually hidden; drop the gaps that separated it from its siblings. */
+  .nt-hero > h1 {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+  }
+  .nt-hero-copy, .nt-hero-empty { margin-top: 0; }
   .nt-plate { left: 8%; width: 120%; translate: 0 -38%; }
   .nt-kpis, .nt-gauges { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .nt-pair { grid-template-columns: minmax(0, 1fr); }
