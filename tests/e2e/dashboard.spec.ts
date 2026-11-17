@@ -259,7 +259,10 @@ test('"Marcar cumplida" saves the meal, moves the adherence and slides to the ne
     // The carousel moves on to the next pending meal, whose button is not pressed.
     await expect(dots.nth(1)).toHaveAttribute("aria-selected", "true");
     await expect(button).toHaveAttribute("aria-pressed", "false");
-    await expect(page.locator(".nt-gauge-tile").first().locator(".nt-gauge-label")).toContainText(/Adherencia \(\d+\/\d+\)/);
+    // The Adherencia dial's line under the dial says "N de M comidas" (metric-dials REQ-3), and N counts the meal just marked.
+    const adherenceLine = page.locator(".nt-metrics .nt-gauges > *").filter({ has: page.getByRole("meter", { name: "Adherencia", exact: true }) }).getByText(/^\d+ de \d+ comidas?$/);
+    await expect(adherenceLine).toBeVisible();
+    expect(Number((await adherenceLine.textContent())!.split(" ")[0])).toBeGreaterThanOrEqual(1);
 
     // Unmarking keeps the slide.
     await dots.nth(0).click();
@@ -349,17 +352,29 @@ test('"Marcar cumplida" makes the Comidas number go up by one', async ({ page })
   }
 });
 
-test("Métricas: title without a range, four tabs, four gauges in order, no order counter", async ({ page }) => {
+test("Métricas: title without a range, four tabs, four tiles in order, no order counter", async ({ page }) => {
   const card = page.locator(".nt-metrics");
   await expect(card.getByRole("heading")).toHaveText("Métricas");
   await expect(card.getByRole("tab")).toHaveText(["Semana", "Mes", "Año", "Histórico"]);
   await expect(card).not.toContainText(/Orders|semanal/i);
+  const tiles = card.locator(".nt-gauges > *");
+  await expect(tiles).toHaveCount(4);
+  // Adherencia, Calorías and Proteína are meters named by their tile (REQ-43); Peso keeps its gauge tile until US3.
+  const meters = ["Adherencia", "Calorías", "Proteína"];
+  for (const [index, name] of meters.entries()) await expect(tiles.nth(index).getByRole("meter", { name, exact: true })).toHaveCount(1);
+  await expect(card.getByRole("meter")).toHaveCount(3);
+  await expect(tiles.nth(3).locator(".nt-gauge-label")).toHaveText(/^Peso\b/);
+  // What each meter reads, by aria-valuetext: with data or "Sin datos", units kept (REQ-43).
+  const valueText = /^(Sin datos|\d+%, \d+ de \d+ comidas?)$/;
+  const estimate = (unit: string) => new RegExp(`^(Sin datos|≈ [\\d,]+ ${unit}, meta [\\d,]+ ${unit})$`);
   for (const tab of ["Mes", "Año", "Histórico", "Semana"]) {
     await card.getByRole("tab", { name: tab }).click();
     await expect(card.getByRole("tab", { name: tab })).toHaveAttribute("aria-selected", "true");
-    const labels = await card.locator(".nt-gauge-label").allTextContents();
-    expect(labels.map((label) => label.split(" (")[0])).toEqual(["Adherencia", "Calorías", "Proteína", "Peso"]);
-    for (const value of await card.locator(".nt-gauge-value").allTextContents()) expect(value).toMatch(/^(—|\d+%)$/);
+    const reads = await Promise.all(meters.map((name) => tiles.getByRole("meter", { name, exact: true }).getAttribute("aria-valuetext")));
+    expect(reads[0], `Adherencia in ${tab}`).toMatch(valueText);
+    expect(reads[1], `Calorías in ${tab}`).toMatch(estimate("kcal"));
+    expect(reads[2], `Proteína in ${tab}`).toMatch(estimate("g"));
+    for (const value of await tiles.nth(3).locator(".nt-gauge-value").allTextContents()) expect(value).toMatch(/^(—|\d+%)$/);
   }
 });
 
@@ -414,13 +429,20 @@ for (const size of [{ width: 1440, height: 900 }, { width: 1440, height: 780 }, 
     await page.waitForLoadState("networkidle");
     expect(await page.evaluate(() => document.documentElement.scrollHeight - innerHeight), "vertical page scroll").toBeLessThanOrEqual(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), "horizontal page scroll").toBeLessThanOrEqual(0);
-    const clipped = await page.locator(".nt-kpi, .nt-metrics, .nt-gauge-tile, .nt-cal, .nt-comp, .nt-prep").evaluateAll((nodes) =>
+    const clipped = await page.locator(".nt-kpi, .nt-metrics, .nt-gauges > *, .nt-cal, .nt-comp, .nt-prep").evaluateAll((nodes) =>
       nodes.filter((node) => node.scrollHeight > node.clientHeight + 1).map((node) => `${node.className}: ${node.scrollHeight} > ${node.clientHeight}`)
     );
     expect(clipped, "cards whose content is cut").toEqual([]);
     const [fab, sky, prep] = await Promise.all([".assistant-fab", ".nt-comp", ".nt-prep"].map(async (selector) => (await page.locator(selector).boundingBox())!));
     expect(sky.y + sky.height).toBeLessThanOrEqual(fab.y);
     expect(prep.y + prep.height).toBeLessThanOrEqual(size.height);
+    // The three dials are the same size (REQ-9); Peso keeps its gauge until US3.
+    const dials = await page.locator(".nt-metrics .nt-dial-box").evaluateAll((nodes) => nodes.map((node) => [node.getBoundingClientRect().width, node.getBoundingClientRect().height]));
+    expect(dials, "three dial boxes").toHaveLength(3);
+    for (const [width, height] of dials) {
+      expect(width).toBeCloseTo(dials[0][0], 0);
+      expect(height).toBeCloseTo(width, 0);
+    }
     if (size.height === 780) await page.screenshot({ path: `${SHOTS}/dashboard-1440x780.png` });
   });
 }
@@ -453,6 +475,12 @@ test("empty state: a day without a plan shows the message and a link to Planes",
     await expect(page.locator(".nt-kpi").first().locator(".nt-roll")).toHaveText("0");
     await expect(page.locator(".nt-kpi").first().locator(".nt-roll-dash")).toHaveAttribute("data-glyph", "—");
     await expect(page.locator(".nt-kpi-context").first()).toHaveText("Día libre");
+    // No plan means no meals and no targets: every dial reads "—" and "Sin datos" (metric-dials REQ-6, REQ-43); Peso keeps its gauge.
+    for (const name of ["Adherencia", "Calorías", "Proteína"]) {
+      const dial = page.locator(".nt-metrics").getByRole("meter", { name, exact: true });
+      await expect(dial).toHaveAttribute("aria-valuetext", "Sin datos");
+      await expect(dial.locator(".nt-dial-readout")).toHaveText("—");
+    }
     for (const value of await page.locator(".nt-gauge-value").allTextContents()) expect(value).toMatch(/^(—|\d+%)$/);
     await page.screenshot({ path: `${SHOTS}/dashboard-empty-1440x900.png` });
   } finally {
