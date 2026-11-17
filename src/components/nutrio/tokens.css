@@ -44,6 +44,13 @@
   --nt-glass-hover: rgb(14 14 16 / 0.055);
   --nt-danger: #b3261e;
   --nt-danger-bg: rgb(179 38 30 / 0.09);
+  /* Metric dials (specs/metric-dials): they sit on the Métricas card, black in both themes, so these are defined once.
+     On --nt-ink-sub: white 17.9:1, tick 3.5:1, line 4.4:1; white on the knob 15.5:1. */
+  --nt-dial-white: #ffffff;
+  --nt-dial-tick: #6b6e76;
+  --nt-dial-knob: #232428;
+  --nt-dial-line: #7a7d86;
+  --nt-dial-focus: #ffffff;
   color: var(--nt-ink);
 }
 /* The geometric sans only applies to the new frame and the dashboard; inner pages keep their own typeface. */
