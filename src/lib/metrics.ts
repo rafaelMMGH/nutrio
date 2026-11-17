@@ -9,9 +9,9 @@ export type Metrics = {
   /** Meals done ÷ meals planned from the start of the period up to today. null = no logs in the period. */
   adherence: { ratio: number | null; done: number; planned: number };
   /** Estimated: the daily goal × adherence (the app does not record intake). `kcal` is the daily average. */
-  calories: { ratio: number | null; kcal: number | null };
+  calories: { ratio: number | null; kcal: number | null; goal: number | null };
   /** Estimated like calories; the goal in grams is kcal × protein % ÷ 4. `grams` is the daily average. */
-  protein: { ratio: number | null; grams: number | null };
+  protein: { ratio: number | null; grams: number | null; goal: number | null };
   /** Progress from the first logged weight towards the goal; `current` is the latest weight of the period. */
   weight: { ratio: number | null; current: number | null };
 };
@@ -47,9 +47,52 @@ export function dashboardMetrics({ logs, slotIds, today, period, kcalGoal, prote
 
   return {
     adherence: { ratio, done, planned },
-    calories: { ratio: kcalGoal ? ratio : null, kcal: kcalGoal && ratio !== null ? Math.round(kcalGoal * ratio) : null },
-    protein: { ratio: proteinGoal ? ratio : null, grams: proteinGoal && ratio !== null ? Math.round(proteinGoal * ratio) : null },
+    calories: { ratio: kcalGoal ? ratio : null, kcal: kcalGoal && ratio !== null ? Math.round(kcalGoal * ratio) : null, goal: kcalGoal || null },
+    protein: { ratio: proteinGoal ? ratio : null, grams: proteinGoal && ratio !== null ? Math.round(proteinGoal * ratio) : null, goal: proteinGoal || null },
     weight: { ratio: weightRatio, current }
+  };
+}
+
+/** What a read-only metric dial shows (specs/metric-dials REQ-3 to REQ-6, REQ-43; spec v1.4: no unit in the knob). */
+export type DialReadout = {
+  /** The number inside the knob: "78%", "≈ 1,445", "≈ 88", or "—" without data. */
+  readout: string;
+  /** The line under the dial, carrying the unit: "25 de 32 comidas", "meta 1,850 kcal"; null when there is none. */
+  line: string | null;
+  min: number;
+  max: number;
+  /** Needle position, unrounded and clamped to min..max; 0 without data. */
+  value: number;
+  /** aria-valuetext: readout and line with units, or "Sin datos". */
+  valueText: string;
+};
+
+const NO_DATA = { min: 0, max: 100, value: 0, valueText: "Sin datos" };
+const whole = (n: number) => Math.round(n).toLocaleString("en-US");
+const clamp = (n: number, max: number) => Math.min(max, Math.max(0, n));
+
+function estimateDial(ratio: number | null, goal: number | null, unit: string): DialReadout {
+  if (!goal) return { readout: "—", line: null, ...NO_DATA };
+  const line = `meta ${whole(goal)} ${unit}`;
+  if (ratio === null) return { readout: "—", line, ...NO_DATA };
+  const estimate = ratio * goal;
+  const readout = `≈ ${whole(estimate)}`;
+  return { readout, line, min: 0, max: goal, value: clamp(estimate, goal), valueText: `${readout} ${unit}, ${line}` };
+}
+
+/** Readouts and meter values of the Adherencia, Calorías and Proteína dials, from the period's metrics. */
+export function metricReadouts({ adherence, calories, protein }: Metrics): { adherence: DialReadout; calories: DialReadout; protein: DialReadout } {
+  let adherenceDial: DialReadout = { readout: "—", line: null, ...NO_DATA };
+  if (adherence.ratio !== null) {
+    const percentage = adherence.ratio * 100;
+    const readout = `${Math.round(percentage)}%`;
+    const line = `${adherence.done} de ${adherence.planned} ${adherence.planned === 1 ? "comida" : "comidas"}`;
+    adherenceDial = { readout, line, min: 0, max: 100, value: clamp(percentage, 100), valueText: `${readout}, ${line}` };
+  }
+  return {
+    adherence: adherenceDial,
+    calories: estimateDial(adherence.ratio, calories.goal, "kcal"),
+    protein: estimateDial(adherence.ratio, protein.goal, "g")
   };
 }
 
