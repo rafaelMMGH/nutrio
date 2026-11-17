@@ -1,6 +1,11 @@
 "use client";
 
 /**
+ * Our copy of the Kokonut UI detent dial (specs/metric-dials plan "Our copy of the dial"): dashboard tokens instead
+ * of the stock Tailwind colours, a read-only meter mode, an external readout and label, size from CSS, and
+ * programmatic value changes that glide without emitting change events.
+ *
+ * Original header:
  * @author: @dorianbaffier
  * @description: Detent Dial
  * @version: 1.0.0
@@ -25,11 +30,10 @@ import {
   type KeyboardEvent,
   type PointerEvent,
   useEffect,
-  useId,
   useRef,
   useState,
 } from "react";
-import { cn } from "@/lib/utils";
+import "./detent-dial.css";
 
 // The dial sweeps 270°, from 7:30 to 4:30 on a clock face.
 const SWEEP = 270;
@@ -54,6 +58,10 @@ const VELOCITY_WINDOW_MS = 80;
 // Seconds of travel a flick is worth: release speed × COAST = distance coasted.
 const COAST = 0.3;
 const SETTLE_SPRING = { type: "spring", duration: 0.35, bounce: 0.2 } as const;
+// Programmatic moves (tab change, rescale, undo) glide with the same spring.
+const GLIDE_SPRING = SETTLE_SPRING;
+// Geometry is drawn in a fixed 240 viewBox and scaled by CSS (--nt-dial-size).
+const VIEW = 240;
 const EASE_OUT = [0.23, 1, 0.32, 1] as const;
 
 function damp(distance: number, max: number) {
@@ -96,38 +104,47 @@ function hapticTick() {
 }
 
 export interface DetentDialProps {
-  /** Accessible name, also shown inside the knob. */
-  label?: string;
-  min?: number;
-  max?: number;
-  step?: number;
-  /** Initial value when uncontrolled. Double-clicking the knob returns here. */
-  defaultValue?: number;
+  /** id of the element that names the dial (the tile renders the name). */
+  labelledBy: string;
+  min: number;
+  max: number;
+  step: number;
   /** Controlled value. */
-  value?: number;
+  value: number;
+  /** The number shown with the dial ("78%", "≈ 1,445", "—"). */
+  readout: string;
+  /** aria-valuetext (REQ-43). */
+  valueText: string;
+  /** A read-only meter: no pointer, key or wheel input, not a keyboard stop (REQ-2). */
+  readOnly?: boolean;
+  /** Inside the knob, or above the dial when the row's numbers are too long for the knob (dial-logic). */
+  readoutPlacement?: "inside" | "above";
+  /** Show the numbers at both ends of the ring (dial-logic `showEndLabels`). */
+  endLabels?: boolean;
+  /** Formats the end labels. */
+  formatEnd?: (value: number) => string;
+  /** Slider mode only: called each time the dial crosses into a new notch by user input. */
   onValueChange?: (value: number) => void;
-  /** Formats the readout, the end labels and `aria-valuetext`. */
-  formatValue?: (value: number) => string;
-  /** Diameter in px. */
-  size?: number;
-  disabled?: boolean;
   className?: string;
 }
 
+const pct = (n: number) => `${(n / VIEW) * 100}%`;
+
 export default function DetentDial({
-  label = "Temperature",
-  min = 16,
-  max = 30,
-  step = 0.5,
-  defaultValue = 21,
+  labelledBy,
+  min,
+  max,
+  step,
   value: valueProp,
+  readout,
+  valueText,
+  readOnly = false,
+  readoutPlacement = "inside",
+  endLabels = false,
+  formatEnd = (v) => String(v),
   onValueChange,
-  formatValue = (v) => `${v.toFixed(1)}°`,
-  size = 240,
-  disabled = false,
   className,
 }: DetentDialProps) {
-  const labelId = useId();
   const knobRef = useRef<HTMLDivElement>(null);
   const tickRefs = useRef<(SVGLineElement | null)[]>([]);
   // The length last written to each tick, so a frame only touches the few
@@ -135,13 +152,17 @@ export default function DetentDial({
   const tickLengths = useRef<number[]>([]);
   const reduceMotion = useReducedMotion();
   const range = max - min;
+  // The transform below reads the limits through a ref, so a rescale applies to the next frame.
+  const limits = useRef({ min, max });
 
-  const initial = clamp(valueProp ?? defaultValue, min, max);
+  const initial = clamp(valueProp, min, max);
   const [value, setValue] = useState(initial);
   const [direction, setDirection] = useState<1 | -1>(1);
   const [grabbing, setGrabbing] = useState(false);
   const committed = useRef(initial);
   const pointerType = useRef("mouse");
+  // True while a programmatic glide runs: notches crossed then are not user changes.
+  const programmatic = useRef(false);
 
   // The raw, unsnapped position in value units. It can run past min/max
   // while winding; everything visual is derived from it.
@@ -157,51 +178,78 @@ export default function DetentDial({
   } | null>(null);
 
   const rotation = useTransform(raw, (r) => {
-    const degPerUnit = range === 0 ? 0 : SWEEP / range;
-    if (r < min) {
-      return START_ANGLE - damp((min - r) * degPerUnit, MAX_OVERSHOOT);
+    const { min: lo, max: hi } = limits.current;
+    const span = hi - lo;
+    const degPerUnit = span === 0 ? 0 : SWEEP / span;
+    if (r < lo) {
+      return START_ANGLE - damp((lo - r) * degPerUnit, MAX_OVERSHOOT);
     }
-    if (r > max) {
-      return START_ANGLE + SWEEP + damp((r - max) * degPerUnit, MAX_OVERSHOOT);
+    if (r > hi) {
+      return START_ANGLE + SWEEP + damp((r - hi) * degPerUnit, MAX_OVERSHOOT);
     }
-    const notch = snap(r, min, step);
+    const notch = snap(r, lo, step);
     const pulled = notch + (r - notch) * (1 - DETENT_PULL);
-    return START_ANGLE + (pulled - min) * degPerUnit;
+    return START_ANGLE + (pulled - lo) * degPerUnit;
   });
 
   // Only re-render when the dial crosses into a new notch, not per frame.
   useMotionValueEvent(raw, "change", (r) => {
-    const next = clamp(snap(r, min, step), min, max);
+    const { min: lo, max: hi } = limits.current;
+    const next = clamp(snap(r, lo, step), lo, hi);
     if (next === committed.current) {
       return;
     }
     setDirection(next > committed.current ? 1 : -1);
     committed.current = next;
     setValue(next);
+    if (programmatic.current) {
+      return;
+    }
     onValueChange?.(next);
     if (pointerType.current === "touch") {
       hapticTick();
     }
   });
 
-  // Follow a controlled value when the parent changes it.
+  // Follow the controlled value and limits. A rescale first keeps the needle's angle in the new scale, then the
+  // needle glides to the value (instant under reduced motion). The first render already sits at the value.
   useEffect(() => {
-    if (valueProp === undefined || drag.current) {
+    if (drag.current) {
       return;
     }
-    const next = clamp(valueProp, min, max);
-    if (next !== committed.current) {
-      animation.current?.stop();
-      committed.current = next;
-      setValue(next);
-      raw.jump(next);
+    const previous = limits.current;
+    if (previous.min !== min || previous.max !== max) {
+      const oldSpan = previous.max - previous.min;
+      const fraction = oldSpan === 0 ? 0 : (raw.get() - previous.min) / oldSpan;
+      limits.current = { min, max };
+      raw.jump(min + fraction * (max - min));
     }
-  }, [valueProp, min, max, raw]);
+    const next = clamp(valueProp, min, max);
+    if (next === committed.current && raw.get() === next) {
+      return;
+    }
+    animation.current?.stop();
+    programmatic.current = true;
+    committed.current = next;
+    setValue(next);
+    if (reduceMotion) {
+      raw.jump(next);
+      programmatic.current = false;
+      return;
+    }
+    animation.current = animate(raw, next, {
+      ...GLIDE_SPRING,
+      onComplete: () => {
+        programmatic.current = false;
+      },
+    });
+  }, [valueProp, min, max, raw, reduceMotion]);
 
   useEffect(() => () => animation.current?.stop(), []);
 
   const settleTo = (target: number) => {
     animation.current?.stop();
+    programmatic.current = false;
     animation.current = animate(
       raw,
       target,
@@ -213,13 +261,14 @@ export default function DetentDial({
   // and an animation on each would trail behind the input.
   const stepBy = (delta: number) => {
     animation.current?.stop();
+    programmatic.current = false;
     const target = clamp(snap(committed.current + delta, min, step), min, max);
     pointerType.current = "keyboard";
     raw.jump(target);
   };
 
   const handlePointerDown = (event: PointerEvent<HTMLDivElement>) => {
-    if (disabled || drag.current) {
+    if (drag.current) {
       return;
     }
     if (event.pointerType === "mouse" && event.button !== 0) {
@@ -228,6 +277,7 @@ export default function DetentDial({
     const rect = event.currentTarget.getBoundingClientRect();
     const { angle } = pointerAngle(event, rect);
     animation.current?.stop();
+    programmatic.current = false;
     pointerType.current = event.pointerType;
     event.currentTarget.setPointerCapture(event.pointerId);
     drag.current = {
@@ -238,7 +288,6 @@ export default function DetentDial({
     };
     setGrabbing(true);
   };
-
   const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
     const current = drag.current;
     if (!current || current.id !== event.pointerId) {
@@ -314,9 +363,6 @@ export default function DetentDial({
   };
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (disabled) {
-      return;
-    }
     const big = Math.max(step, snap(range / 10, 0, step));
     const keySteps: Record<string, number> = {
       ArrowUp: step,
@@ -338,8 +384,8 @@ export default function DetentDial({
   // The wheel only turns the dial once it has focus, so scrolling the page
   // past it never changes the value by accident. The listener is attached
   // once and reads the latest props through a ref.
-  const wheelStep = useRef({ disabled, step, stepBy });
-  wheelStep.current = { disabled, step, stepBy };
+  const wheelStep = useRef({ readOnly, step, stepBy });
+  wheelStep.current = { readOnly, step, stepBy };
   useEffect(() => {
     const knob = knobRef.current;
     if (!knob) {
@@ -348,7 +394,7 @@ export default function DetentDial({
     let accumulated = 0;
     const onWheel = (event: WheelEvent) => {
       const latest = wheelStep.current;
-      if (latest.disabled || document.activeElement !== knob) {
+      if (latest.readOnly || document.activeElement !== knob) {
         return;
       }
       event.preventDefault();
@@ -364,13 +410,11 @@ export default function DetentDial({
     return () => knob.removeEventListener("wheel", onWheel);
   }, []);
 
-  const center = size / 2;
+  const center = VIEW / 2;
   const tickCount = Math.max(1, Math.min(Math.round(range / step), MAX_TICKS));
   const valueFraction = range === 0 ? 0 : (value - min) / range;
   const activeTick = Math.round(valueFraction * tickCount);
-  const knobSize = size * 0.64;
-  const outer = size / 2 - 6;
-
+  const outer = VIEW / 2 - 6;
   // Ticks swell as the indicator passes them, following its exact angle
   // (not the snapped value), so a wave travels round the ring as you turn.
   function tickLength(i: number, indicatorAngle: number) {
@@ -418,123 +462,87 @@ export default function DetentDial({
   const minLabel = polar(center, center, outer + 2, START_ANGLE - 12);
   const maxLabel = polar(center, center, outer + 2, START_ANGLE + SWEEP + 12);
 
+  const readoutNode = (
+    <RollingValue
+      direction={direction}
+      reduceMotion={Boolean(reduceMotion)}
+      text={readout}
+    />
+  );
+
+  const interaction = readOnly
+    ? {}
+    : {
+        onKeyDown: handleKeyDown,
+        onLostPointerCapture: handlePointerUp,
+        onPointerCancel: handlePointerUp,
+        onPointerDown: handlePointerDown,
+        onPointerMove: handlePointerMove,
+        onPointerUp: handlePointerUp,
+        tabIndex: 0,
+      };
+
   return (
-    <div
-      className={cn(
-        "relative select-none",
-        disabled && "opacity-50",
-        className
-      )}
-      style={{ width: size, height: size }}
-    >
-      <svg
-        aria-hidden="true"
-        className="absolute inset-0"
-        height={size}
-        viewBox={`0 0 ${size} ${size}`}
-        width={size}
-      >
-        {Array.from({ length: tickCount + 1 }, (_, i) => {
-          const lit = i <= activeTick;
-          const current = i === activeTick;
-          const length = tickLength(i, rotation.get());
-          tickLengths.current[i] = length;
-          const { a, b } = tickGeometry(i, length);
-          return (
-            <line
-              className={cn(
-                "transition-[stroke] duration-150",
-                current && "stroke-orange-600 dark:stroke-orange-400",
-                !current &&
-                  (lit
-                    ? "stroke-zinc-900 dark:stroke-zinc-100"
-                    : "stroke-zinc-300 dark:stroke-zinc-700")
-              )}
-              // biome-ignore lint/suspicious/noArrayIndexKey: ticks are positional.
-              key={i}
-              ref={(node) => {
-                tickRefs.current[i] = node;
-              }}
-              strokeLinecap="round"
-              strokeWidth={current ? 2 : 1.5}
-              x1={a.x}
-              x2={b.x}
-              y1={a.y}
-              y2={b.y}
-            />
-          );
-        })}
-      </svg>
-
-      <span
-        aria-hidden="true"
-        className="absolute -translate-x-1/2 text-[11px] text-zinc-400 tabular-nums"
-        style={{ left: minLabel.x, top: minLabel.y }}
-      >
-        {formatValue(min)}
-      </span>
-      <span
-        aria-hidden="true"
-        className="absolute -translate-x-1/2 text-[11px] text-zinc-400 tabular-nums"
-        style={{ left: maxLabel.x, top: maxLabel.y }}
-      >
-        {formatValue(max)}
-      </span>
-
-      <div
-        aria-disabled={disabled || undefined}
-        aria-labelledby={labelId}
-        aria-valuemax={max}
-        aria-valuemin={min}
-        aria-valuenow={value}
-        aria-valuetext={formatValue(value)}
-        className={cn(
-          "absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 touch-none rounded-full outline-none",
-          "border border-zinc-200 bg-white shadow-[0_1px_2px_rgb(0_0_0/0.06),0_12px_32px_-12px_rgb(0_0_0/0.25)] dark:border-zinc-800 dark:bg-zinc-900 dark:shadow-[0_1px_2px_rgb(0_0_0/0.4),0_12px_32px_-12px_rgb(0_0_0/0.8)]",
-          "transition-[border-color] duration-150 focus-visible:ring-2 focus-visible:ring-zinc-400 focus-visible:ring-offset-4 focus-visible:ring-offset-white dark:focus-visible:ring-offset-zinc-950",
-          grabbing
-            ? "cursor-grabbing border-zinc-300 dark:border-zinc-700"
-            : "cursor-grab",
-          disabled && "cursor-not-allowed"
-        )}
-        onDoubleClick={() => {
-          if (!disabled) {
-            pointerType.current = "mouse";
-            settleTo(clamp(defaultValue, min, max));
-          }
-        }}
-        onKeyDown={handleKeyDown}
-        onLostPointerCapture={handlePointerUp}
-        onPointerCancel={handlePointerUp}
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={handlePointerUp}
-        ref={knobRef}
-        role="slider"
-        style={{ width: knobSize, height: knobSize }}
-        tabIndex={disabled ? -1 : 0}
-      >
-        {/* Only the indicator turns; the readout stays upright. */}
-        <motion.div
+    <div className={["nt-dial", readOnly ? "is-readonly" : "is-slider", className].filter(Boolean).join(" ")}>
+      {readoutPlacement === "above" ? <div className="nt-dial-readout nt-dial-readout-above">{readoutNode}</div> : null}
+      <div className="nt-dial-box">
+        <svg
           aria-hidden="true"
-          className="absolute inset-0"
-          style={{ rotate: rotation }}
+          className="nt-dial-ring"
+          viewBox={`0 0 ${VIEW} ${VIEW}`}
         >
-          <span className="absolute top-2.5 left-1/2 h-3 w-[3px] -translate-x-1/2 rounded-full bg-zinc-900 dark:bg-zinc-100" />
-        </motion.div>
+          {Array.from({ length: tickCount + 1 }, (_, i) => {
+            const lit = i <= activeTick;
+            const length = tickLength(i, rotation.get());
+            tickLengths.current[i] = length;
+            const { a, b } = tickGeometry(i, length);
+            return (
+              <line
+                className={lit ? "nt-dial-tick is-lit" : "nt-dial-tick"}
+                // biome-ignore lint/suspicious/noArrayIndexKey: ticks are positional.
+                key={i}
+                ref={(node) => {
+                  tickRefs.current[i] = node;
+                }}
+                strokeLinecap="round"
+                strokeWidth={i === activeTick ? 2 : 1.5}
+                vectorEffect="non-scaling-stroke"
+                x1={a.x}
+                x2={b.x}
+                y1={a.y}
+                y2={b.y}
+              />
+            );
+          })}
+        </svg>
 
-        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-          <span
-            className="text-xs text-zinc-500 dark:text-zinc-400"
-            id={labelId}
-          >
-            {label}
-          </span>
-          <RollingValue
-            direction={direction}
-            reduceMotion={Boolean(reduceMotion)}
-            text={formatValue(value)}
-          />
+        {endLabels ? (
+          <>
+            <span aria-hidden="true" className="nt-dial-end" style={{ left: pct(minLabel.x), top: pct(minLabel.y) }}>
+              {formatEnd(min)}
+            </span>
+            <span aria-hidden="true" className="nt-dial-end" style={{ left: pct(maxLabel.x), top: pct(maxLabel.y) }}>
+              {formatEnd(max)}
+            </span>
+          </>
+        ) : null}
+
+        <div
+          aria-labelledby={labelledBy}
+          aria-valuemax={max}
+          aria-valuemin={min}
+          aria-valuenow={value}
+          aria-valuetext={valueText}
+          className={grabbing ? "nt-dial-knob is-grabbing" : "nt-dial-knob"}
+          ref={knobRef}
+          role={readOnly ? "meter" : "slider"}
+          {...interaction}
+        >
+          {/* Only the indicator turns; the readout stays upright. */}
+          <motion.div aria-hidden="true" className="nt-dial-turn" style={{ rotate: rotation }}>
+            <span className="nt-dial-indicator" />
+          </motion.div>
+          {readoutPlacement === "inside" ? <div className="nt-dial-readout nt-dial-readout-inside">{readoutNode}</div> : null}
         </div>
       </div>
     </div>
@@ -576,13 +584,10 @@ function RollingValue({
 }) {
   const offset = reduceMotion ? 0 : direction * 10;
   return (
-    <span
-      aria-hidden="true"
-      className="relative flex font-medium text-3xl text-zinc-900 tabular-nums tracking-tight dark:text-zinc-100"
-    >
+    <span aria-hidden="true" className="nt-dial-digits">
       {text.split("").map((char, index) => (
         <span
-          className="relative inline-flex overflow-hidden"
+          className="nt-dial-char"
           // Position is the identity: the same slot keeps its node.
           // biome-ignore lint/suspicious/noArrayIndexKey: characters are positional.
           key={index}

@@ -1,0 +1,117 @@
+/* Our copy of the Kokonut detent dial (specs/metric-dials). Size from --nt-dial-size, readout size from
+   --nt-dial-readout, accent from --nt-dial-accent (set by the tile); colours are the --nt-dial-* tokens. */
+.nt-dial {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.nt-dial-box {
+  position: relative;
+  width: var(--nt-dial-size, 84px);
+  height: var(--nt-dial-size, 84px);
+  flex: none;
+}
+.nt-dial-ring {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.nt-dial-tick {
+  stroke: var(--nt-dial-tick);
+  transition: stroke 150ms;
+}
+.nt-dial-tick.is-lit {
+  stroke: var(--nt-dial-accent, var(--nt-dial-white));
+}
+.nt-dial-end {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 11px;
+  line-height: 1;
+  color: var(--nt-muted-on-ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.nt-dial-knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 64%;
+  height: 64%;
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+  border: 1px solid var(--nt-dial-line);
+  background: var(--nt-dial-knob);
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.4), 0 12px 32px -12px rgb(0 0 0 / 0.8);
+  outline: none;
+  transition: border-color 150ms;
+}
+.nt-dial.is-readonly .nt-dial-knob {
+  touch-action: auto;
+  cursor: default;
+}
+.nt-dial.is-slider .nt-dial-knob {
+  touch-action: none;
+  cursor: grab;
+}
+.nt-dial.is-slider .nt-dial-knob.is-grabbing {
+  cursor: grabbing;
+  border-color: var(--nt-dial-accent, var(--nt-dial-white));
+}
+.nt-dial-knob:focus-visible {
+  box-shadow: 0 0 0 3px var(--nt-dial-focus);
+}
+.nt-dial-turn {
+  position: absolute;
+  inset: 0;
+}
+.nt-dial-indicator {
+  position: absolute;
+  top: 6.5%;
+  left: 50%;
+  width: 3px;
+  height: 7.8%;
+  min-height: 4px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: var(--nt-dial-accent, var(--nt-dial-white));
+}
+.nt-dial-readout {
+  color: var(--nt-dial-white);
+  font-size: var(--nt-dial-readout, 16px);
+  font-weight: 500;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.nt-dial-readout-inside {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.nt-dial-readout-above {
+  margin-bottom: 4px;
+}
+.nt-dial-digits {
+  position: relative;
+  display: flex;
+}
+.nt-dial-char {
+  position: relative;
+  display: inline-flex;
+  overflow: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .nt-dial-tick,
+  .nt-dial-knob {
+    transition: none;
+  }
+}
