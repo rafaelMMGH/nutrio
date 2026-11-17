@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Archive, ArrowLeft, Check, ChefHat, CircleCheck, Pencil, Plus, ShoppingCart, Trash2 } from "lucide-react";
+import { CookingModeIcon } from "@/components/cooking/CookingModeIcon";
 import { ViewTransition } from "@/components/shared/ViewTransition";
 import { foodGroup, foodIcon, isReadableName, plural, qty } from "@/components/dashboard/food";
 import { useAssistantContext } from "@/components/app/assistant";
@@ -90,8 +91,8 @@ export function RecipeDetail({ recipe }: Props) {
               </ul>
             )}
             {plans.length > 0 && <p className="rx-source">De tu plan: {plans.join(", ")}</p>}
-            <Link href={`/recipes/${recipe.id}/cook`} className="rx-btn rx-cook">
-              <ChefHat size={18} /> Modo Cocina
+            <Link href={`/recipes/${recipe.id}/cook`} className="rx-btn rx-cook" title="Cocina paso a paso, en pantalla completa">
+              <CookingModeIcon size={18} /> Modo Cocina
             </Link>
             <button type="button" className="rx-btn rx-add-all" data-state={addAll} disabled={addAll !== "idle"} onClick={runAddAll}>
               {addAll === "added" ? (

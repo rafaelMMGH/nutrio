@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { ArrowUpRight, Check, ChefHat, Clock, CookingPot, Star } from "lucide-react";
+import { ArrowUpRight, Check, Clock, CookingPot, Star } from "lucide-react";
 import { foodIcon, mealLabel, mealTitle, type Meal } from "@/components/dashboard/food";
 import { prepMinutes, recipeRating } from "@/lib/metrics";
 import { HoldToConfirm } from "./HoldToConfirm";
-import { DottedProgress, Figure, IconBadge, Pill } from "./primitives";
+import { CookingModeIcon } from "@/components/cooking/CookingModeIcon";
+import { DottedProgress, Figure, IconBadge, IconButton, Pill } from "./primitives";
 
 // How long after the hold completes the carousel waits before moving to the next pending meal, so the drawn check and "Cumplida" are seen first.
 const ADVANCE_DELAY = 900;
@@ -119,9 +120,9 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
             onUndo={() => toggle(meal.id, false)}
           />
           {meal.recipe && (
-            <Link href={`/recipes/${meal.recipe.id}/cook`} className="nt-pill tone-ink nt-cook">
-              <ChefHat size={16} aria-hidden /> Modo Cocina
-            </Link>
+            <IconButton href={`/recipes/${meal.recipe.id}/cook`} label="Modo Cocina" dark className="nt-cook">
+              <CookingModeIcon />
+            </IconButton>
           )}
         </div>
       </div>
