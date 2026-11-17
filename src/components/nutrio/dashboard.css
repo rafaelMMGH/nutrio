@@ -139,7 +139,6 @@ html.dark:not(:has([data-theme-lock])) .nt-plate-dish { background: radial-gradi
 .nt-kpi {
   display: flex;
   align-items: flex-start;
-  padding: 14px 16px;
   border-radius: 24px;
   /* Pop in left to right (--i is the tile's position). Backwards fill only: the resting style stays the final state, so hover and press compose after the entrance and a tile is never stuck hidden. */
   animation: nt-kpi-in 450ms cubic-bezier(0.34, 1.4, 0.64, 1) calc(var(--i, 0) * 60ms) backwards;
@@ -194,7 +193,7 @@ button.nt-gauge-tile:hover { background: #202024; }
 .nt-cal-total small { font-size: 14px; margin-left: 4px; letter-spacing: 0; }
 .nt-cal-side { display: grid; gap: 8px; flex: 1; min-width: 0; padding-left: 16px; border-left: 1px solid rgb(14 14 16 / 0.35); font-size: 12px; align-self: center; }
 .nt-cal-side div { display: flex; justify-content: space-between; gap: 8px; }
-.nt-bars { flex: 1; min-height: 72px; display: grid; grid-template-columns: repeat(9, 1fr); align-items: end; gap: 8px; }
+.nt-bars { flex: 1; min-height: 56px; display: grid; grid-template-columns: repeat(9, 1fr); align-items: end; gap: 8px; }
 .nt-bars i {
   display: block;
   border: 1px solid #0e0e10;
@@ -234,7 +233,7 @@ button.nt-gauge-tile:hover { background: #202024; }
   .nt-data { padding-top: clamp(8px, calc(100dvh - 892px), 25px); }
 }
 /* Short screens (laptops with browser chrome): tighter cards so everything still fits without scrolling, down to ~768 px. */
-@media (min-width: 1280px) and (max-height: 859px) {
+@media (min-width: 1280px) and (max-height: 899px) {
   .nt-dash h1 { font-size: 52px; }
   .nt-hero { padding-top: 12px; }
   .nt-hero-copy { margin-top: 24px; gap: 10px; }
