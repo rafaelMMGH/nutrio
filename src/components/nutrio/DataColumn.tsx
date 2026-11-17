@@ -1,12 +1,14 @@
 "use client";
 
-import { useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { ArrowUp, ArrowUpRight, ChevronDown, ClipboardList, ConciergeBell, Flame, Gauge, HandPlatter, Package, Utensils } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import type { Metrics, Period } from "@/lib/metrics";
+import { metricReadouts, type DialReadout, type Metrics, type Period } from "@/lib/metrics";
 import { kpiContexts } from "@/lib/kpis";
 import { Card, Figure, IconBadge, Pill, RadialGauge, SegmentedTabs } from "./primitives";
+import DetentDial from "./DetentDial";
+import { showEndLabels } from "./dial-logic";
 import { RollingNumber } from "./RollingNumber";
 
 /* ---------- KPI tiles (§5.4) ---------- */
@@ -62,7 +64,8 @@ type MetricsProps = {
 
 export function MetricsCard({ period, onPeriod, metrics, weightToday, weightGoal, onSaveWeight }: MetricsProps) {
   const [editing, setEditing] = useState(false);
-  const { adherence, calories, protein, weight } = metrics;
+  const { weight } = metrics;
+  const dials = metricReadouts(metrics);
   return (
     <Card tone="black" className="nt-metrics" aria-labelledby="nt-metrics-title">
       <header className="nt-card-head">
@@ -73,9 +76,9 @@ export function MetricsCard({ period, onPeriod, metrics, weightToday, weightGoal
         <SegmentedTabs tabs={PERIODS} value={period} onChange={onPeriod} label="Periodo" onInk />
       </header>
       <div className="nt-gauges" role="tabpanel" aria-label={PERIODS.find((item) => item.value === period)?.label}>
-        <GaugeTile value={percent(adherence.ratio)} ratio={adherence.ratio} color="var(--nt-yellow-accent)" label="Adherencia" detail={adherence.ratio === null ? null : `${adherence.done}/${adherence.planned}`} />
-        <GaugeTile value={percent(calories.ratio)} ratio={calories.ratio} color="var(--nt-sky-accent)" label="Calorías" detail={calories.kcal === null ? null : `≈${calories.kcal} kcal`} />
-        <GaugeTile value={percent(protein.ratio)} ratio={protein.ratio} color="#ffffff" label="Proteína" detail={protein.grams === null ? null : `≈${protein.grams} g`} />
+        <DialTile label="Adherencia" accent="var(--nt-yellow-accent)" dial={dials.adherence} longestReadout={4} />
+        <DialTile label="Calorías" accent="var(--nt-sky-accent)" dial={dials.calories} longestReadout={estimateLength(dials.calories)} />
+        <DialTile label="Proteína" accent="var(--nt-dial-white)" dial={dials.protein} longestReadout={estimateLength(dials.protein)} />
         <GaugeTile
           value={percent(weight.ratio)}
           ratio={weight.ratio}
@@ -91,27 +94,59 @@ export function MetricsCard({ period, onPeriod, metrics, weightToday, weightGoal
   );
 }
 
-// One dial: big percentage, wedge and "Label (detail)". No data shows "—" and an empty dial. Over 100% the dial stays full.
-function GaugeTile({ value, ratio, color, label, detail, onClick, actionLabel }: { value: number | null; ratio: number | null; color: string; label: string; detail: string | null; onClick?: () => void; actionLabel?: string }) {
-  const body = (
-    <>
+const whole = (n: number) => Math.round(n).toLocaleString("en-US");
+/** "≈ " plus the target: the longest the estimate readout gets in any period, so its font does not change with the tab. */
+const estimateLength = (dial: DialReadout) => Math.max(dial.readout.length, dial.valueText === "Sin datos" ? 0 : `≈ ${whole(dial.max)}`.length);
+
+/**
+ * Adherencia, Calorías or Proteína: a read-only dial (specs/metric-dials), its name and, under it, the line with the unit.
+ * The dial's size comes from CSS (dashboard.css); only the end labels need it here, so the tile measures the box.
+ */
+function DialTile({ label, accent, dial, longestReadout }: { label: string; accent: string; dial: DialReadout; longestReadout: number }) {
+  const labelId = useId();
+  const tile = useRef<HTMLDivElement>(null);
+  const [size, setSize] = useState<number | null>(null);
+  useEffect(() => {
+    const box = tile.current?.querySelector(".nt-dial-box");
+    if (!box) return;
+    const observer = new ResizeObserver(([entry]) => setSize(entry.contentRect.width));
+    observer.observe(box);
+    return () => observer.disconnect();
+  }, []);
+  const endLabels = size !== null && showEndLabels(size, whole(dial.max).length);
+  return (
+    <div ref={tile} className="nt-gauge-tile nt-dial-tile" style={{ "--nt-dial-accent": accent, "--nt-dial-n": Math.max(longestReadout, 1) } as CSSProperties}>
+      <DetentDial
+        labelledBy={labelId}
+        min={dial.min}
+        max={dial.max}
+        step={(dial.max - dial.min) / 40}
+        value={dial.value}
+        readout={dial.readout}
+        valueText={dial.valueText}
+        readOnly
+        endLabels={endLabels}
+        formatEnd={whole}
+      />
+      <span id={labelId} className="nt-gauge-label">{label}</span>
+      {/* The unit lives on this line; the dial's value text already says it all to a screen reader. */}
+      <span className="nt-dial-line" aria-hidden="true">{dial.line}</span>
+    </div>
+  );
+}
+
+// Peso keeps its gauge until it becomes a dial (US3): big percentage, wedge and "Label (detail)". No data shows "—" and an empty dial. Over 100% the dial stays full.
+function GaugeTile({ value, ratio, color, label, detail, onClick, actionLabel }: { value: number | null; ratio: number | null; color: string; label: string; detail: string | null; onClick: () => void; actionLabel: string }) {
+  const text = `${label}: ${value === null ? "sin datos" : `${value} %`}${detail ? `, ${detail}` : ""}`;
+  return (
+    <button type="button" className="nt-gauge-tile" onClick={onClick} aria-label={`${text}. ${actionLabel}`} title={actionLabel}>
       <Figure className="nt-gauge-value" value={value === null ? "—" : value} unit={value === null ? undefined : "%"} />
       <RadialGauge ratio={ratio} color={color} />
       <span className="nt-gauge-label">
         {label}
         {detail && ` (${detail})`}
       </span>
-    </>
-  );
-  const text = `${label}: ${value === null ? "sin datos" : `${value} %`}${detail ? `, ${detail}` : ""}`;
-  return onClick ? (
-    <button type="button" className="nt-gauge-tile" onClick={onClick} aria-label={`${text}. ${actionLabel}`} title={actionLabel}>
-      {body}
     </button>
-  ) : (
-    <div className="nt-gauge-tile" role="img" aria-label={text}>
-      {body}
-    </div>
   );
 }
 

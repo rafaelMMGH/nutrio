@@ -531,7 +531,8 @@ export default function DetentDial({
           aria-labelledby={labelledBy}
           aria-valuemax={max}
           aria-valuemin={min}
-          aria-valuenow={value}
+          // A meter reports the value it was given, at once and unsnapped; the slider reports the notch it sits on.
+          aria-valuenow={readOnly ? clamp(valueProp, min, max) : value}
           aria-valuetext={valueText}
           className={grabbing ? "nt-dial-knob is-grabbing" : "nt-dial-knob"}
           ref={knobRef}

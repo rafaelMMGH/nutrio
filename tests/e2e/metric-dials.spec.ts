@@ -122,7 +122,8 @@ const card = (page: Page) => page.locator(".nt-metrics");
 const tiles = (page: Page) => card(page).locator(".nt-gauges > *");
 // The knob carries role="meter" and is named by the tile's label (aria-labelledby): "the name underneath".
 const meter = (page: Page, name: Dial) => card(page).getByRole("meter", { name, exact: true });
-const tileOf = (page: Page, name: Dial) => tiles(page).filter({ has: meter(page, name) });
+// `has` is queried inside the tile, so the inner locator must not start from the card again.
+const tileOf = (page: Page, name: Dial) => tiles(page).filter({ has: page.getByRole("meter", { name, exact: true }) });
 const tab = (page: Page, period: Period) => card(page).getByRole("tab", { name: TABS[period], exact: true });
 const box = async (locator: Locator) => (await locator.boundingBox())!;
 
@@ -156,6 +157,23 @@ async function expectDial(page: Page, name: Dial, expected: { readout: string; l
   await expect(dial).toHaveAttribute("aria-valuetext", expected.valueText);
   await expect(dial.locator(".nt-dial-readout")).toHaveText(expected.readout);
   await expect(tileOf(page, name).getByText(expected.line, { exact: true })).toBeVisible();
+}
+
+/**
+ * A tab change starts a glide, a digit roll and a 150 ms colour fade of the ticks; the tests that read the resting
+ * state wait until the value text is the new one and the needle and the digits have stopped changing.
+ */
+async function atRest(dial: Locator, expected: { readout: string; valueText: string }) {
+  await expect(dial).toHaveAttribute("aria-valuetext", expected.valueText);
+  let last = "";
+  await expect
+    .poll(async () => {
+      const now = `${await needle(dial)}|${await dial.locator(".nt-dial-readout").textContent()}`;
+      const same = now === last && now.endsWith(`|${expected.readout}`);
+      last = now;
+      return same;
+    })
+    .toBe(true);
 }
 
 /* ---------- REQ-10: the dependency ---------- */
@@ -200,9 +218,11 @@ test("REQ-2: drag, click and wheel change nothing, send no request, and the dial
   const requests: string[] = [];
   page.on("request", (request) => ["fetch", "xhr"].includes(request.resourceType()) && requests.push(`${request.method()} ${new URL(request.url()).pathname}`));
 
+  const settled = readouts(25, 32, KCAL);
   for (const name of DIALS) {
     const dial = meter(page, name);
     await expect(dial).toBeVisible();
+    await atRest(dial, settled[name]);
     const before = { text: await dial.getAttribute("aria-valuetext"), now: await dial.getAttribute("aria-valuenow"), angle: await needle(dial), readout: await dial.locator(".nt-dial-readout").textContent() };
     const { x, y, width, height } = await box(dial);
     const [cx, cy, radius] = [x + width / 2, y + height / 2, width / 2];
@@ -240,6 +260,7 @@ test("REQ-3, 4, 5, 43: 25 of 32 meals and 1,850 kcal read 78%, ≈ 1,445 and ≈
   const expected = readouts(25, 32, KCAL);
   for (const name of DIALS) {
     const dial = meter(page, name);
+    await atRest(dial, expected[name]);
     // The scale runs from 0 to 100, to the kcal target and to the protein target; the needle shows the unrounded value.
     expect(Number(await dial.getAttribute("aria-valuemin")), `${name} min`).toBe(0);
     expect(Number(await dial.getAttribute("aria-valuemax")), `${name} max`).toBeCloseTo(expected[name].max, 3);
@@ -468,7 +489,7 @@ for (const theme of ["light", "dark"] as Theme[]) {
     // 1920×1080 is the size whose dials show their end labels.
     await open(page, { width: 1920, height: 1080 });
     await tab(page, "all").click();
-    await expect(meter(page, "Adherencia")).toHaveAttribute("aria-valuetext", "78%, 25 de 32 comidas");
+    for (const name of DIALS) await atRest(meter(page, name), readouts(25, 32, KCAL)[name]);
     const rgb = async (name: string) => toRgb(page, await token(page, name));
     for (const name of DIALS) {
       const tile = tileOf(page, name);
