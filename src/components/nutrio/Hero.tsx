@@ -7,7 +7,7 @@ import { foodIcon, mealLabel, mealTitle, type Meal } from "@/components/dashboar
 import { prepMinutes, recipeRating } from "@/lib/metrics";
 import { HoldToConfirm } from "./HoldToConfirm";
 import { CookingModeIcon } from "@/components/cooking/CookingModeIcon";
-import { DottedProgress, Figure, IconBadge, IconButton, Pill } from "./primitives";
+import { DottedProgress, Figure, IconBadge, Pill } from "./primitives";
 
 // How long after the hold completes the carousel waits before moving to the next pending meal, so the drawn check and "Cumplida" are seen first.
 const ADVANCE_DELAY = 900;
@@ -32,6 +32,8 @@ const DOTS = [
   { x: 44, y: 55 },
   { x: 38, y: 74 }
 ];
+/** The dot closest to the plate's centre: it is the Modo Cocina link. */
+const COOK_DOT = DOTS[2];
 
 function plateIcons(meal: Meal) {
   const icons = (meal.recipe?.ingredients ?? []).map((item) => foodIcon(item.name, item.category));
@@ -119,26 +121,30 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
             onConfirm={() => toggle(meal.id, true)}
             onUndo={() => toggle(meal.id, false)}
           />
-          {meal.recipe && (
-            <IconButton href={`/recipes/${meal.recipe.id}/cook`} label="Modo Cocina" dark className="nt-cook">
-              <CookingModeIcon />
-            </IconButton>
-          )}
         </div>
       </div>
 
       {/* Plate drawn in CSS with the recipe's ingredient icons: the recipes have no photos yet (ronda 2, R1). */}
-      <div className="nt-plate-clip" aria-hidden>
+      <div className="nt-plate-clip">
         <div className="nt-plate" key={meal.id}>
-          <div className="nt-plate-dish" />
+          <div className="nt-plate-dish" aria-hidden />
           {icons.length ? (
-            icons.map((src, i) => <img key={src} src={src} alt="" className="nt-plate-food" style={{ left: `${SPOTS[i].x}%`, top: `${SPOTS[i].y}%`, width: `${SPOTS[i].size / 6.4}%` }} fetchPriority={index === 0 && i === 0 ? "high" : undefined} />)
+            icons.map((src, i) => <img key={src} src={src} alt="" className="nt-plate-food" aria-hidden style={{ left: `${SPOTS[i].x}%`, top: `${SPOTS[i].y}%`, width: `${SPOTS[i].size / 6.4}%` }} fetchPriority={index === 0 && i === 0 ? "high" : undefined} />)
           ) : (
-            <img src="/food/plate.png" alt="" className="nt-plate-food" style={{ left: "50%", top: "48%", width: "26%" }} />
+            <img src="/food/plate.png" alt="" className="nt-plate-food" style={{ left: "50%", top: "48%", width: "26%" }} aria-hidden />
           )}
-          {DOTS.map((dot) => (
-            <i key={`${dot.x}-${dot.y}`} className="nt-plate-dot" style={{ left: `${dot.x}%`, top: `${dot.y}%` }} />
-          ))}
+          {DOTS.map((dot) =>
+            // The dot nearest the middle of the plate opens Modo Cocina for the meal on screen (specs/cooking-mode REQ-4).
+            dot === COOK_DOT && meal.recipe ? (
+              <Link key="cook" href={`/recipes/${meal.recipe.id}/cook`} className="nt-plate-dot nt-cook-dot" style={{ left: `${dot.x}%`, top: `${dot.y}%` }} aria-label={`Modo Cocina: ${title}`}>
+                <span className="nt-cook-tip" aria-hidden>
+                  <CookingModeIcon size={14} /> Modo Cocina
+                </span>
+              </Link>
+            ) : (
+              <i key={`${dot.x}-${dot.y}`} className="nt-plate-dot" style={{ left: `${dot.x}%`, top: `${dot.y}%` }} aria-hidden />
+            )
+          )}
         </div>
       </div>
 

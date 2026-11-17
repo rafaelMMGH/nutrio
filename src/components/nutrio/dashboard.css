@@ -30,7 +30,6 @@
 .nt-hero-meal { margin-top: -8px; font-size: 14px; color: var(--nt-muted); }
 .nt-hero-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
 /* Modo Cocina for the meal on screen (specs/cooking-mode REQ-4). */
-.nt-hero-actions .nt-cook { width: 40px; height: 40px; }
 .nt-rating { height: 40px; font-size: 15px; }
 .nt-done {
   display: inline-flex;
@@ -91,6 +90,55 @@ html.dark:not(:has([data-theme-lock])) .nt-plate-dish { background: radial-gradi
   border: 1px solid rgb(255 255 255 / 0.9);
 }
 .nt-plate-dot::after { content: ""; position: absolute; inset: 8px; border-radius: 50%; background: #fff; }
+/* Modo Cocina on the plate's middle dot (specs/cooking-mode REQ-4): a 44 px hit area around the 22 px dot, a soft
+   halo that breathes, and a tooltip that rises and fades in on hover or keyboard focus. */
+.nt-cook-dot {
+  z-index: 2;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: scale 260ms var(--nt-spring), background 200ms ease;
+}
+.nt-cook-dot::before { content: ""; position: absolute; inset: -12px; border-radius: 50%; }
+.nt-cook-dot::after { transition: inset 260ms var(--nt-spring); }
+.nt-cook-dot { box-shadow: 0 0 0 0 rgb(255 255 255 / 0.55); animation: nt-cook-halo 2.6s ease-out infinite; }
+@keyframes nt-cook-halo {
+  0% { box-shadow: 0 0 0 0 rgb(255 255 255 / 0.55); }
+  70%, 100% { box-shadow: 0 0 0 14px rgb(255 255 255 / 0); }
+}
+.nt-cook-dot:hover, .nt-cook-dot:focus-visible { scale: 1.18; background: rgb(255 255 255 / 0.7); }
+.nt-cook-dot:hover::after, .nt-cook-dot:focus-visible::after { inset: 6px; }
+.nt-cook-dot:focus-visible { outline: none; box-shadow: var(--nt-focus); animation: none; }
+.nt-cook-tip {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--nt-radius-pill);
+  background: var(--nt-ink);
+  color: var(--nt-on-ink);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 10px 24px -12px rgb(0 0 0 / 0.45);
+  opacity: 0;
+  translate: -50% 6px;
+  scale: 0.92;
+  transform-origin: 50% 100%;
+  pointer-events: none;
+  transition: opacity 180ms ease, translate 320ms var(--nt-spring), scale 320ms var(--nt-spring);
+}
+.nt-cook-tip::after { content: ""; position: absolute; top: 100%; left: 50%; translate: -50% -1px; border: 6px solid transparent; border-top-color: var(--nt-ink); }
+.nt-cook-dot:hover .nt-cook-tip, .nt-cook-dot:focus-visible .nt-cook-tip { opacity: 1; translate: -50% 0; scale: 1; }
+/* The tooltip sits outside the dot, so the scale on hover must not shrink it back: undo it on the tip. */
+.nt-cook-dot:hover .nt-cook-tip, .nt-cook-dot:focus-visible .nt-cook-tip { scale: calc(1 / 1.18); }
+@media (hover: none) { .nt-cook-tip { opacity: 1; translate: -50% 0; scale: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .nt-cook-dot { animation: none; transition: none; }
+  .nt-cook-tip { transition: opacity 120ms ease; translate: -50% 0; scale: 1; }
+}
 .nt-hero.is-empty .nt-plate { opacity: 0.6; }
 
 .nt-pager { position: absolute; right: 4%; top: 66%; display: grid; gap: 6px; padding: 6px; }
