@@ -273,7 +273,13 @@
 .rx-group-list i { width: 8px; height: 8px; border-radius: 999px; }
 .rx-group-list b { color: var(--text-1); font-weight: 700; }
 .rx-source { margin: 0; color: var(--rx-muted); font-size: 13px; line-height: 20px; }
-.rx-add-all { width: 100%; margin-top: 4px; }
+/* Modo Cocina (specs/cooking-mode REQ-1): the ink pill above the cart button. */
+.rx-cook { width: 100%; margin-top: 4px; background: var(--text-1); color: var(--surface); text-decoration: none; }
+@media (hover: hover) and (pointer: fine) {
+  .rx-cook:hover { background: color-mix(in srgb, var(--text-1) 86%, var(--surface)); box-shadow: 0 10px 20px -12px rgb(0 0 0 / 0.5); }
+}
+.rx-cook:focus-visible { outline: 2px solid var(--brand); outline-offset: 3px; }
+.rx-add-all { width: 100%; }
 .rx-add-all[data-state="added"] { background: var(--brand-solid); }
 .rx-add-all[data-state="busy"] { cursor: progress; opacity: 0.8; }
 .rx-add-all svg { transition: transform 200ms var(--rx-ease-out), opacity 200ms var(--rx-ease-out); }
