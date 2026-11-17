@@ -29,6 +29,10 @@
 }
 .nt-hero-meal { margin-top: -8px; font-size: 14px; color: var(--nt-muted); }
 .nt-hero-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+/* Modo Cocina for the meal on screen (specs/cooking-mode REQ-4). */
+.nt-cook { height: 40px; padding: 0 16px; text-decoration: none; cursor: pointer; transition: transform 160ms ease; }
+.nt-cook:active { transform: scale(0.97); }
+.nt-cook:focus-visible { outline: none; box-shadow: var(--nt-focus); }
 .nt-rating { height: 40px; font-size: 15px; }
 .nt-done {
   display: inline-flex;

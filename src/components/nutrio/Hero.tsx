@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { ArrowUpRight, Check, Clock, CookingPot, Star } from "lucide-react";
+import { ArrowUpRight, Check, ChefHat, Clock, CookingPot, Star } from "lucide-react";
 import { foodIcon, mealLabel, mealTitle, type Meal } from "@/components/dashboard/food";
 import { prepMinutes, recipeRating } from "@/lib/metrics";
 import { HoldToConfirm } from "./HoldToConfirm";
@@ -118,6 +118,11 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
             onConfirm={() => toggle(meal.id, true)}
             onUndo={() => toggle(meal.id, false)}
           />
+          {meal.recipe && (
+            <Link href={`/recipes/${meal.recipe.id}/cook`} className="nt-pill tone-ink nt-cook">
+              <ChefHat size={16} aria-hidden /> Modo Cocina
+            </Link>
+          )}
         </div>
       </div>
 
