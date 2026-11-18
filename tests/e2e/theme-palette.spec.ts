@@ -55,15 +55,17 @@ const STRUCTURED_PLAN = {
   }
 };
 
-async function openWizard(page: Page, step: number) {
+/** Wizard states: 0 the empty upload form, 1 the "PDF procesado" result, then 2 Datos, 3 Comidas, 4 Confirmar. */
+async function openWizard(page: Page, state: number) {
   await page.route(/\/api\/plans\/upload$/, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(STRUCTURED_PLAN) }));
   await page.getByRole("button", { name: /Subir plan nuevo/ }).first().click();
   await expect(page.locator(".upload-wizard-modal")).toBeVisible();
-  if (step > 0) {
+  if (state > 0) {
     await page.locator('input[name="pdf"]').setInputFiles({ name: "plan.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 e2e") });
     await page.getByRole("button", { name: "Procesar PDF" }).click();
-    await expect(page.getByText("Procesamiento completado")).toBeVisible();
-    for (let current = 1; current < step; current++) await page.getByRole("button", { name: "Siguiente" }).click();
+    // The toast says "PDF procesado" too, so the result is found by its heading.
+    await expect(page.getByRole("heading", { name: "PDF procesado" })).toBeVisible();
+    for (let current = 1; current < state; current++) await page.getByRole("button", { name: "Siguiente" }).click();
   }
   return ".upload-wizard-modal";
 }
@@ -166,10 +168,10 @@ const sharedUi: SharedUi[] = [
   },
   { name: "assistant button", path: "/recipes", open: async () => ".assistant-fab" },
   { name: "upload wizard: file step", path: "/recipes", sweep: true, open: (page) => openWizard(page, 0) },
-  { name: "upload wizard: review", path: "/recipes", sweep: true, open: (page) => openWizard(page, 1) },
+  { name: "upload wizard: result", path: "/recipes", sweep: true, open: (page) => openWizard(page, 1) },
+  { name: "upload wizard: data", path: "/recipes", sweep: true, open: (page) => openWizard(page, 2) },
   { name: "upload wizard: meals", path: "/recipes", open: (page) => openWizard(page, 3) },
-  { name: "upload wizard: ingredients", path: "/recipes", open: (page) => openWizard(page, 4) },
-  { name: "upload wizard: complements", path: "/recipes", open: (page) => openWizard(page, 5) },
+  { name: "upload wizard: confirm", path: "/recipes", open: (page) => openWizard(page, 4) },
   {
     name: "empty state",
     path: "/recipes",

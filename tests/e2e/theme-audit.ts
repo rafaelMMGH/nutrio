@@ -185,7 +185,7 @@ export function installToolkit() {
     [".home-wave", "backgroundColor"],
     [".rx-groups i", "backgroundColor"],
     [".rx-group-list i", "backgroundColor"],
-    [".steps span.done", "backgroundColor"]
+    [".stepper-item[data-status=\"completed\"] .stepper-disc", "backgroundColor"]
   ];
   const FIELD = 'input:not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):not([type="file"]):not([type="submit"]):not([type="button"]), select, textarea';
   // The wave encodes the weekly water level and its fill is still measured as a mark (MARKS). Only the crest svg
