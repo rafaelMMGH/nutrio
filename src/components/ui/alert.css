@@ -10,6 +10,7 @@
   --alert-icon: var(--brand-accent);
   --alert-edge: var(--brand-accent);
   --alert-dismiss: var(--text-muted);
+  --alert-focus: var(--brand-text);
   min-width: 0;
 }
 .alert-live[data-tone="warning"] { --alert-bg: var(--warn-soft); --alert-icon: var(--warn-text); --alert-edge: var(--warn-text); }
@@ -29,6 +30,6 @@
 .alert-description[data-motion-pop-id] { margin: 0; }
 .alert-dismiss { display: grid; width: 28px; height: 28px; flex: 0 0 auto; place-items: center; margin: -5px -6px -5px 0; border: 0; border-radius: 999px; background: transparent; color: var(--alert-dismiss); cursor: pointer; transition: transform 0.2s, background-color 0.15s, color 0.15s; }
 .alert-dismiss:active { transform: scale(0.96); }
-.alert-dismiss:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
-@media (hover: hover) and (pointer: fine) { .alert-dismiss:hover { background: var(--alert-bg); color: var(--alert-title); } }
+.alert-dismiss:focus-visible { outline: 2px solid var(--alert-focus); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) { .alert-dismiss:hover { background: color-mix(in srgb, var(--alert-title) 8%, transparent); color: var(--alert-title); } }
 @media (prefers-reduced-motion: reduce) { .alert-dismiss { transition: none; } .alert-dismiss:active { transform: none; } }

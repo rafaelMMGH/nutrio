@@ -15,7 +15,7 @@ const dark = { ...light, ...declarations(globals, "html.dark:not(:has([data-them
 const darkPrefix = "html.dark:not(:has([data-theme-lock])) ";
 const tones = [["danger", "danger"], ["warning", "warning"]] as const;
 const text = ["--alert-title", "--alert-body"];
-const graphics = ["--alert-icon", "--alert-edge"];
+const graphics = ["--alert-icon", "--alert-edge", "--alert-focus"];
 
 for (const [themeName, theme] of [["light", light], ["dark", dark]] as const) {
   for (const [label, tone] of tones) {
@@ -30,7 +30,7 @@ for (const [themeName, theme] of [["light", light], ["dark", dark]] as const) {
     test(`${themeName}: ${label} alert text reaches 4.5:1`, () => {
       for (const fg of text) assert.ok(ratio(fg) >= 4.5, `${fg} on --alert-bg: ${ratio(fg).toFixed(2)}`);
     });
-    test(`${themeName}: ${label} alert icon and edge reach 3:1`, () => {
+    test(`${themeName}: ${label} alert icon, edge and focus ring reach 3:1`, () => {
       for (const fg of graphics) assert.ok(ratio(fg) >= 3, `${fg} on --alert-bg: ${ratio(fg).toFixed(2)}`);
     });
   }
