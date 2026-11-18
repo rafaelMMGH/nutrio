@@ -1,0 +1,35 @@
+/* Alert styles, adapted from the uiarc Alert (MIT, see alert.tsx). Every class is prefixed `alert-` so Tailwind v4 never
+   mistakes one for a utility; a bare `.alert` is taken by globals.css. */
+
+/* Colours resolve to project tokens, so both themes follow them; tests/unit/alert-contrast.test.ts checks every pair for
+   the danger and warning tones. The wrapper itself paints nothing: it only carries the aliases and the live region. */
+.alert-live {
+  --alert-bg: var(--surface);
+  --alert-title: var(--text-1);
+  --alert-body: var(--text-2);
+  --alert-icon: var(--brand-accent);
+  --alert-edge: var(--brand-accent);
+  --alert-dismiss: var(--text-muted);
+  --alert-focus: var(--brand-text);
+  min-width: 0;
+}
+.alert-live[data-tone="warning"] { --alert-bg: var(--warn-soft); --alert-icon: var(--warn-text); --alert-edge: var(--warn-text); }
+.alert-live[data-tone="danger"] { --alert-bg: var(--danger-soft); --alert-icon: var(--danger-edge); --alert-edge: var(--danger-edge); }
+
+.alert-presence { min-width: 0; }
+.alert-box { display: flex; align-items: flex-start; gap: 0.75rem; padding: 0.75rem 1rem; border: 1px solid var(--alert-edge); border-radius: 12px; background: var(--alert-bg); color: var(--alert-title); }
+.alert-icon, .alert-glyph { position: relative; display: grid; flex: 0 0 auto; place-items: center; }
+.alert-icon { width: 18px; height: 18px; margin-top: 1px; color: var(--alert-icon); }
+.alert-icon svg { display: block; }
+.alert-copy { flex: 1; min-width: 0; }
+.alert-content { position: relative; }
+.alert-title { position: relative; display: block; font-size: 0.875rem; font-weight: 500; color: var(--alert-title); overflow-wrap: anywhere; }
+.alert-line { display: block; }
+.alert-description { position: relative; margin: 0.25rem 0 0; color: var(--alert-body); font-size: 0.8125rem; }
+/* AnimatePresence pops the outgoing description out of flow at its measured offset; its margin would then move it. */
+.alert-description[data-motion-pop-id] { margin: 0; }
+.alert-dismiss { display: grid; width: 28px; height: 28px; flex: 0 0 auto; place-items: center; margin: -5px -6px -5px 0; border: 0; border-radius: 999px; background: transparent; color: var(--alert-dismiss); cursor: pointer; transition: transform 0.2s, background-color 0.15s, color 0.15s; }
+.alert-dismiss:active { transform: scale(0.96); }
+.alert-dismiss:focus-visible { outline: 2px solid var(--alert-focus); outline-offset: 2px; }
+@media (hover: hover) and (pointer: fine) { .alert-dismiss:hover { background: color-mix(in srgb, var(--alert-title) 8%, transparent); color: var(--alert-title); } }
+@media (prefers-reduced-motion: reduce) { .alert-dismiss { transition: none; } .alert-dismiss:active { transform: none; } }

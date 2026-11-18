@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState, type CSSProperties } from "react";
+import { useEffect, useMemo, useState, type CSSProperties } from "react";
 import { Archive, ArrowLeft, Check, ChefHat, CircleCheck, Pencil, Plus, ShoppingCart, Trash2 } from "lucide-react";
 import { ViewTransition } from "@/components/shared/ViewTransition";
 import { foodGroup, foodIcon, isReadableName, plural, qty } from "@/components/dashboard/food";
@@ -29,6 +29,15 @@ export function RecipeDetail({ recipe }: Props) {
   const plans = [...new Set((recipe.appearances ?? []).map((a: any) => a.plan_name).filter(Boolean))] as string[];
 
   useAssistantContext({ subtitle: `Sobre ${recipe.name}` });
+
+  // Modo Cocina's "Escribir los pasos" opens this page with ?edit=1 (specs/cooking-mode REQ-13).
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("edit") !== "1") return;
+    setEditing(true);
+    url.searchParams.delete("edit");
+    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+  }, []);
 
   async function remove() {
     setBusy(true);
@@ -81,6 +90,9 @@ export function RecipeDetail({ recipe }: Props) {
               </ul>
             )}
             {plans.length > 0 && <p className="rx-source">De tu plan: {plans.join(", ")}</p>}
+            <Link href={`/recipes/${recipe.id}/cook`} className="rx-btn rx-cook">
+              <ChefHat size={18} /> Modo Cocina
+            </Link>
             <button type="button" className="rx-btn rx-add-all" data-state={addAll} disabled={addAll !== "idle"} onClick={runAddAll}>
               {addAll === "added" ? (
                 <>

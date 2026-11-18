@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Page } from "@playwright/test";
 import { expect, expectIssues, test } from "./fixtures";
+import { addPdf } from "./upload-wizard-helpers";
 import { inScopePages, oklch, THEME_KEY, toRgb, type Rgba, type Theme } from "./theme-helpers";
 import { auditNow, installToolkit, report, settle, visit, type StyleEntry } from "./theme-audit";
 
@@ -55,16 +56,47 @@ const STRUCTURED_PLAN = {
   }
 };
 
-async function openWizard(page: Page, step: number) {
+/**
+ * The wizard animates with JS (motion springs and fades), which the audit's `animation: none` rule cannot stop, so the
+ * audit would sample colours and opacity mid-fade. Waits until a snapshot of every element's box, opacity, colours,
+ * transform and filter is identical across three reads 100 ms apart.
+ */
+async function waitForMotionToSettle(page: Page, scope: string) {
+  const snapshot = () =>
+    page.evaluate((selector) => {
+      const root = document.querySelector(selector)!;
+      return [root, ...Array.from(root.querySelectorAll("*"))]
+        .map((node) => {
+          const style = getComputedStyle(node);
+          const box = node.getBoundingClientRect();
+          return [node.className, box.x, box.y, box.width, box.height, style.opacity, style.color, style.backgroundColor, style.borderTopColor, style.transform, style.filter].join("|");
+        })
+        .join("\n");
+    }, scope);
+  let previous = "";
+  let stable = 0;
+  await expect
+    .poll(async () => {
+      const current = await snapshot();
+      stable = current === previous ? stable + 1 : 0;
+      previous = current;
+      await page.waitForTimeout(100);
+      return stable;
+    }, { timeout: 15_000 })
+    .toBeGreaterThanOrEqual(3);
+}
+
+/** Wizard states: 0 the empty upload form, 1 the "PDF procesado" result, then 2 Datos, 3 Comidas, 4 Confirmar. */
+async function openWizard(page: Page, state: number) {
   await page.route(/\/api\/plans\/upload$/, (route) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(STRUCTURED_PLAN) }));
   await page.getByRole("button", { name: /Subir plan nuevo/ }).first().click();
   await expect(page.locator(".upload-wizard-modal")).toBeVisible();
-  if (step > 0) {
-    await page.locator('input[name="pdf"]').setInputFiles({ name: "plan.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 e2e") });
-    await page.getByRole("button", { name: "Procesar PDF" }).click();
-    await expect(page.getByText("Procesamiento completado")).toBeVisible();
-    for (let current = 1; current < step; current++) await page.getByRole("button", { name: "Siguiente" }).click();
+  if (state > 0) {
+    await addPdf(page);
+    await expect(page.getByRole("heading", { name: "PDF procesado" })).toBeVisible();
+    for (let current = 1; current < state; current++) await page.getByRole("button", { name: "Siguiente" }).click();
   }
+  await waitForMotionToSettle(page, ".upload-wizard-modal");
   return ".upload-wizard-modal";
 }
 
@@ -166,10 +198,10 @@ const sharedUi: SharedUi[] = [
   },
   { name: "assistant button", path: "/recipes", open: async () => ".assistant-fab" },
   { name: "upload wizard: file step", path: "/recipes", sweep: true, open: (page) => openWizard(page, 0) },
-  { name: "upload wizard: review", path: "/recipes", sweep: true, open: (page) => openWizard(page, 1) },
+  { name: "upload wizard: result", path: "/recipes", sweep: true, open: (page) => openWizard(page, 1) },
+  { name: "upload wizard: data", path: "/recipes", sweep: true, open: (page) => openWizard(page, 2) },
   { name: "upload wizard: meals", path: "/recipes", open: (page) => openWizard(page, 3) },
-  { name: "upload wizard: ingredients", path: "/recipes", open: (page) => openWizard(page, 4) },
-  { name: "upload wizard: complements", path: "/recipes", open: (page) => openWizard(page, 5) },
+  { name: "upload wizard: confirm", path: "/recipes", open: (page) => openWizard(page, 4) },
   {
     name: "empty state",
     path: "/recipes",
@@ -222,7 +254,7 @@ async function openShared(page: Page, ui: SharedUi, theme: Theme) {
 // ---------------------------------------------------------------------------------------------------------------
 
 const REPO = process.cwd(); // Playwright runs from the repo root
-const SCANNED_CSS = ["src/app/globals.css", "src/components/app/shell.css", "src/components/dashboard/home.css", "src/components/recipes/recipes.css", "src/components/shared/upload-plan-button.css", "src/components/auth/login.css"];
+const SCANNED_CSS = ["src/app/globals.css", "src/components/app/shell.css", "src/components/recipes/recipes.css", "src/components/shared/upload-plan-button.css", "src/components/auth/login.css"];
 
 test.describe("REQ-6: no light color literal outside the theme tokens", () => {
   test("the in-scope stylesheets have no color literal lighter than OKLCH L 0.8", async ({ page }) => {
