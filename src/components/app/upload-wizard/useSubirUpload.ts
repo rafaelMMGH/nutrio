@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useReducer, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { ApiError, api } from "@/lib/client/api";
 import { uploadWithProgress } from "@/lib/client/upload";
 import { PDF_TOO_LARGE } from "@/lib/http/body-limit";
@@ -38,31 +39,24 @@ export function useSubirUpload({ onProcessed, onReset, refresh }: Options) {
     ({ drop: dropRef, rowX: rowXRef, retry: retryRef })[target].current?.focus();
   });
 
-  // Q24: a new rejection while one is open closes the Alert and reopens it a frame later, so it counts
-  // as a new opening and is announced again. Closing and opening in one tick would batch into no change.
+  // Q24: a repeated rejection closes the Alert and reopens it, so it counts as a new opening and is announced
+  // again. flushSync commits the closed render before the reject is dispatched, so the reopen, which runs in
+  // a later frame, can never batch with the close into no change. It runs in event or promise callbacks, never
+  // in an effect, where React forbids it.
   const [rejectionOpen, setRejectionOpen] = useState(true);
-  const hadRejection = useRef(false);
-  const rejectionId = state.rejection?.id;
-  useEffect(() => {
-    const had = hadRejection.current;
-    hadRejection.current = rejectionId !== undefined;
-    if (rejectionId === undefined || !had) {
+  const reopenFrame = useRef(0);
+  const sendRejection = (event: Extract<UploadEvent, { type: "reject" | "reject413" }>) => {
+    cancelAnimationFrame(reopenFrame.current);
+    if (latest.current.rejection) {
+      flushSync(() => setRejectionOpen(false));
+      reopenFrame.current = requestAnimationFrame(() => setRejectionOpen(true));
+    } else {
       setRejectionOpen(true);
-      return;
     }
-    setRejectionOpen(false);
-    // Two frames: the false above is committed by a passive effect, and one rAF often fires before React
-    // renders it, which would batch false and true into no change.
-    let inner = 0;
-    const outer = requestAnimationFrame(() => {
-      inner = requestAnimationFrame(() => setRejectionOpen(true));
-    });
-    return () => {
-      cancelAnimationFrame(outer);
-      cancelAnimationFrame(inner);
-    };
-  }, [rejectionId]);
+    send(event);
+  };
 
+  useEffect(() => () => cancelAnimationFrame(reopenFrame.current), []);
   useEffect(() => () => controller.current?.abort(), []);
 
   async function start(file: File) {
@@ -92,7 +86,7 @@ export function useSubirUpload({ onProcessed, onReset, refresh }: Options) {
       if (own.signal.aborted || latest.current.attempt !== attempt) return;
       if (err instanceof ApiError && err.status === 413) {
         pendingFocus.current = "drop";
-        send({ type: "reject413", attempt, message: PDF_TOO_LARGE });
+        sendRejection({ type: "reject413", attempt, message: PDF_TOO_LARGE });
       } else {
         pendingFocus.current = "retry";
         send({ type: "fail", attempt, reason: failureReason(err) });
@@ -103,7 +97,7 @@ export function useSubirUpload({ onProcessed, onReset, refresh }: Options) {
   const onFiles = (files: File[]) => {
     const check = checkFiles(files, latest.current.file !== null);
     if (!check) return;
-    if ("message" in check) return send({ type: "reject", message: check.message });
+    if ("message" in check) return sendRejection({ type: "reject", message: check.message });
     send({ type: "add", file: check.file });
     void start(check.file);
   };
