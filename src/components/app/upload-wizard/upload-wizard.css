@@ -85,3 +85,5 @@
 .uw-field-error { margin: 4px 0 0; font-size: 13px; color: var(--warn-text); }
 
 @media (prefers-reduced-motion: reduce) { .uw-chevron { transition: none; } }
+.uw-confirm-alert { flex: none; padding: 0 18px; }
+.uw-confirm-alert:has(.alert-presence) { padding-bottom: 12px; }

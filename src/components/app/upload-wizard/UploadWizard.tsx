@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CheckCircle2, X } from "lucide-react";
+import { Alert } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Stepper } from "@/components/ui/stepper";
 import { api, getErrorMessage } from "@/lib/client/api";
@@ -11,6 +12,7 @@ import { ComidasStep } from "./ComidasStep";
 import { ConfirmarStep } from "./ConfirmarStep";
 import { DatosStep } from "./DatosStep";
 import { SubirStep } from "./SubirStep";
+import { failureReason } from "./upload-phase";
 import { confirmChanges, goTo, nameMissing, next, prev, resetAfterChange, wizardSteps, WIZARD_STEPS, type UploadResult, type WizardEdits, type WizardState } from "./upload-wizard-logic";
 import "./upload-wizard.css";
 
@@ -25,6 +27,7 @@ export function UploadWizard({ onClose, refresh }: { onClose: () => void; refres
   const [state, setState] = useState<WizardState>({ step: 0, furthest: 0, data: null });
   const [edits, setEdits] = useState<WizardEdits>({});
   const [busy, setBusy] = useState<Busy>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
   // The state update lands a render later; the ref is what stops a second click in the same tick.
   const running = useRef(false);
   const compact = useMediaQuery(COMPACT_QUERY);
@@ -87,20 +90,22 @@ export function UploadWizard({ onClose, refresh }: { onClose: () => void; refres
   });
 
   const confirm = () => request("confirm", async () => {
+    // Closing first makes a repeated failure a fresh opening, so it is announced again.
+    setConfirmError(null);
     try {
       await api(`/api/plans/${state.data?.plan.id}`, { method: "PATCH", body: JSON.stringify(confirmChanges(edits)) });
       onClose();
-      toast.success("Plan confirmado");
       refresh();
       return null;
     } catch (err) {
-      toast.error("No se pudo confirmar el plan", { description: getErrorMessage(err) });
+      setConfirmError(`No se pudo confirmar el plan: ${failureReason(err)}`);
       return "confirm";
     }
   });
 
   const move = (change: (state: WizardState) => WizardState) => {
     pendingFocus.current = "heading";
+    setConfirmError(null);
     setState(change);
   };
 
@@ -116,7 +121,7 @@ export function UploadWizard({ onClose, refresh }: { onClose: () => void; refres
       details="current"
       disabled={locked}
       // A jump keeps focus on the stepper, so keyboard users stay where they were.
-      onStepSelect={(index) => setState((current) => goTo(current, index))}
+      onStepSelect={(index) => { setConfirmError(null); setState((current) => goTo(current, index)); }}
     />
   );
 
@@ -141,6 +146,7 @@ export function UploadWizard({ onClose, refresh }: { onClose: () => void; refres
             {data && state.step === 3 && <ConfirmarStep data={data} edits={edits} headingRef={headings[3]} />}
           </main>
         </div>
+        {data && state.step === LAST && <div className="uw-confirm-alert"><Alert tone="warning" open={!!confirmError} title={confirmError ?? ""} /></div>}
         <footer className="uw-footer row between">
           <Button variant="outline" disabled={locked || state.step === 0} onClick={() => move(prev)}>Anterior</Button>
           <div className="toolbar">
