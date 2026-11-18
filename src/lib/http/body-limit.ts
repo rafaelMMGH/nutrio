@@ -13,7 +13,8 @@ export class BodyTooLarge extends Error {
 export async function readCapped(body: ReadableStream<Uint8Array> | null, declaredLength: string | null, limit: number): Promise<Uint8Array> {
   const declared = declaredLength === null ? NaN : Number(declaredLength);
   if (declared > limit) {
-    await body?.cancel();
+    // The 413 is the outcome; a failing cancel (client already gone) must not replace it.
+    await body?.cancel().catch(() => {});
     throw new BodyTooLarge();
   }
   if (!body) return new Uint8Array(0);
@@ -26,7 +27,7 @@ export async function readCapped(body: ReadableStream<Uint8Array> | null, declar
     if (done) break;
     total += value.byteLength;
     if (total > limit) {
-      await reader.cancel();
+      await reader.cancel().catch(() => {});
       throw new BodyTooLarge();
     }
     chunks.push(value);

@@ -59,4 +59,47 @@ describe("readCapped", () => {
   it("returns an empty array for a missing body", async () => {
     assert.equal((await readCapped(null, null, MAX_PDF_BYTES)).byteLength, 0);
   });
+
+  it("ignores an unparseable or negative declared length and trusts the running total", async () => {
+    for (const declared of ["abc", "-5", " 100 ", ""]) {
+      const bytes = await readCapped(chunkedStream(100).body, declared, MAX_PDF_BYTES);
+      assert.equal(bytes.byteLength, 100, `declared ${JSON.stringify(declared)}`);
+    }
+    await assert.rejects(readCapped(chunkedStream(MAX_PDF_BYTES + 1).body, "abc", MAX_PDF_BYTES), BodyTooLarge);
+  });
+
+  it("refuses a padded declared length above the limit", async () => {
+    await assert.rejects(readCapped(chunkedStream(10).body, ` ${MAX_PDF_BYTES + 1} `, MAX_PDF_BYTES), BodyTooLarge);
+  });
+
+  it("returns an empty array for a stream that closes at once", async () => {
+    const body = new ReadableStream<Uint8Array>({ start: (controller) => controller.close() });
+    assert.equal((await readCapped(body, null, MAX_PDF_BYTES)).byteLength, 0);
+  });
+
+  it("rethrows the error of a stream that fails mid-read", async () => {
+    let pulls = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        if (pulls++ === 0) controller.enqueue(new Uint8Array(10));
+        else controller.error(new Error("connection reset"));
+      },
+    });
+    await assert.rejects(readCapped(body, null, MAX_PDF_BYTES), /connection reset/);
+  });
+
+  it("still reports too large when cancelling the stream fails", async () => {
+    const failingCancel = (totalBytes: number) => {
+      const { body } = chunkedStream(totalBytes);
+      return Object.assign(body, { cancel: () => Promise.reject(new Error("cancel failed")) }) as ReadableStream<Uint8Array>;
+    };
+    await assert.rejects(readCapped(failingCancel(10), String(MAX_PDF_BYTES + 1), MAX_PDF_BYTES), BodyTooLarge);
+    const stream = new ReadableStream<Uint8Array>({
+      pull: (controller) => controller.enqueue(new Uint8Array(MAX_PDF_BYTES + 1)),
+    });
+    const reader = stream.getReader();
+    reader.cancel = () => Promise.reject(new Error("cancel failed"));
+    const wrapped = { getReader: () => reader, cancel: () => Promise.resolve() } as unknown as ReadableStream<Uint8Array>;
+    await assert.rejects(readCapped(wrapped, null, MAX_PDF_BYTES), BodyTooLarge);
+  });
 });

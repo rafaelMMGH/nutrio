@@ -13,7 +13,8 @@ export async function POST(request: Request) {
   const auth = await requireSession();
   if (auth.response) return auth.response;
   try {
-    const buffer = Buffer.from(await readCapped(request.body, request.headers.get("content-length"), MAX_PDF_BYTES));
+    const bytes = await readCapped(request.body, request.headers.get("content-length"), MAX_PDF_BYTES);
+    const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     const fileName = decodeURIComponent(request.headers.get("x-file-name") || `plan-${Date.now()}.pdf`);
     const db = await loadDb(auth.user, ["plans", "recipes", "ingredients"], { settings: true, empty: created });
     const marks = mark(db, ["plans", "recipes", "ingredients", ...created]);
