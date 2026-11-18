@@ -251,3 +251,18 @@ export async function toDatos(page: Page) {
 
 /** A meal card on Comidas, found by its header button. Unlike `cardHead` it is not rooted at `.uw-content`, so it works as a scope. */
 export const mealCard = (page: Page, meal: string): Locator => page.locator(".uw-card").filter({ has: page.getByRole("button", { name: new RegExp(`^${meal}\\b`) }) });
+
+/** 44px touch target with a sub-pixel tolerance: layout can report 43.99997 for a 44px box. */
+export const MIN_TARGET = 44 - 0.01;
+
+/** Bounding box once two consecutive reads agree, so a box still animating or reflowing is not measured. */
+export async function settledBox(locator: Locator): Promise<{ x: number; y: number; width: number; height: number }> {
+  let last = "";
+  await expect.poll(async () => {
+    const now = JSON.stringify(await locator.boundingBox());
+    const settled = now === last && now !== "null";
+    last = now;
+    return settled;
+  }).toBe(true);
+  return JSON.parse(last);
+}

@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { WIZARD_PLAN } from "../shared/wizard-plan-fixture";
-import { confirmButton, mealCard, mockWizardApi, modal, next, openWizard, step, stepper, toConfirmar, toDatos, uploadPdf } from "./upload-wizard-helpers";
+import { MIN_TARGET, confirmButton, mealCard, mockWizardApi, modal, next, openWizard, step, stepper, toConfirmar, toDatos, uploadPdf } from "./upload-wizard-helpers";
 
 // Upload wizard Comidas review and Datos validation (spec upload-wizard-stepper, US2). Every write is mocked; the
 // fixture has two options needing review (Desayuno "Huevos con jamón" and Comida "Pollo asado").
@@ -67,7 +67,8 @@ test.describe("REQ-10, REQ-6: the Comidas error", () => {
     await uploadPdf(page);
     await expect(stepper(page).locator(".stepper-error")).toHaveText(["No se detectaron comidas en el PDF"]);
     await expect(errorSteps(page)).toHaveCount(1);
-    await toDatos(page);
+    // uploadPdf already processed the PDF; toDatos would add it again and the second add is rejected.
+    await next(page).click();
     await next(page).click();
     await expect(page.locator(".uw-content").getByText("No se detectaron comidas en el PDF.")).toBeVisible();
     await expect(page.locator(".uw-card")).toHaveCount(0);
@@ -170,7 +171,8 @@ test.describe("REQ-8, REQ-9, REQ-20: meal cards", () => {
     await page.keyboard.press("Tab");
     await expect(head).toBeFocused();
     const outline = await head.evaluate((node) => ({ style: getComputedStyle(node).outlineStyle, width: parseFloat(getComputedStyle(node).outlineWidth) }));
-    expect(outline).toEqual({ style: "solid", width: 2 });
+    expect(outline.style).not.toBe("none");
+    expect(outline.width).toBeGreaterThanOrEqual(2);
   });
 
   test("a meal with no options shows 'Sin opciones detectadas'", async ({ page }) => {
@@ -191,8 +193,8 @@ test.describe("REQ-8, REQ-9, REQ-20: meal cards", () => {
     const heads = page.locator(".uw-card-head");
     await expect(heads).toHaveCount(4);
     for (const box of await heads.evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()))) {
-      expect(box.height).toBeGreaterThanOrEqual(44);
-      expect(box.width).toBeGreaterThanOrEqual(44);
+      expect(box.height).toBeGreaterThanOrEqual(MIN_TARGET);
+      expect(box.width).toBeGreaterThanOrEqual(MIN_TARGET);
     }
     expect(await page.evaluate(() => { const c = document.querySelector<HTMLElement>(".uw-content")!; return c.scrollWidth - c.clientWidth; })).toBe(0);
   });

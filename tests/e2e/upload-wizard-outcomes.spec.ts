@@ -2,7 +2,7 @@ import type { Locator, Page } from "@playwright/test";
 import { expect, expectIssues, test } from "./fixtures";
 import { WIZARD_PLAN } from "../shared/wizard-plan-fixture";
 import { seedTheme } from "./theme-helpers";
-import { addPdf, closeButton, dropzone, expectNoAlert, expectNoToast, heldUpload, mockWizardApi, modal, openWizard, resultHeading, retry, rowRemove, step, watchAnnouncements } from "./upload-wizard-helpers";
+import { MIN_TARGET, settledBox, addPdf, closeButton, dropzone, expectNoAlert, expectNoToast, heldUpload, mockWizardApi, modal, openWizard, resultHeading, retry, rowRemove, step, watchAnnouncements } from "./upload-wizard-helpers";
 
 // Upload wizard outcomes with the real XHR (spec upload-wizard-stepper, US4, T030): failures, retry, the row's X, the real
 // cancel, long names, 44px targets, focus rings and reduced motion. Outcomes come from page.route, so the browser's own
@@ -320,13 +320,13 @@ test.describe("REQ-19: targets and focus rings", () => {
       expect(await page.evaluate(() => getComputedStyle(document.documentElement).colorScheme)).toBe(theme);
       await tabTo(page, dropzone(page));
       await expectFocusRing(dropzone(page));
-      expect((await dropzone(page).boundingBox())!.height).toBeGreaterThanOrEqual(44);
+      expect((await settledBox(dropzone(page))).height).toBeGreaterThanOrEqual(MIN_TARGET);
       await addPdf(page);
       await expect(retry(page)).toBeVisible();
-      expect((await retry(page).boundingBox())!.height).toBeGreaterThanOrEqual(44);
-      const x = (await rowRemove(page).boundingBox())!;
-      expect(x.height).toBeGreaterThanOrEqual(44);
-      expect(x.width).toBeGreaterThanOrEqual(44);
+      expect((await settledBox(retry(page))).height).toBeGreaterThanOrEqual(MIN_TARGET);
+      const x = await settledBox(rowRemove(page));
+      expect(x.height).toBeGreaterThanOrEqual(MIN_TARGET);
+      expect(x.width).toBeGreaterThanOrEqual(MIN_TARGET);
       await tabTo(page, retry(page));
       await expectFocusRing(retry(page));
       await page.keyboard.press("Tab");

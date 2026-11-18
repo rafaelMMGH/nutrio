@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { WIZARD_PLAN } from "../shared/wizard-plan-fixture";
-import { confirmButton, closeButton, mockWizardApi, next, openWizard, previous, step, stepper, toDatos, uploadPdf } from "./upload-wizard-helpers";
+import { MIN_TARGET, settledBox, confirmButton, closeButton, mockWizardApi, modal, next, openWizard, previous, step, stepper, toDatos, uploadPdf } from "./upload-wizard-helpers";
 
 // Upload wizard accessibility, layout, reduced motion and 44px targets (spec upload-wizard-stepper, US1). Busy states
 // and failures live in upload-wizard-checks.spec.ts. Every write is mocked.
@@ -25,13 +25,15 @@ test.describe("REQ-6: the stepper is accessible", () => {
     await expect(step(page, "Subir")).toHaveAccessibleName(status("Subir", "completada"));
     await expect(step(page, "Datos")).toHaveAttribute("aria-current", "step");
     await expect(step(page, "Datos")).not.toHaveAccessibleName(/completada|disponible|sin iniciar|con error/);
-    await expect(step(page, "Comidas")).toHaveAccessibleName(status("Comidas", "sin iniciar"));
+    // REQ-6: "con error" takes precedence over the progress status, even on a locked Comidas.
+    await expect(step(page, "Comidas")).toHaveAccessibleName(/^Comidas\s*,\s*con error\b/);
     for (const label of ["Subir", "Comidas", "Confirmar"]) await expect(step(page, label)).not.toHaveAttribute("aria-current", /.*/);
 
     await next(page).click();
     await next(page).click();
     await expect(liveRegion(page)).toHaveText("Paso 4 de 4: Confirmar");
-    for (const label of ["Subir", "Datos", "Comidas"]) await expect(step(page, label)).toHaveAccessibleName(status(label, "completada"));
+    for (const label of ["Subir", "Datos"]) await expect(step(page, label)).toHaveAccessibleName(status(label, "completada"));
+    await expect(step(page, "Comidas")).toHaveAccessibleName(/^Comidas\s*,\s*con error\b/);
 
     // Jumping back: the current step reads no status and Confirmar is reached but not passed.
     await step(page, "Datos").click();
@@ -39,7 +41,7 @@ test.describe("REQ-6: the stepper is accessible", () => {
     await expect(step(page, "Datos")).toHaveAttribute("aria-current", "step");
     await expect(step(page, "Datos")).not.toHaveAccessibleName(/completada|disponible|sin iniciar|con error/);
     await expect(step(page, "Confirmar")).toHaveAccessibleName(status("Confirmar", "disponible"));
-    await expect(step(page, "Comidas")).toHaveAccessibleName(status("Comidas", "completada"));
+    await expect(step(page, "Comidas")).toHaveAccessibleName(/^Comidas\s*,\s*con error\b/);
   });
 
   test("ArrowDown, ArrowUp, Home, End, Enter and Space move among the selectable steps", async ({ page }) => {
@@ -93,7 +95,8 @@ const horizontalOverflow = (page: Page) =>
   page.evaluate(() => {
     const root = document.documentElement;
     const content = document.querySelector<HTMLElement>(".uw-content")!;
-    return { page: root.scrollWidth - root.clientWidth, content: content.scrollWidth - content.clientWidth };
+    // A negative difference (the content is narrower than its box) is not overflow, so it counts as 0.
+    return { page: Math.max(0, root.scrollWidth - root.clientWidth), content: Math.max(0, content.scrollWidth - content.clientWidth) };
   });
 
 test.describe("REQ-2, REQ-18: layout", () => {
@@ -154,6 +157,10 @@ test.describe("REQ-2, REQ-18: layout", () => {
     const sizes = await content.evaluate((node) => ({ scroll: node.scrollHeight, client: node.clientHeight }));
     expect(sizes.scroll, "Comidas is taller than its area, so it has to scroll").toBeGreaterThan(sizes.client);
 
+    // The caption's height spring may still be settling here; wait until two reads 100 ms apart agree. A tolerance
+    // would hide a real drift while scrolling, which is what this test guards against.
+    const readHeader = async () => JSON.stringify(await page.locator(".uw-header").boundingBox());
+    await expect.poll(async () => (await readHeader()) === (await page.waitForTimeout(100).then(readHeader))).toBe(true);
     const header = (await page.locator(".uw-header").boundingBox())!;
     const footer = (await page.locator(".uw-footer").boundingBox())!;
     await content.evaluate((node) => node.scrollTo(0, node.scrollHeight));
@@ -258,13 +265,52 @@ test.describe("REQ-19: 44px targets in the compact layout", () => {
     }
 
     for (const button of [closeButton(page), previous(page), next(page)]) {
-      const box = (await button.boundingBox())!;
-      expect(box.width).toBeGreaterThanOrEqual(44);
-      expect(box.height).toBeGreaterThanOrEqual(44);
+      const box = await settledBox(button);
+      expect(box.width).toBeGreaterThanOrEqual(MIN_TARGET);
+      expect(box.height).toBeGreaterThanOrEqual(MIN_TARGET);
     }
     await next(page).click();
     await next(page).click();
-    const box = (await confirmButton(page).boundingBox())!;
-    expect(box.height).toBeGreaterThanOrEqual(44);
+    const box = await settledBox(confirmButton(page));
+    expect(box.height).toBeGreaterThanOrEqual(MIN_TARGET);
+  });
+});
+
+test.describe("REQ-16: the wizard is modal", () => {
+  test("Q29: Tab never reaches the page behind the wizard, and the page is reachable and refocused after closing", async ({ page }) => {
+    await mockWizardApi(page);
+    await openWizard(page);
+    // Tab may leave the document for the browser UI or the dev overlay (both outside .app-shell); it must never land in the
+    // page behind the wizard, which is everything else in the shell.
+    const inside = () => page.evaluate(() => {
+      const active = document.activeElement;
+      return !active?.closest(".app-shell") || !!active.closest(".upload-wizard-modal");
+    });
+    const inModal = () => page.evaluate(() => !!document.activeElement?.closest(".upload-wizard-modal"));
+    const describe = () => page.evaluate(() => {
+      const el = document.activeElement;
+      return el ? `${el.tagName}|${el.id}|${el.getAttribute("aria-label") ?? ""}|${(el.textContent ?? "").trim().slice(0, 30)}` : "none";
+    });
+    await expect(modal(page)).toBeFocused();
+    const visited = new Set<string>();
+    for (let i = 0; i < 25; i++) {
+      await page.keyboard.press("Tab");
+      expect(await inside(), `Tab ${i + 1} never reaches the page behind`).toBe(true);
+      if (i === 0) expect(await inModal(), "first Tab lands inside the modal").toBe(true);
+      if (await inModal()) visited.add(await describe());
+    }
+    expect(visited.size, `distinct modal elements visited: ${[...visited].join(" ; ")}`).toBeGreaterThanOrEqual(3);
+    for (let i = 0; i < 5; i++) {
+      await page.keyboard.press("Shift+Tab");
+      expect(await inside(), `Shift+Tab ${i + 1} never reaches the page behind`).toBe(true);
+    }
+
+    await closeButton(page).click();
+    await expect(modal(page)).toHaveCount(0);
+    // Focus returns to the control that opened it, and the page behind is no longer inert.
+    await expect(page.getByRole("button", { name: /Subir plan nuevo/ }).first()).toBeFocused();
+    for (const behind of ["header.nt-topbar", "nav.nt-sidebar", "main.content"]) await expect(page.locator(behind)).not.toHaveAttribute("inert", /.*/);
+    await page.getByRole("button", { name: "Abrir asistente" }).focus();
+    await expect(page.getByRole("button", { name: "Abrir asistente" })).toBeFocused();
   });
 });

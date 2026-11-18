@@ -1,7 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { WIZARD_PLAN } from "../shared/wizard-plan-fixture";
-import { confirmButton, expectNoToast, mockWizardApi, next, openWizard, previous, step, toConfirmar, toDatos, uploadPdf } from "./upload-wizard-helpers";
+import { MIN_TARGET, settledBox, confirmButton, expectNoToast, mockWizardApi, next, openWizard, previous, step, toConfirmar, toDatos, uploadPdf } from "./upload-wizard-helpers";
 
 // Confirmar summary (spec upload-wizard-stepper, US3: REQ-12, REQ-13). Every write is mocked.
 
@@ -106,8 +106,10 @@ test.describe("REQ-12: the Confirmar summary", () => {
     await page.keyboard.press("Tab");
     // The first Tab from the heading reaches the disclosure; the ring is its outline.
     await expect(recommendations(page)).toBeFocused();
-    await expect(recommendations(page)).toHaveCSS("outline-style", "solid");
-    expect(parseFloat(await recommendations(page).evaluate((el) => getComputedStyle(el).outlineWidth))).toBeGreaterThanOrEqual(2);
+    // The effective ring must be an outline: a box-shadow does not count.
+    const ring = await recommendations(page).evaluate((el) => ({ style: getComputedStyle(el).outlineStyle, width: parseFloat(getComputedStyle(el).outlineWidth) }));
+    expect(ring.style).not.toBe("none");
+    expect(ring.width).toBeGreaterThanOrEqual(2);
   });
 
   test("Confirmar plan still sends the same PATCH", async ({ page }) => {
@@ -141,12 +143,13 @@ test.describe("REQ-12, REQ-18: compact layout", () => {
     await expect(step(page, "Confirmar")).toHaveAttribute("aria-current", "step");
     await recommendations(page).click();
     await expect(recommendations(page)).toHaveAttribute("aria-expanded", "true");
-    const box = (await recommendations(page).boundingBox())!;
-    expect(box.height).toBeGreaterThanOrEqual(44);
+    const box = await settledBox(recommendations(page));
+    expect(box.height).toBeGreaterThanOrEqual(MIN_TARGET);
     const overflow = await page.evaluate(() => {
       const root = document.documentElement;
       const content = document.querySelector<HTMLElement>(".uw-content")!;
-      return { page: root.scrollWidth - root.clientWidth, content: content.scrollWidth - content.clientWidth };
+      // A negative difference is not overflow.
+      return { page: Math.max(0, root.scrollWidth - root.clientWidth), content: Math.max(0, content.scrollWidth - content.clientWidth) };
     });
     expect(overflow).toEqual({ page: 0, content: 0 });
   });

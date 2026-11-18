@@ -24,9 +24,19 @@ test.describe("REQ-1, REQ-5: the four steps and the footer", () => {
     // The description follows the current step.
     await uploadPdf(page);
     // Filtered by text because the outgoing description is still in the DOM while it fades.
-    for (const text of ["Nombre, objetivo y calorías", "Opciones, ingredientes y complementos", "Revisa y activa el plan"]) {
+    // Comidas has 2 options to review, so its error caption replaces its description while it is current.
+    const shown = [
+      [".stepper-description", "Nombre, objetivo y calorías"],
+      [".stepper-error", "2 opciones necesitan revisión"],
+      [".stepper-description", "Revisa y activa el plan"]
+    ];
+    for (const [selector, text] of shown) {
       await next(page).click();
-      await expect(stepper(page).locator(".stepper-description").filter({ hasText: text })).toBeVisible();
+      await expect(stepper(page).locator(selector).filter({ hasText: text })).toBeVisible();
+      if (text === "2 opciones necesitan revisión") {
+        // Checked while Comidas is current, where the error must have replaced the description.
+        await expect(stepper(page).locator(".stepper-description").filter({ hasText: "Opciones, ingredientes y complementos" })).toHaveCount(0);
+      }
     }
   });
 
