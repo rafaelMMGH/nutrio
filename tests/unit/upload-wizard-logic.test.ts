@@ -121,8 +121,8 @@ test("REQ-10: wizardSteps has no error before a PDF is processed or when nothing
 test("REQ-12: confirmSummary reads the fixture and prefers the edited name", () => {
   assert.deepEqual(confirmSummary(data, {}), { name: "Plan de prueba", kcal: 1800, meals: 4, options: 6, supplements: [], recommendations: "Beber dos litros de agua al día." });
   assert.equal(confirmSummary(data, { name: "  Mi plan  " }).name, "Mi plan");
-  // A blank edit is not a name: the detected one shows (Confirmar plan is disabled anyway).
-  assert.equal(confirmSummary(data, { name: "   " }).name, "Plan de prueba");
+  // A blank edit is not replaced by the detected name: Confirmar shows the missing-name hint.
+  assert.equal(confirmSummary(data, { name: "   " }).name, "");
 });
 
 test("REQ-12: confirmSummary lists supplements and drops blank ones, kcal and recommendations", () => {

@@ -30,6 +30,22 @@ test.describe("REQ-12: the Confirmar summary", () => {
     await expect(page.getByText("Sin suplementos")).toHaveCount(0);
   });
 
+  test("a cleared name shows the hint instead of the detected name, and Confirmar plan is disabled", async ({ page }) => {
+    await mockWizardApi(page);
+    await openWizard(page);
+    // Reaching Confirmar first raises `furthest` to 3, so the stepper keeps it selectable after jumping back to Datos (REQ-3).
+    await toConfirmar(page);
+    await step(page, "Datos").click();
+    await expect(step(page, "Datos")).toHaveAttribute("aria-current", "step");
+    await page.getByLabel("Nombre").fill("");
+    await step(page, "Confirmar").click();
+    await expect(step(page, "Confirmar")).toHaveAttribute("aria-current", "step");
+    // Datos has the same text, so the locator is scoped to the summary.
+    await expect(summary(page).getByText("El nombre es obligatorio")).toBeVisible();
+    await expect(summary(page).getByText("Plan de prueba")).toHaveCount(0);
+    await expect(confirmButton(page)).toBeDisabled();
+  });
+
   test("the edited name replaces the detected one, and Anterior and Siguiente keep it", async ({ page }) => {
     await mockWizardApi(page);
     await openWizard(page);
@@ -86,6 +102,7 @@ test.describe("REQ-12: the Confirmar summary", () => {
     await mockWizardApi(page);
     await openWizard(page);
     await toConfirmar(page);
+    await expect(page.getByRole("heading", { name: "Listo para confirmar" })).toBeFocused();
     await page.keyboard.press("Tab");
     // The first Tab from the heading reaches the disclosure; the ring is its outline.
     await expect(recommendations(page)).toBeFocused();

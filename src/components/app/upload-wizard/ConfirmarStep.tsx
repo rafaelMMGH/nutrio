@@ -13,11 +13,11 @@ export function ConfirmarStep({ data, edits, headingRef }: Props) {
   const bodyId = useId();
   return (
     <div className="list">
-      <div className="card uw-confirm">
+      <div className="card">
         <h3 ref={headingRef} tabIndex={-1}>Listo para confirmar</h3>
         <p>Al confirmar, el plan queda activo y listo para planificar compras.</p>
         <dl className="uw-summary">
-          <div><dt>Plan</dt><dd>{summary.name}</dd></div>
+          <div><dt>Plan</dt>{summary.name ? <dd>{summary.name}</dd> : <dd className="uw-field-error">El nombre es obligatorio</dd>}</div>
           {summary.kcal ? <div><dt>Calorías</dt><dd>{summary.kcal} kcal al día</dd></div> : null}
           <div><dt>Comidas</dt><dd>{plural(summary.meals, "comida", "comidas")} y {plural(summary.options, "opción", "opciones")}</dd></div>
           {summary.supplements.length > 0 && <div><dt>Suplementos</dt><dd>{summary.supplements.join(", ")}</dd></div>}

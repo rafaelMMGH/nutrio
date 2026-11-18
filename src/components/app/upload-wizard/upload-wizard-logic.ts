@@ -88,7 +88,8 @@ export function uploadCounts(data: Pick<PlanData, "meals">) {
 export function confirmSummary(data: PlanData, edits: WizardEdits) {
   const counts = uploadCounts(data);
   return {
-    name: edits.name?.trim() || data.name,
+    // An edit, even blank, wins over the detected name so a cleared name is not hidden (see nameMissing).
+    name: edits.name === undefined ? data.name : edits.name.trim(),
     kcal: data.nutrition_summary?.kcal,
     meals: counts.meals,
     options: counts.options,
