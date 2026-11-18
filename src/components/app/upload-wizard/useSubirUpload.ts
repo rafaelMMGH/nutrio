@@ -46,7 +46,10 @@ export function useSubirUpload({ onProcessed, onReset, refresh }: Options) {
   useEffect(() => {
     const had = hadRejection.current;
     hadRejection.current = rejectionId !== undefined;
-    if (rejectionId === undefined || !had) return setRejectionOpen(true);
+    if (rejectionId === undefined || !had) {
+      setRejectionOpen(true);
+      return;
+    }
     setRejectionOpen(false);
     // Two frames: the false above is committed by a passive effect, and one rAF often fires before React
     // renders it, which would batch false and true into no change.

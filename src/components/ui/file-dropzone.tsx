@@ -23,8 +23,8 @@
  */
 
 import { useEffect, useRef, useState } from "react"
-import type { DragEvent, RefObject } from "react"
-import { AnimatePresence, motion, useReducedMotion } from "motion/react"
+import type { ComponentProps, DragEvent, RefObject } from "react"
+import { AnimatePresence, motion, useIsPresent, useReducedMotion } from "motion/react"
 import { Check, LoaderCircle, RotateCw, Upload, X } from "lucide-react"
 
 import { Alert } from "./alert"
@@ -74,6 +74,12 @@ function useAnnouncement(phase: UploadPhase, name: string | undefined, failure: 
     if (text) setAnnouncement(current => ({ id: current.id + 1, text }))
   }, [phase, name, failure])
   return announcement
+}
+
+/** While the row animates out it is still mounted; `inert` takes it out of the tab order and the accessibility tree. */
+function FileRow(props: ComponentProps<typeof motion.div>) {
+  const isPresent = useIsPresent()
+  return <motion.div {...props} inert={!isPresent} />
 }
 
 export function FileDropzone({ phase, file, progress, failure, rowError, rejection, rejectionOpen, onFiles, onCancel, onRetry, onRemove, onDelete, dropRef, rowXRef, retryRef }: FileDropzoneProps) {
@@ -135,7 +141,7 @@ export function FileDropzone({ phase, file, progress, failure, rowError, rejecti
       </div>
       <AnimatePresence initial={false}>
         {file && (
-          <motion.div key="row" className="fdz-row" {...rowMotion}>
+          <FileRow key="row" className="fdz-row" {...rowMotion}>
             <div className="fdz-copy">
               {phase === "processed" ? (
                 <span className="fdz-status" data-phase={phase}><Check className="fdz-done" aria-hidden="true" /><span className="fdz-name" title={file.name}>{file.name}</span></span>
@@ -165,7 +171,7 @@ export function FileDropzone({ phase, file, progress, failure, rowError, rejecti
                 </button>
               )}
             </div>
-          </motion.div>
+          </FileRow>
         )}
       </AnimatePresence>
       <div className="fdz-alert-slot">
