@@ -24,6 +24,8 @@ type Props = {
   turns: Turn[];
   busy: boolean;
   open: boolean;
+  /** The page is modal elsewhere (the upload wizard): the button and panel leave the tab order. */
+  inert?: boolean;
   onOpenChange: (open: boolean) => void;
   /** Changes whenever something outside the panel (the dashboard search bar) asks, so the input takes focus even if the panel is already open. */
   focusRequest: number;
@@ -37,7 +39,7 @@ type Props = {
 
 // Floating chat over the RAG endpoint: a FAB in the bottom-right corner opens the panel (kept mounted so the
 // conversation survives closing it). The 4 starters when empty, one article per turn, pill composer with dictation.
-export function AssistantChat({ title = "Asistente", subtitle, turns, busy, open, onOpenChange, focusRequest, onSend, onSuggest, onRetry, onClear }: Props) {
+export function AssistantChat({ title = "Asistente", subtitle, turns, busy, open, inert, onOpenChange, focusRequest, onSend, onSuggest, onRetry, onClear }: Props) {
   const [draft, setDraft] = useState("");
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fabRef = useRef<HTMLButtonElement>(null);
@@ -46,13 +48,13 @@ export function AssistantChat({ title = "Asistente", subtitle, turns, busy, open
   const sheet = useMediaQuery(SHEET_QUERY);
 
   useEffect(() => {
-    if (open) inputRef.current?.focus();
-  }, [open, focusRequest]);
+    if (open && !inert) inputRef.current?.focus();
+  }, [open, inert, focusRequest]);
 
   // Escape closes the panel; a popup inside it takes Escape first by calling preventDefault.
   // In the modal sheet Tab wraps, because inert on the page alone lets focus escape to the browser's own controls.
   useEffect(() => {
-    if (!open) return;
+    if (!open || inert) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented) return;
       if (event.key === "Escape") close();
@@ -60,7 +62,7 @@ export function AssistantChat({ title = "Asistente", subtitle, turns, busy, open
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, sheet]);
+  }, [open, inert, sheet]);
 
   // The FAB is `display: none` while the sheet is open, so it can take focus only after the closing render.
   const returnFocus = useRef(false);
@@ -240,11 +242,12 @@ export function AssistantChat({ title = "Asistente", subtitle, turns, busy, open
         aria-label={open ? "Cerrar asistente" : "Abrir asistente"}
         aria-expanded={open}
         aria-controls="assistant-chat-panel"
+        inert={inert}
       >
         {open ? <X size={24} /> : <Bot size={26} />}
       </button>
       {open && sheet && <div className="assistant-chat-backdrop" aria-hidden="true" />}
-      <aside ref={panelRef} id="assistant-chat-panel" className={open ? "assistant-chat open" : "assistant-chat"} aria-label={title} aria-hidden={!open} inert={!open}>
+      <aside ref={panelRef} id="assistant-chat-panel" className={open ? "assistant-chat open" : "assistant-chat"} aria-label={title} aria-hidden={!open} inert={!open || inert}>
         <header>
           <span className="assistant-chat-icon"><Bot size={20} /></span>
           <div className="assistant-chat-heading">

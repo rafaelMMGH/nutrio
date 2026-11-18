@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { TopBar, type Chef } from "@/components/nutrio/TopBar";
 import { Sidebar } from "@/components/nutrio/Sidebar";
 import "@/components/nutrio/tokens.css";
@@ -56,6 +56,17 @@ export function AppShell({ user, chef, children }: Props) {
     };
   }, [sheet]);
 
+  // The wizard is modal (REQ-16): while it is open everything behind it is inert, and closing it returns focus to the
+  // control that opened it. Inert drops focus to the body, so the opener is remembered here and refocused on close.
+  const opener = useRef<HTMLElement | null>(null);
+  const inertBehind = sheet || wizardOpen;
+  useEffect(() => {
+    if (wizardOpen) return;
+    const target = opener.current;
+    opener.current = null;
+    if (target?.isConnected) target.focus();
+  }, [wizardOpen]);
+
   // Every page reads its data on the server, so re-rendering them picks up any change.
   const refresh = useCallback(() => router.refresh(), [router]);
 
@@ -63,7 +74,12 @@ export function AppShell({ user, chef, children }: Props) {
 
   const askAssistant = useCallback((message: string) => ask(message), [ask]);
 
-  const shell = useMemo<Shell>(() => ({ refresh, openDrawer, assistantBusy, askAssistant, openUpload: () => setWizardOpen(true) }), [refresh, openDrawer, assistantBusy, askAssistant]);
+  const openUpload = useCallback(() => {
+    opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setWizardOpen(true);
+  }, []);
+
+  const shell = useMemo<Shell>(() => ({ refresh, openDrawer, assistantBusy, askAssistant, openUpload }), [refresh, openUpload, openDrawer, assistantBusy, askAssistant]);
 
   async function logout() {
     try {
@@ -79,16 +95,17 @@ export function AppShell({ user, chef, children }: Props) {
   return (
     <ShellContext.Provider value={shell}>
       <div className="app-shell nt">
-        <TopBar user={user} chef={chef} busy={assistantBusy} onAsk={askAssistant} onUpload={shell.openUpload} onLogout={logout} inert={sheet} />
-        <Sidebar inert={sheet} />
+        <TopBar user={user} chef={chef} busy={assistantBusy} onAsk={askAssistant} onUpload={openUpload} onLogout={logout} inert={inertBehind} />
+        <Sidebar inert={inertBehind} />
         <AssistantPageProvider value={assistant.setPage}>
-          <main className="content" inert={sheet}>{children}</main>
+          <main className="content" inert={inertBehind}>{children}</main>
         </AssistantPageProvider>
         <AssistantChat
           subtitle={assistant.context.subtitle}
           turns={assistant.turns}
           busy={assistant.busy}
           open={assistant.open}
+          inert={wizardOpen}
           onOpenChange={assistant.setOpen}
           focusRequest={assistant.focusRequest}
           onSend={assistant.send}

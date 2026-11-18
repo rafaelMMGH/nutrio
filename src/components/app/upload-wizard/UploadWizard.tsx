@@ -33,11 +33,13 @@ export function UploadWizard({ onClose, refresh }: { onClose: () => void; refres
 
   const headings = [useRef<HTMLHeadingElement>(null), useRef<HTMLHeadingElement>(null), useRef<HTMLHeadingElement>(null), useRef<HTMLHeadingElement>(null)];
   const confirmRef = useRef<HTMLButtonElement>(null);
-  const pendingFocus = useRef<FocusTarget | null>(null);
+  // The step is part of the request: effects of an earlier render can flush before the update that changes the step lands,
+  // and must not spend the request on the step being left.
+  const pendingFocus = useRef<{ target: FocusTarget; step: number } | null>(null);
 
   const upload = useSubirUpload({
     onProcessed: (result: UploadResult) => {
-      pendingFocus.current = "heading";
+      pendingFocus.current = { target: "heading", step: 0 };
       setState({ step: 0, furthest: 0, data: result });
     },
     onReset: () => {
@@ -47,11 +49,19 @@ export function UploadWizard({ onClose, refresh }: { onClose: () => void; refres
     refresh
   });
 
+  // The opener goes inert and drops focus to the body; the dialog takes it so Tab starts inside.
+  const modalRef = useRef<HTMLElement>(null);
+  useEffect(() => modalRef.current?.focus(), []);
+
+  // Runs after every render and clears the request only once something took focus, so a ref that attaches a render late
+  // (the Subir result heading) is still focused. The mount focus above runs once, before any request can exist.
   useEffect(() => {
-    const target = pendingFocus.current;
-    if (!target) return;
+    const request = pendingFocus.current;
+    if (!request || request.step !== state.step) return;
+    const element = { heading: headings[state.step].current, confirm: confirmRef.current }[request.target];
+    if (!element) return;
     pendingFocus.current = null;
-    ({ heading: headings[state.step].current, confirm: confirmRef.current })[target]?.focus();
+    element.focus();
   });
 
   const data = state.data?.structured_data ?? null;
@@ -71,7 +81,7 @@ export function UploadWizard({ onClose, refresh }: { onClose: () => void; refres
       refresh();
     } catch (err) {
       setConfirmError(`No se pudo confirmar el plan: ${failureReason(err)}`);
-      pendingFocus.current = "confirm";
+      pendingFocus.current = { target: "confirm", step: LAST };
     } finally {
       running.current = false;
       setConfirming(false);
@@ -79,9 +89,11 @@ export function UploadWizard({ onClose, refresh }: { onClose: () => void; refres
   }
 
   const move = (change: (state: WizardState) => WizardState) => {
-    pendingFocus.current = "heading";
+    const to = change(state);
+    if (to === state) return;
+    pendingFocus.current = { target: "heading", step: to.step };
     setConfirmError(null);
-    setState(change);
+    setState(to);
   };
 
   // The error shows as soon as there is data, even while Comidas is locked; it never blocks anything.
@@ -102,7 +114,7 @@ export function UploadWizard({ onClose, refresh }: { onClose: () => void; refres
 
   return (
     <div className="uw-backdrop">
-      <section className="uw-modal upload-wizard-modal">
+      <section ref={modalRef} tabIndex={-1} className="uw-modal upload-wizard-modal">
         <header className="uw-header">
           <div className="row between">
             <h2>Creación de Plan Nutricional</h2>

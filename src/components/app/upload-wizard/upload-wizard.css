@@ -1,7 +1,8 @@
 /* Upload wizard layout. Every class is prefixed `uw-` so Tailwind v4 never mistakes one for a utility.
    No container here clips with `overflow: hidden`: the compact stepper's 44px hit areas extend 8px past its root. */
 
-.uw-backdrop { position: fixed; inset: 0; z-index: 50; background: var(--overlay-modal); display: grid; place-items: center; padding: 18px; }
+/* Above every floating control (assistant button and panel at 60/59, drawer 45), so nothing covers "Siguiente" at 390px. */
+.uw-backdrop { position: fixed; inset: 0; z-index: 70; background: var(--overlay-modal); display: grid; place-items: center; padding: 18px; }
 
 /* Fixed header and footer around a content area that scrolls; a fixed height keeps the frame still between steps. */
 .uw-modal {
@@ -71,7 +72,9 @@
   text-align: left;
   cursor: pointer;
 }
-.uw-card-head:focus-visible { outline: 2px solid var(--brand-text); outline-offset: 2px; }
+/* The shell's `.nt :is(a, button, [tabindex]):focus-visible` (0,3,0) swaps the outline for a 1.36:1 box-shadow; inside the
+   wizard this (0,4,0) rule wins so every control keeps a 3:1 ring. Components keep their own rules for use outside it. */
+.nt .upload-wizard-modal :is(a, button, [tabindex], input, summary):focus-visible { outline: 2px solid var(--brand-text); outline-offset: 2px; box-shadow: none; }
 .uw-card-main { flex: 1; min-width: 0; display: grid; gap: 2px; }
 .uw-card-name { font-weight: 600; }
 .uw-card-main .uw-muted { margin: 0; }
@@ -87,3 +90,6 @@
 @media (prefers-reduced-motion: reduce) { .uw-chevron { transition: none; } }
 .uw-confirm-alert { flex: none; padding: 0 18px; }
 .uw-confirm-alert:has(.alert-presence) { padding-bottom: 12px; }
+
+/* The dialog itself takes focus on open so Tab starts inside; it is not a control, so it shows no ring. */
+.nt .upload-wizard-modal:focus-visible { outline: none; box-shadow: none; }
