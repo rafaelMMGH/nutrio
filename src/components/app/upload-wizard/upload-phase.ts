@@ -114,6 +114,17 @@ const CONTROLS: Record<UploadPhase, SubirControls> = {
 
 export const subirControls = (phase: UploadPhase): SubirControls => CONTROLS[phase];
 
+// REQ-25: what the polite status region says when the phase changes, or null for silence.
+// "Processed" also follows "uploading": `sent` and `done` can land in one render batch, skipping "processing".
+// A retry (failed to uploading) is not a new file, and every entry into "failed" is announced again.
+export function announcementFor(before: UploadPhase, phase: UploadPhase, name: string | undefined, failure: string | null): string | null {
+  if (before === phase) return null;
+  if (phase === "uploading" && before === "empty") return `Se agregó ${name}`;
+  if (phase === "processed" && (before === "processing" || before === "uploading")) return `PDF procesado: ${name}`;
+  if (phase === "failed") return `No se pudo procesar el PDF: ${failure}`;
+  return null;
+}
+
 const NO_CONNECTION = "sin conexión con el servidor";
 
 // REQ-24 <motivo>: the readable server message, else the status, and "no connection" when no response arrived.

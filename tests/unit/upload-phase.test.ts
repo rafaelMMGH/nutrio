@@ -4,6 +4,7 @@ import { MAX_PDF_BYTES } from "@/lib/http/body-limit";
 import { ApiError, REQUEST_FAILED } from "@/lib/client/api";
 import { UploadNetworkError } from "@/lib/client/upload";
 import {
+  announcementFor,
   checkFiles,
   failureReason,
   formatSize,
@@ -280,5 +281,30 @@ describe("formatSize", () => {
   });
   it("has no GB unit", () => {
     assert.equal(formatSize(1024 ** 3), "1024 MB");
+  });
+});
+
+describe("announcementFor", () => {
+  it("announces the added file only for empty to uploading", () => {
+    assert.equal(announcementFor("empty", "uploading", "plan.pdf", null), "Se agregó plan.pdf");
+  });
+  it("does not announce a retry as an added file", () => {
+    assert.equal(announcementFor("failed", "uploading", "plan.pdf", null), null);
+  });
+  it("announces processed after processing, and after uploading when sent and done batch together", () => {
+    assert.equal(announcementFor("processing", "processed", "plan.pdf", null), "PDF procesado: plan.pdf");
+    assert.equal(announcementFor("uploading", "processed", "plan.pdf", null), "PDF procesado: plan.pdf");
+  });
+  it("announces the failure on entering failed, again after a retry", () => {
+    assert.equal(announcementFor("processing", "failed", "plan.pdf", "boom"), "No se pudo procesar el PDF: boom");
+    assert.equal(announcementFor("failed", "uploading", "plan.pdf", null), null);
+    assert.equal(announcementFor("uploading", "failed", "plan.pdf", "boom"), "No se pudo procesar el PDF: boom");
+  });
+  it("stays silent otherwise", () => {
+    assert.equal(announcementFor("processed", "processed", "plan.pdf", null), null);
+    assert.equal(announcementFor("processed", "deleting", "plan.pdf", null), null);
+    assert.equal(announcementFor("deleting", "processed", "plan.pdf", null), null);
+    assert.equal(announcementFor("uploading", "empty", "plan.pdf", null), null);
+    assert.equal(announcementFor("deleting", "empty", "plan.pdf", null), null);
   });
 });
