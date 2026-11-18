@@ -16,13 +16,13 @@ type Recognition = {
   stop: () => void;
   abort: () => void;
 };
-type RecognitionCtor = new () => Recognition;
+export type RecognitionCtor = new () => Recognition;
 type Engine = "native" | "whisper";
 export type DictationPhase = "idle" | "listening" | "transcribing";
 
 const ENGINE_KEY = "nm-dictation-engine";
 
-function recognitionCtor(): RecognitionCtor | null {
+export function recognitionCtor(): RecognitionCtor | null {
   if (typeof window === "undefined") return null;
   const w = window as unknown as { SpeechRecognition?: RecognitionCtor; webkitSpeechRecognition?: RecognitionCtor };
   return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;

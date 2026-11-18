@@ -311,6 +311,8 @@ html.dark:not(:has([data-theme-lock])) .app-shell.nt { background: var(--nt-bg);
   .nt-chef-text { display: none; }
   .nt-profile-text { display: none; }
   .nt-profile-btn > svg { display: none; }
+  /* The 10px right padding only exists for the name and chevron hidden here. */
+  .nt-profile-btn { padding: 0; }
 }
 @media (max-width: 1023px) {
   .nt-chef { display: none; }
