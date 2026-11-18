@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { WIZARD_STEPS, comidasError, confirmChanges, goTo, nameMissing, next, prev, resetAfterChange, reviewCount, uploadCounts, wizardSteps, type WizardState } from "@/components/app/upload-wizard/upload-wizard-logic";
+import { WIZARD_STEPS, comidasError, confirmChanges, confirmSummary, goTo, nameMissing, next, prev, resetAfterChange, reviewCount, uploadCounts, wizardSteps, type WizardState } from "@/components/app/upload-wizard/upload-wizard-logic";
 import { WIZARD_PLAN } from "../shared/wizard-plan-fixture";
 
 const data = WIZARD_PLAN.structured_data;
@@ -116,4 +116,18 @@ test("REQ-10: wizardSteps has no error before a PDF is processed or when nothing
   assert.ok(wizardSteps(null).every((s) => !s.error));
   assert.ok(wizardSteps({ meals: [snack] }).every((s) => !s.error));
   assert.equal(wizardSteps({ meals: [] })[2].error, "No se detectaron comidas en el PDF");
+});
+
+test("REQ-12: confirmSummary reads the fixture and prefers the edited name", () => {
+  assert.deepEqual(confirmSummary(data, {}), { name: "Plan de prueba", kcal: 1800, meals: 4, options: 6, supplements: [], recommendations: "Beber dos litros de agua al día." });
+  assert.equal(confirmSummary(data, { name: "  Mi plan  " }).name, "Mi plan");
+  // A blank edit is not a name: the detected one shows (Confirmar plan is disabled anyway).
+  assert.equal(confirmSummary(data, { name: "   " }).name, "Plan de prueba");
+});
+
+test("REQ-12: confirmSummary lists supplements and drops blank ones, kcal and recommendations", () => {
+  const full = confirmSummary({ ...data, supplements: [{ name: "Vitamina D" }, { name: " " }, { name: "Omega 3" }] }, {});
+  assert.deepEqual(full.supplements, ["Vitamina D", "Omega 3"]);
+  const bare = confirmSummary({ name: "Solo nombre", recommendations: "  \n ", supplements: undefined, nutrition_summary: {} }, {});
+  assert.deepEqual(bare, { name: "Solo nombre", kcal: undefined, meals: 0, options: 0, supplements: [], recommendations: undefined });
 });

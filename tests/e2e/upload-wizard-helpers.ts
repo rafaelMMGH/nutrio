@@ -2,7 +2,7 @@ import type { Locator, Page, Route } from "@playwright/test";
 import { expect } from "./fixtures";
 import { WIZARD_PLAN } from "../shared/wizard-plan-fixture";
 
-// Shared by upload-wizard.spec.ts, upload-wizard-checks.spec.ts, upload-wizard-layout.spec.ts and upload-wizard-review.spec.ts. Every write the wizard makes is mocked here, so no
+// Shared by upload-wizard.spec.ts, upload-wizard-checks.spec.ts, upload-wizard-layout.spec.ts, upload-wizard-review.spec.ts and upload-wizard-confirm.spec.ts. Every write the wizard makes is mocked here, so no
 // test creates, archives or confirms a real plan in the shared database clone.
 
 const PLAN_URL = /\/api\/plans\/plan-e2e$/;

@@ -84,6 +84,19 @@ export function uploadCounts(data: Pick<PlanData, "meals">) {
   };
 }
 
+/** What Confirmar shows (REQ-12). An empty `supplements` or undefined `recommendations` means that block is left out. */
+export function confirmSummary(data: PlanData, edits: WizardEdits) {
+  const counts = uploadCounts(data);
+  return {
+    name: edits.name?.trim() || data.name,
+    kcal: data.nutrition_summary?.kcal,
+    meals: counts.meals,
+    options: counts.options,
+    supplements: (data.supplements ?? []).map((item) => item.name.trim()).filter(Boolean),
+    recommendations: data.recommendations?.trim() || undefined
+  };
+}
+
 export function nameMissing(data: Pick<PlanData, "name">, edits: WizardEdits): boolean {
   return !(edits.name ?? data.name ?? "").trim();
 }

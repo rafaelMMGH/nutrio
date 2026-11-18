@@ -138,7 +138,7 @@ export function UploadWizard({ onClose, refresh }: { onClose: () => void; refres
             {state.step === 0 && <SubirStep data={data} busy={locked} uploading={busy === "upload"} deleting={busy === "delete"} onUpload={upload} onChangePdf={changePdf} headingRef={headings[0]} fileRef={fileRef} submitRef={submitRef} changeRef={changeRef} />}
             {data && state.step === 1 && <DatosStep data={data} edits={edits} setEdits={setEdits} disabled={locked} headingRef={headings[1]} />}
             {data && state.step === 2 && <ComidasStep data={data} headingRef={headings[2]} />}
-            {data && state.step === 3 && <ConfirmarStep data={data} headingRef={headings[3]} />}
+            {data && state.step === 3 && <ConfirmarStep data={data} edits={edits} headingRef={headings[3]} />}
           </main>
         </div>
         <footer className="uw-footer row between">

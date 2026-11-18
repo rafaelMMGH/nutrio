@@ -43,6 +43,13 @@
 .uw-muted { margin: 4px 0 0; font-size: 13px; color: var(--text-muted); font-style: normal; }
 /* globals.css colors bare p, label and .empty with --text-3 (4.04:1 on white, about 3.8:1 on the review card), under 4.5:1 (REQ-19). */
 .uw-content label, .uw-content .empty, .uw-content .item p, .uw-addon { color: var(--text-muted); }
+/* Confirmar summary (REQ-12): label and value pairs that wrap instead of overflowing at 390px. */
+.uw-summary { margin: 0; display: grid; gap: 8px; }
+.uw-summary > div { display: grid; grid-template-columns: minmax(84px, max-content) minmax(0, 1fr); gap: 4px 12px; }
+.uw-summary dt { color: var(--text-muted); }
+.uw-summary dd { margin: 0; font-weight: 600; color: var(--text-1); }
+/* Bare paragraphs (Subir intro, Confirmar): a zero-weight selector, so every uw- class above keeps its own color. */
+:where(.uw-content) p { color: var(--text-muted); }
 .uw-pre { white-space: pre-line; }
 
 /* Comidas cards (REQ-8, REQ-9, REQ-20). Text uses --text-muted and --warn-text. Borders use --text-3 (3:1 as a non-text edge)
