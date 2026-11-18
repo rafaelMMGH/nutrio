@@ -34,6 +34,10 @@ test("REQ-3: prev and a jump back keep furthest", () => {
   assert.deepEqual(goTo(state(3, 3), 1), state(1, 3));
 });
 
+test("REQ-3: jump forward up to furthest", () => {
+  assert.deepEqual(goTo(state(1, 3), 3), state(3, 3));
+});
+
 test("REQ-5: prev stops on Subir", () => {
   assert.deepEqual(prev(state(0, 2)), state(0, 2));
 });
