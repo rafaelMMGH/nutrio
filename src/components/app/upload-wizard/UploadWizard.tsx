@@ -1,150 +1,157 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { CheckCircle2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Stepper12 } from "@/components/ui/stepper-12";
-import { formatTime, mealLabel, plural, qty } from "@/components/dashboard/food";
-import { Badge, Empty } from "@/components/app/feedback";
+import { Stepper } from "@/components/ui/stepper";
 import { api, getErrorMessage } from "@/lib/client/api";
+import { useMediaQuery } from "@/lib/client/useMediaQuery";
+import { ComidasStep } from "./ComidasStep";
+import { ConfirmarStep } from "./ConfirmarStep";
+import { DatosStep } from "./DatosStep";
+import { SubirStep } from "./SubirStep";
+import { confirmChanges, goTo, nameMissing, next, prev, resetAfterChange, WIZARD_STEPS, type UploadResult, type WizardEdits, type WizardState } from "./upload-wizard-logic";
+import "./upload-wizard.css";
 
-export function UploadWizard({ wizard, setWizard, refresh }: { wizard: any; setWizard: (wizard: any) => void; refresh: () => void }) {
-  const steps = ["Subir", "Procesar", "Datos", "Comidas", "Ingredientes", "Complementos", "Duplicados", "Confirmar"];
-  const data = wizard.data?.structured_data;
-  const [edits, setEdits] = useState<{ name?: string; objective?: string }>({});
-  async function upload(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const file = (event.currentTarget.elements.namedItem("pdf") as HTMLInputElement).files?.[0];
-    if (!file) return;
+const COMPACT_QUERY = "(max-width: 937px)";
+const LAST = WIZARD_STEPS.length - 1;
+
+type Busy = "upload" | "confirm" | "delete" | null;
+// Where focus goes after the next render, once the controls are enabled again.
+type FocusTarget = "heading" | "file" | "upload" | "confirm" | "change";
+
+export function UploadWizard({ onClose, refresh }: { onClose: () => void; refresh: () => void }) {
+  const [state, setState] = useState<WizardState>({ step: 0, furthest: 0, data: null });
+  const [edits, setEdits] = useState<WizardEdits>({});
+  const [busy, setBusy] = useState<Busy>(null);
+  // The state update lands a render later; the ref is what stops a second click in the same tick.
+  const running = useRef(false);
+  const compact = useMediaQuery(COMPACT_QUERY);
+
+  const headings = [useRef<HTMLHeadingElement>(null), useRef<HTMLHeadingElement>(null), useRef<HTMLHeadingElement>(null), useRef<HTMLHeadingElement>(null)];
+  const fileRef = useRef<HTMLInputElement>(null);
+  const submitRef = useRef<HTMLButtonElement>(null);
+  const changeRef = useRef<HTMLButtonElement>(null);
+  const confirmRef = useRef<HTMLButtonElement>(null);
+  const pendingFocus = useRef<FocusTarget | null>(null);
+
+  useEffect(() => {
+    const target = pendingFocus.current;
+    if (!target) return;
+    pendingFocus.current = null;
+    const element = { heading: headings[state.step].current, file: fileRef.current, upload: submitRef.current, confirm: confirmRef.current, change: changeRef.current }[target];
+    element?.focus();
+  });
+
+  const data = state.data?.structured_data ?? null;
+  const locked = busy !== null;
+
+  /** Runs one request at a time; the action returns where focus lands once the controls are enabled again. */
+  async function request(kind: Exclude<Busy, null>, action: () => Promise<FocusTarget | null>) {
+    if (running.current) return;
+    running.current = true;
+    setBusy(kind);
     try {
-      const result = await api("/api/plans/upload", { method: "POST", body: file, headers: { "Content-Type": "application/pdf", "X-File-Name": encodeURIComponent(file.name) } });
-      setWizard({ step: 1, data: result });
-      toast.success("PDF procesado", { description: "Revisa los campos detectados antes de confirmar." });
-      await refresh();
-    } catch (err) {
-      toast.error("No se pudo procesar el PDF", { description: getErrorMessage(err) });
+      pendingFocus.current = await action();
+    } finally {
+      running.current = false;
+      setBusy(null);
     }
   }
+
+  const upload = (file: File) => request("upload", async () => {
+    try {
+      const result: UploadResult = await api("/api/plans/upload", { method: "POST", body: file, headers: { "Content-Type": "application/pdf", "X-File-Name": encodeURIComponent(file.name) } });
+      setState({ step: 0, furthest: 0, data: result });
+      toast.success("PDF procesado", { description: "Revisa los campos detectados antes de confirmar." });
+      refresh();
+      return "heading";
+    } catch (err) {
+      toast.error("No se pudo procesar el PDF", { description: getErrorMessage(err) });
+      return "upload";
+    }
+  });
+
+  const changePdf = () => request("delete", async () => {
+    try {
+      await api(`/api/plans/${state.data?.plan.id}`, { method: "DELETE" });
+      setState(resetAfterChange());
+      setEdits({});
+      refresh();
+      return "file";
+    } catch (err) {
+      toast.error("No se pudo quitar el PDF", { description: getErrorMessage(err) });
+      return "change";
+    }
+  });
+
+  const confirm = () => request("confirm", async () => {
+    try {
+      await api(`/api/plans/${state.data?.plan.id}`, { method: "PATCH", body: JSON.stringify(confirmChanges(edits)) });
+      onClose();
+      toast.success("Plan confirmado");
+      refresh();
+      return null;
+    } catch (err) {
+      toast.error("No se pudo confirmar el plan", { description: getErrorMessage(err) });
+      return "confirm";
+    }
+  });
+
+  const move = (change: (state: WizardState) => WizardState) => {
+    pendingFocus.current = "heading";
+    setState(change);
+  };
+
+  const steps = WIZARD_STEPS.map(({ id, label, description }) => ({ id, label, description }));
+  const stepper = (
+    <Stepper
+      steps={steps}
+      current={state.step}
+      furthest={state.furthest}
+      orientation={compact ? "horizontal" : "vertical"}
+      compact={compact}
+      details="current"
+      disabled={locked}
+      // A jump keeps focus on the stepper, so keyboard users stay where they were.
+      onStepSelect={(index) => setState((current) => goTo(current, index))}
+    />
+  );
+
   return (
-    <div className="modal-backdrop">
-      <section className="modal upload-wizard-modal">
-        <header>
+    <div className="uw-backdrop">
+      <section className="uw-modal upload-wizard-modal">
+        <header className="uw-header">
           <div className="row between">
             <h2>Creación de Plan Nutricional</h2>
-            <Button variant="ghost" size="icon-sm" title="Cerrar" aria-label="Cerrar" onClick={() => setWizard(null)}>
+            <Button className="uw-close" variant="ghost" size="icon-sm" title="Cerrar" aria-label="Cerrar" disabled={locked} onClick={onClose}>
               <X size={16} />
             </Button>
           </div>
-          <Stepper12 steps={steps.map((label) => ({ label }))} currentStep={wizard.step} />
+          {compact && <div className="uw-progress">{stepper}</div>}
         </header>
-        <main>
-          {!data ? (
-            <form className="form" onSubmit={upload}>
-              <p>Sube el PDF privado del plan. El MVP guarda el archivo localmente y extrae estructura inicial cuando el texto esta disponible.</p>
-              <input name="pdf" type="file" accept="application/pdf" required />
-              <Button type="submit">Procesar PDF</Button>
-            </form>
-          ) : (
-            <WizardStep data={data} step={wizard.step} edits={edits} setEdits={setEdits} />
-          )}
-        </main>
-        <footer className="row between">
-          <Button variant="outline" disabled={wizard.step === 0} onClick={() => setWizard({ ...wizard, step: Math.max(0, wizard.step - 1) })}>Anterior</Button>
+        <div className="uw-body">
+          {!compact && <aside className="uw-rail">{stepper}</aside>}
+          <main className="uw-content">
+            {state.step === 0 && <SubirStep data={data} busy={locked} uploading={busy === "upload"} deleting={busy === "delete"} onUpload={upload} onChangePdf={changePdf} headingRef={headings[0]} fileRef={fileRef} submitRef={submitRef} changeRef={changeRef} />}
+            {data && state.step === 1 && <DatosStep data={data} edits={edits} setEdits={setEdits} disabled={locked} headingRef={headings[1]} />}
+            {data && state.step === 2 && <ComidasStep data={data} headingRef={headings[2]} />}
+            {data && state.step === 3 && <ConfirmarStep data={data} headingRef={headings[3]} />}
+          </main>
+        </div>
+        <footer className="uw-footer row between">
+          <Button variant="outline" disabled={locked || state.step === 0} onClick={() => move(prev)}>Anterior</Button>
           <div className="toolbar">
-            {data && wizard.step < 7 && <Button variant="secondary" onClick={() => setWizard({ ...wizard, step: wizard.step + 1 })}>Siguiente</Button>}
-            {wizard.step === 7 && <Button onClick={async () => { try { const changes = Object.fromEntries(Object.entries(edits).map(([key, value]) => [key, value?.trim()]).filter(([, value]) => value)); await api(`/api/plans/${wizard.data.plan.id}`, { method: "PATCH", body: JSON.stringify({ processing_status: "confirmed", ...changes }) }); setWizard(null); toast.success("Plan confirmado"); await refresh(); } catch (err) { toast.error("No se pudo confirmar el plan", { description: getErrorMessage(err) }); } }}><CheckCircle2 size={16} />Confirmar plan</Button>}
+            {data && state.step < LAST && <Button variant="secondary" disabled={locked} onClick={() => move(next)}>Siguiente</Button>}
+            {data && state.step === LAST && (
+              <Button ref={confirmRef} disabled={locked || nameMissing(data, edits)} aria-busy={busy === "confirm"} onClick={confirm}>
+                <CheckCircle2 size={16} />Confirmar plan
+              </Button>
+            )}
           </div>
         </footer>
       </section>
     </div>
   );
-}
-
-function WizardStep({ data, step, edits, setEdits }: { data: any; step: number; edits: { name?: string; objective?: string }; setEdits: (edits: { name?: string; objective?: string }) => void }) {
-  const meals: any[] = data.meals || [];
-  const options = meals.flatMap((meal) => meal.options);
-  const ingredientCount = options.reduce((sum: number, option: any) => sum + option.recipe.ingredients.length, 0);
-  const complements = meals.flatMap((meal) => meal.add_ons || []);
-  const toReview = options.filter((option: any) => option.requires_review).length;
-  const summary = data.nutrition_summary || {};
-  const line = (item: any) => `${qty(item.quantity)} ${item.unit} ${item.name}`.replace(/\s+/g, " ").trim();
-
-  if (step === 1) {
-    return (
-      <div className="card review-card">
-        <div>
-          <h3>Procesamiento completado</h3>
-          <p className="review-status"><strong>Detectado:</strong> {plural(meals.length, "comida", "comidas")}, {plural(options.length, "opción", "opciones")}, {plural(ingredientCount, "ingrediente", "ingredientes")} y {plural(complements.length, "complemento", "complementos")}.</p>
-        </div>
-        <p className="review-note">{!meals.length ? data.recommendations : toReview ? `${plural(toReview, "opción necesita", "opciones necesitan")} revisión antes de confirmar.` : "Todo se leyó con buena confianza. Revisa los datos y confirma."}</p>
-      </div>
-    );
-  }
-  if (step === 2) {
-    return (
-      <div className="list">
-        <label>Nombre<input value={edits.name ?? data.name} onChange={(event) => setEdits({ ...edits, name: event.target.value })} /></label>
-        <label>Objetivo<input value={edits.objective ?? data.objective} onChange={(event) => setEdits({ ...edits, objective: event.target.value })} /></label>
-        {summary.kcal && (
-          <div className="item">
-            <h3>{summary.kcal} kcal al día</h3>
-            {summary.macros && <p>Carbohidratos {summary.macros.carbohidratos}% · Proteínas {summary.macros.proteinas}% · Lípidos {summary.macros.lipidos}%</p>}
-          </div>
-        )}
-      </div>
-    );
-  }
-  if (step === 3) {
-    return (
-      <div className="list">
-        {meals.length ? meals.map((meal, index) => (
-          <div className="item" key={index}>
-            <div className="row between"><h3>{mealLabel(meal.name)}</h3>{meal.time_window && <Badge>{formatTime(meal.time_window)}</Badge>}</div>
-            <p>{meal.options.map((option: any) => option.recipe.name).join(" · ")}</p>
-            {meal.equivalents && <p className="wizard-muted">Equivalentes: {Object.entries(meal.equivalents).map(([group, amount]) => `${group} ${amount}`).join(" · ")}</p>}
-          </div>
-        )) : <Empty message="No se detectaron comidas en el PDF." />}
-      </div>
-    );
-  }
-  if (step === 4) {
-    return (
-      <div className="list">
-        {meals.flatMap((meal, mealIndex) => meal.options.map((option: any, optionIndex: number) => (
-          <div className={`item ${option.requires_review ? "warning" : ""}`} key={`${mealIndex}-${optionIndex}`}>
-            <div className="row between"><h3>{mealLabel(meal.name)} · {option.recipe.name}</h3><Badge tone={option.requires_review ? "warn" : "success"}>confianza {Math.round(option.confidence_score * 100)}%</Badge></div>
-            <ul className="ingredient-lines">
-              {option.recipe.ingredients.map((item: any, index: number) => <li key={index}><strong>{line(item)}</strong>{item.notes ? <span> · {item.notes}</span> : null}</li>)}
-            </ul>
-          </div>
-        )))}
-        {!options.length && <Empty message="No se detectaron ingredientes." />}
-      </div>
-    );
-  }
-  if (step === 5) {
-    return (
-      <div className="list">
-        {meals.filter((meal) => meal.add_ons?.length).map((meal, index) => (
-          <div className="item" key={index}>
-            <h3>{mealLabel(meal.name)}</h3>
-            {meal.add_ons.map((addOn: any, addOnIndex: number) => (
-              <p key={addOnIndex}>
-                <strong>{addOn.name}:</strong>{" "}
-                {addOn.ingredients.map((item: any, index: number) => <span key={index}>{index ? " + " : ""}{line(item)}{item.notes ? <em className="wizard-note"> ({item.notes})</em> : null}</span>)}
-              </p>
-            ))}
-          </div>
-        ))}
-        {!complements.length && <Empty message="No se detectaron complementos por comida." />}
-        <div className="two">
-          <div className="card"><h3>Suplementos</h3><p>{(data.supplements || []).map((item: any) => item.name).join(", ") || "Sin suplementos"}</p></div>
-          <div className="card"><h3>Recomendaciones</h3><p className="pre-line">{data.recommendations}</p></div>
-        </div>
-      </div>
-    );
-  }
-  if (step === 6) return <div className="card"><h3>Duplicados</h3><p>Las recetas con los mismos ingredientes, cantidades y unidades se reutilizan en lugar de duplicarse.</p></div>;
-  return <div className="card"><h3>Listo para confirmar</h3><p>Al confirmar, el plan queda activo y listo para planificar compras.</p></div>;
 }

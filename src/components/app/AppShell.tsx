@@ -38,7 +38,7 @@ type Props = { user: ShellUser; chef: Chef; children: ReactNode };
 // Frame shared by every signed-in page: top bar, floating assistant and the PDF upload wizard.
 export function AppShell({ user, chef, children }: Props) {
   const router = useRouter();
-  const [wizard, setWizard] = useState<{ step: number; data: any } | null>(null);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const assistant = useAssistantState();
   const { setOpen: setAssistantOpen, ask, busy: assistantBusy } = assistant;
 
@@ -63,7 +63,7 @@ export function AppShell({ user, chef, children }: Props) {
 
   const askAssistant = useCallback((message: string) => ask(message), [ask]);
 
-  const shell = useMemo<Shell>(() => ({ refresh, openDrawer, assistantBusy, askAssistant, openUpload: () => setWizard({ step: 0, data: null }) }), [refresh, openDrawer, assistantBusy, askAssistant]);
+  const shell = useMemo<Shell>(() => ({ refresh, openDrawer, assistantBusy, askAssistant, openUpload: () => setWizardOpen(true) }), [refresh, openDrawer, assistantBusy, askAssistant]);
 
   async function logout() {
     try {
@@ -96,7 +96,7 @@ export function AppShell({ user, chef, children }: Props) {
           onRetry={assistant.retry}
           onClear={assistant.clear}
         />
-        {wizard && <UploadWizard wizard={wizard} setWizard={setWizard} refresh={refresh} />}
+        {wizardOpen && <UploadWizard onClose={() => setWizardOpen(false)} refresh={refresh} />}
         <ConfirmationDialogHost />
       </div>
     </ShellContext.Provider>
