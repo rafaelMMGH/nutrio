@@ -95,7 +95,7 @@ test.describe("REQ-5: chips under the latest answer", () => {
     await expect(ui.chips).toHaveText([RECIPES_CHIP, "Mi cena de hoy"]);
 
     // An in-app link keeps the shell, and with it the thread, mounted.
-    await chat.getByRole("link", { name: "Hoy" }).click();
+    await chat.getByRole("link", { name: "Inicio", exact: true }).click();
     await expect(chat).toHaveURL(/\/$/);
     await expect(ui.chips).toHaveCount(2);
 

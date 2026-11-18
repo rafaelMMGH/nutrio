@@ -16,7 +16,7 @@ async function loadRecipe(params: Props["params"]) {
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const recipe = await loadRecipe(params);
-  return { title: `${recipe?.name ?? "Receta"} · Nutritional Manager` };
+  return { title: `${recipe?.name ?? "Receta"} · NUTRIO` };
 }
 
 export default async function RecipePage({ params }: Props) {

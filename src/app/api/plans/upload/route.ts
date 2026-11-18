@@ -1,4 +1,5 @@
 import { ingestPdfPlan } from "@/lib/domain/plans";
+import { BodyTooLarge, MAX_PDF_BYTES, PDF_TOO_LARGE, readCapped } from "@/lib/http/body-limit";
 import { badRequest, json } from "@/lib/http/respond";
 import { requireSession } from "@/lib/http/auth";
 import { prisma } from "@/lib/storage/pg";
@@ -12,7 +13,8 @@ export async function POST(request: Request) {
   const auth = await requireSession();
   if (auth.response) return auth.response;
   try {
-    const buffer = Buffer.from(await request.arrayBuffer());
+    const bytes = await readCapped(request.body, request.headers.get("content-length"), MAX_PDF_BYTES);
+    const buffer = Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength);
     const fileName = decodeURIComponent(request.headers.get("x-file-name") || `plan-${Date.now()}.pdf`);
     const db = await loadDb(auth.user, ["plans", "recipes", "ingredients"], { settings: true, empty: created });
     const marks = mark(db, ["plans", "recipes", "ingredients", ...created]);
@@ -25,6 +27,7 @@ export async function POST(request: Request) {
     });
     return json(result);
   } catch (error) {
+    if (error instanceof BodyTooLarge) return json({ error: PDF_TOO_LARGE }, 413);
     return badRequest(error);
   }
 }

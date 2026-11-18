@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { getSettings, loadFor } from "@/lib/domain/queries";
 import { getPageSession } from "@/lib/server/session";
 
-export const metadata: Metadata = { title: "Configuración · Nutritional Manager" };
+export const metadata: Metadata = { title: "Configuración · NUTRIO" };
 
 export default async function SettingsPage() {
   const { user } = await getPageSession();

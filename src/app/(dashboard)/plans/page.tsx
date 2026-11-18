@@ -4,7 +4,7 @@ import { PageHeader } from "@/components/shared/PageHeader";
 import { listPlans, loadFor } from "@/lib/domain/queries";
 import { getPageSession } from "@/lib/server/session";
 
-export const metadata: Metadata = { title: "Planes · Nutritional Manager" };
+export const metadata: Metadata = { title: "Planes · NUTRIO" };
 
 export default async function PlansPage() {
   const { user } = await getPageSession();

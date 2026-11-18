@@ -78,7 +78,7 @@ export function LoginForm() {
       <nav className="lp-island" aria-label="Principal">
         <Link href="/" className="lp-brand">
           <LandingMark />
-          <span>Nutritional Manager</span>
+          <span>NUTRIO</span>
         </Link>
         <Link href="/inicio" className="login-back">
           <ArrowLeft size={16} weight="bold" aria-hidden /> Volver al inicio

@@ -482,7 +482,7 @@ test.describe("REQ-22: desktop is non-modal", () => {
     await expect(ui.input).toBeFocused();
     await expect(ui.backdrop).toHaveCount(0);
     await expect(chat.locator("main.content")).toHaveJSProperty("inert", false);
-    await expect(chat.locator("header.topbar")).toHaveJSProperty("inert", false);
+    await expect(chat.locator("header.nt-topbar")).toHaveJSProperty("inert", false);
     expect(await chat.evaluate(() => document.documentElement.style.overflow)).toBe("");
     await chat.getByRole("link", { name: "Compras" }).click();
     await expect(chat).toHaveURL(/\/groceries$/);
@@ -625,7 +625,7 @@ test.describe("REQ-22: the sheet at 360 px is modal", () => {
     await openSheet(chat);
     await expect(ui.input).toBeFocused();
     await expect(chat.locator("main.content")).toHaveJSProperty("inert", true);
-    await expect(chat.locator("header.topbar")).toHaveJSProperty("inert", true);
+    await expect(chat.locator("header.nt-topbar")).toHaveJSProperty("inert", true);
     expect(await chat.evaluate(() => getComputedStyle(document.documentElement).overflow)).toBe("hidden");
 
     await chat.mouse.move(180, 300);
@@ -641,7 +641,7 @@ test.describe("REQ-22: the sheet at 360 px is modal", () => {
 
     await ui.close.click();
     await expect(chat.locator("main.content")).toHaveJSProperty("inert", false);
-    await expect(chat.locator("header.topbar")).toHaveJSProperty("inert", false);
+    await expect(chat.locator("header.nt-topbar")).toHaveJSProperty("inert", false);
     expect(await chat.evaluate(() => document.documentElement.style.overflow)).toBe("");
   });
 

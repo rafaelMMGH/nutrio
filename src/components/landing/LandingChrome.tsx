@@ -6,7 +6,13 @@ import "./landing.css";
 export function LandingMark() {
   return (
     <span className="lp-mark" aria-hidden>
-      N
+      {/* The NUTRIO sprout (same drawing as src/components/nutrio/Emblem.tsx and the favicon). */}
+      <svg viewBox="0 0 40 40" width="100%" height="100%" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 28V19" />
+        <path d="M20 19c0-4.2-2.6-6.6-6.6-6.8 0 4 2.4 6.6 6.6 6.8Z" />
+        <path d="M20 22.5c0-3.6 2.3-5.8 6-6 0 3.5-2.2 5.8-6 6Z" />
+        <path d="M15.5 28h9" />
+      </svg>
     </span>
   );
 }
@@ -17,7 +23,7 @@ export function LandingFooter() {
       <div className="lp-wrap lp-footer-row">
         <Link href="/" className="lp-brand">
           <LandingMark />
-          <span>Nutritional Manager</span>
+          <span>NUTRIO</span>
         </Link>
         <nav aria-label="Legal">
           <ul>
@@ -32,7 +38,7 @@ export function LandingFooter() {
             </li>
           </ul>
         </nav>
-        <p>© 2026 Nutritional Manager</p>
+        <p>© 2026 NUTRIO</p>
       </div>
     </footer>
   );
@@ -49,7 +55,7 @@ export function LandingPlainPage({ children }: { children: React.ReactNode }) {
       <nav className="lp-island" aria-label="Principal">
         <Link href="/" className="lp-brand">
           <LandingMark />
-          <span>Nutritional Manager</span>
+          <span>NUTRIO</span>
         </Link>
         <Link href="/login" className="lp-btn lp-btn-sm">
           Entrar

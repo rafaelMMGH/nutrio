@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { LandingPlainPage } from "@/components/landing/LandingChrome";
 
-export const metadata: Metadata = { title: "Términos · Nutritional Manager", description: "Condiciones de uso de Nutritional Manager." };
+export const metadata: Metadata = { title: "Términos · NUTRIO", description: "Condiciones de uso de NUTRIO." };
 
 export default function TermsPage() {
   return (
@@ -9,7 +9,7 @@ export default function TermsPage() {
       <p className="lp-meta">Actualizado el 17 de octubre de 2026</p>
       <h1>Términos de uso</h1>
       <h2>Qué es y qué no es</h2>
-      <p>Nutritional Manager organiza el plan de alimentación que te entregó tu nutriólogo. No es un servicio médico, no diseña planes y no cambia porciones ni indicaciones. Ante cualquier duda sobre tu alimentación, consulta a tu nutriólogo.</p>
+      <p>NUTRIO organiza el plan de alimentación que te entregó tu nutriólogo. No es un servicio médico, no diseña planes y no cambia porciones ni indicaciones. Ante cualquier duda sobre tu alimentación, consulta a tu nutriólogo.</p>
       <h2>Tu contenido</h2>
       <p>Los planes que subes siguen siendo tuyos. Solo sube documentos que tengas derecho a usar.</p>
       <h2>Lectura de los PDF</h2>

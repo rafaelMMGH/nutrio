@@ -138,8 +138,6 @@ test.describe("REQ-15: /login follows the stored theme", () => {
 
     // Brand fills keep their value in dark by design. Each entry is "<part prefix>:<facet>" with the reason it may not change.
     const allowUnchanged: Record<string, string> = {
-      "lp-mark:bg": "brand fill (teal mark)",
-      "lp-mark:color": "text on the brand fill",
       "login-submit:bg": "brand fill (primary button)",
       "login-submit:color": "text on the brand fill",
       "login-submit:border": "border of the brand fill"
@@ -208,7 +206,7 @@ test.describe("moving into and out of /login without a reload", () => {
     const marker = await softNavMarker(page);
     await page.locator(".login-submit").click();
     await page.waitForURL((url) => url.pathname === "/");
-    await expect(page.locator(".topbar .theme-toggle")).toBeVisible();
+    await expect(page.locator(".nt-sidebar .theme-toggle")).toBeVisible();
     await expectThemeMeta(page, "dark");
     await marker.expectSoft();
   });

@@ -6,6 +6,6 @@ setup("sign in with the demo account", async ({ page }) => {
   await page.goto("/login");
   await page.locator(".login-submit").click();
   await page.waitForURL("/");
-  await expect(page.locator(".home-hello h1")).toHaveText("Hola, Rafael");
+  await expect(page.locator(".nt-dash h1")).toHaveText("Dashboard");
   await page.context().storageState({ path: "tests/e2e/.auth/user.json" });
 });

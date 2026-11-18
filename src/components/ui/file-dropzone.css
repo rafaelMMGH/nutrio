@@ -1,0 +1,106 @@
+/* File dropzone styles, adapted from the uiarc File dropzone (MIT, see file-dropzone.tsx). Every class is prefixed `fdz-`
+   so Tailwind v4 never mistakes one for a utility. Upstream `--accent` maps to the project `--brand` scale. */
+
+/* Colours resolve to project tokens, so both themes follow them; tests/unit/file-dropzone-contrast.test.ts checks every pair. */
+.fdz-root {
+  --fdz-surface: var(--surface);
+  --fdz-row-bg: var(--surface);
+  --fdz-drag-bg: var(--brand-50);
+  --fdz-prompt: var(--text-1);
+  --fdz-secondary: var(--text-2);
+  --fdz-note: var(--text-muted);
+  --fdz-name: var(--text-1);
+  --fdz-meta: var(--text-muted);
+  --fdz-status: var(--text-2);
+  --fdz-failed: var(--danger-ink);
+  --fdz-retry: var(--text-1);
+  --fdz-edge: var(--text-3);
+  --fdz-edge-active: var(--brand-accent);
+  --fdz-fill: var(--brand-accent);
+  --fdz-track: var(--line-strong);
+  --fdz-done: var(--brand-accent);
+  --fdz-hover-bg: var(--brand-50); /* --hairline put the note at 4.27:1 in light */
+  --fdz-row-line: var(--hairline);
+  --fdz-focus: var(--brand-text);
+  position: relative;
+  display: grid;
+  min-width: 0;
+  color: var(--fdz-prompt);
+}
+/* Dark: --line-strong is too close to the accent fill, so the track drops to the pill surface and the fill stays readable. */
+@media screen {
+  html.dark:not(:has([data-theme-lock])) .fdz-root { --fdz-track: var(--pill); }
+}
+
+/* The target is one button, so click, Enter and Space all open the picker. A CSS dashed border replaces upstream's measured SVG edge. */
+.fdz-zone { position: relative; display: grid; min-width: 0; border: 1.5px dashed var(--fdz-edge); border-radius: 16px; background: var(--fdz-surface); transition: background-color 0.2s, border-color 0.2s; }
+.fdz-trigger { display: flex; width: 100%; flex-direction: column; align-items: center; justify-content: center; gap: 0.375rem; margin: 0; padding: 1.5rem 1.25rem; border: 0; border-radius: inherit; background: transparent; color: inherit; font: inherit; text-align: center; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.fdz-trigger:focus-visible { outline: 2px solid var(--fdz-focus); outline-offset: 3px; }
+.fdz-trigger:focus:not(:focus-visible) { outline: none; }
+.fdz-icon { width: 1.75rem; height: 1.75rem; margin-bottom: 0.25rem; color: var(--fdz-secondary); }
+.fdz-prompt { display: block; max-width: 100%; color: var(--fdz-prompt); font-size: 0.9375rem; font-weight: 500; line-height: 1.4; overflow-wrap: anywhere; }
+.fdz-secondary { display: block; color: var(--fdz-secondary); font-size: 0.875rem; line-height: 1.4; }
+.fdz-note { display: block; padding-top: 0.25rem; color: var(--fdz-note); font-size: 0.75rem; line-height: 1.4; }
+.fdz-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* A file over the target solidifies the edge and tints the zone; with a row the zone only changes colour, never layout. */
+.fdz-zone[data-dragging] { border-style: solid; border-color: var(--fdz-edge-active); background: var(--fdz-drag-bg); }
+@media (hover: hover) and (pointer: fine) {
+  .fdz-zone:not([data-dragging]):has(.fdz-trigger:hover) { background: var(--fdz-hover-bg); }
+}
+
+/* Row: the name column takes the slack and truncates on one line; the size and the actions never shrink. */
+.fdz-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; column-gap: 0.75rem; min-width: 0; margin-top: 0.75rem; padding: 0.5rem 0.5rem 0.5rem 0.875rem; border: 1px solid var(--fdz-row-line); border-radius: 12px; background: var(--fdz-row-bg); }
+.fdz-copy { display: grid; min-width: 0; }
+.fdz-name { overflow: hidden; color: var(--fdz-name); font-size: 0.875rem; font-weight: 500; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.fdz-size { color: var(--fdz-meta); font-size: 0.75rem; font-variant-numeric: tabular-nums; line-height: 1.4; white-space: nowrap; }
+.fdz-status { display: flex; min-width: 0; align-items: center; gap: 0.375rem; color: var(--fdz-status); font-size: 0.75rem; line-height: 1.4; }
+.fdz-status[data-phase="failed"] { color: var(--fdz-failed); align-items: flex-start; }
+.fdz-reason { min-width: 0; overflow-wrap: anywhere; }
+.fdz-percent { font-variant-numeric: tabular-nums; }
+.fdz-done { flex: none; width: 0.875rem; height: 0.875rem; color: var(--fdz-done); }
+
+.fdz-bar { display: block; position: relative; height: 4px; margin: 0.375rem 0 0.125rem; overflow: hidden; border-radius: 999px; background: var(--fdz-track); }
+/* Determinate progress is an inline scaleX(n) from the left at width: 100%. */
+.fdz-bar-fill { display: block; width: 100%; height: 100%; border-radius: inherit; background: var(--fdz-fill); transform-origin: left center; }
+/* Processing has no measurable progress: a short segment slides along the track. */
+.fdz-bar[data-indeterminate] .fdz-bar-fill { width: 40%; animation: fdz-slide 1.4s ease-in-out infinite; }
+@keyframes fdz-slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+
+.fdz-actions { display: flex; align-items: center; gap: 0.25rem; }
+.fdz-retry, .fdz-remove { display: inline-flex; align-items: center; justify-content: center; margin: 0; border: 0; font: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.fdz-retry { min-height: 2rem; gap: 0.375rem; padding: 0 0.75rem; border: 1px solid var(--fdz-edge); border-radius: 999px; background: transparent; color: var(--fdz-retry); font-size: 0.75rem; font-weight: 500; white-space: nowrap; }
+.fdz-remove { width: 2rem; height: 2rem; border-radius: 999px; background: transparent; color: var(--fdz-secondary); }
+.fdz-retry:focus-visible, .fdz-remove:focus-visible { outline: 2px solid var(--fdz-focus); outline-offset: 2px; }
+.fdz-retry:focus:not(:focus-visible), .fdz-remove:focus:not(:focus-visible) { outline: none; }
+.fdz-remove-icon { width: 1rem; height: 1rem; }
+@media (hover: hover) and (pointer: fine) {
+  .fdz-retry:hover, .fdz-remove:hover { background: var(--fdz-hover-bg); }
+}
+/* Deleting: the ✕ is replaced by a spinner, disabled and not clickable. */
+.fdz-remove[aria-busy="true"] { cursor: progress; }
+.fdz-spinner { width: 1rem; height: 1rem; animation: fdz-spin 0.9s linear infinite; }
+@keyframes fdz-spin { to { transform: rotate(360deg); } }
+
+/* The rejection and row-error Alerts sit below the zone and the row at full width (T023 places two slots: rejection
+   under the zone, row-error under the row). The gap is on the alert box, so a closed slot leaves none. */
+.fdz-alert-slot { display: block; min-width: 0; }
+.fdz-alert-slot .alert-box { margin-top: 0.75rem; }
+.fdz-sr { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Compact layout: the target, the ✕ and "Reintentar" are at least 44px by 44px. The row grows, the name keeps its ellipsis. */
+@media (max-width: 937px) {
+  .fdz-trigger { min-height: 44px; }
+  .fdz-retry { min-width: 44px; min-height: 44px; }
+  .fdz-remove { width: 44px; height: 44px; }
+  .fdz-row { column-gap: 0.5rem; padding-block: 0.25rem; }
+}
+@media (min-width: 938px) {
+  .fdz-trigger { min-height: 9.5rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fdz-zone { transition: none; }
+  .fdz-bar[data-indeterminate] .fdz-bar-fill { animation: none; }
+  .fdz-spinner { animation: none; }
+}

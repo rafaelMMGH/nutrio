@@ -1,0 +1,95 @@
+/* Upload wizard layout. Every class is prefixed `uw-` so Tailwind v4 never mistakes one for a utility.
+   No container here clips with `overflow: hidden`: the compact stepper's 44px hit areas extend 8px past its root. */
+
+/* Above every floating control (assistant button and panel at 60/59, drawer 45), so nothing covers "Siguiente" at 390px. */
+.uw-backdrop { position: fixed; inset: 0; z-index: 70; background: var(--overlay-modal); display: grid; place-items: center; padding: 18px; }
+
+/* Fixed header and footer around a content area that scrolls; a fixed height keeps the frame still between steps. */
+.uw-modal {
+  display: flex;
+  flex-direction: column;
+  width: min(900px, 100%);
+  height: min(640px, 86vh);
+  background: var(--surface);
+  border-radius: 24px;
+  box-shadow: var(--shadow);
+}
+.uw-header, .uw-footer { flex: none; background: var(--surface-raised); padding: 14px 18px; }
+.uw-header { border-bottom: 1px solid var(--hairline); border-radius: 24px 24px 0 0; }
+.uw-footer { border-top: 1px solid var(--hairline); border-radius: 0 0 24px 24px; }
+.uw-body { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr); }
+.uw-content { min-width: 0; min-height: 0; overflow: auto; padding: 18px; overflow-wrap: anywhere; }
+.uw-rail { background: var(--surface); padding: 18px 12px 18px 18px; overflow-y: auto; min-height: 0; }
+.uw-progress { padding: 8px; }
+
+@media (min-width: 938px) {
+  .uw-body { grid-template-columns: 200px minmax(0, 1fr); }
+  .uw-rail { border-right: 1px solid var(--hairline); }
+}
+
+@media (max-width: 937px) {
+  .uw-footer button, .uw-close { min-height: 44px; }
+  .uw-close { min-width: 44px; }
+}
+
+.uw-result { display: grid; gap: 12px; border-color: var(--accent-line); background: var(--accent-soft); }
+.uw-result h3 { margin-bottom: 6px; }
+.uw-result-counts { margin: 0; color: var(--text-1); }
+.uw-note { margin: 0; padding-top: 12px; border-top: 1px solid var(--hairline); color: var(--text-muted); font-style: italic; }
+.uw-option { margin-top: 8px; }
+.uw-review { border-left: 3px solid var(--warn-text); padding-left: 8px; }
+.uw-lines { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 14px; color: var(--text-2); }
+.uw-lines strong { font-weight: 600; color: var(--text-1); }
+.uw-lines span { color: var(--text-muted); }
+.uw-muted { margin: 4px 0 0; font-size: 13px; color: var(--text-muted); font-style: normal; }
+/* globals.css colors bare p, label and .empty with --text-3 (4.04:1 on white, about 3.8:1 on the review card), under 4.5:1 (REQ-19). */
+.uw-content label, .uw-content .empty, .uw-content .item p, .uw-addon { color: var(--text-muted); }
+/* Confirmar summary (REQ-12): label and value pairs that wrap instead of overflowing at 390px. */
+.uw-summary { margin: 0; display: grid; gap: 8px; }
+.uw-summary > div { display: grid; grid-template-columns: minmax(84px, max-content) minmax(0, 1fr); gap: 4px 12px; }
+.uw-summary dt { color: var(--text-muted); }
+.uw-summary dd { margin: 0; font-weight: 600; color: var(--text-1); }
+/* Bare paragraphs (Subir intro, Confirmar): a zero-weight selector, so every uw- class above keeps its own color. */
+:where(.uw-content) p { color: var(--text-muted); }
+.uw-pre { white-space: pre-line; }
+
+/* Comidas cards (REQ-8, REQ-9, REQ-20). Text uses --text-muted and --warn-text. Borders use --text-3 (3:1 as a non-text edge)
+   and --warn-text for review cards: --hairline is under 1.3:1 and --warn-line is a pale tint, both far under 3:1. */
+.uw-card { border: 1px solid var(--text-3); border-radius: 16px; background: var(--surface); }
+.uw-card-review { border: 2px solid var(--warn-text); background: var(--warn-soft); }
+.uw-card-title { margin: 0; }
+.uw-card-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 14px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  color: var(--text-1);
+  text-align: left;
+  cursor: pointer;
+}
+/* The shell's `.nt :is(a, button, [tabindex]):focus-visible` (0,3,0) swaps the outline for a 1.36:1 box-shadow; inside the
+   wizard this (0,4,0) rule wins so every control keeps a 3:1 ring. Components keep their own rules for use outside it. */
+.nt .upload-wizard-modal :is(a, button, [tabindex], input, summary):focus-visible { outline: 2px solid var(--brand-text); outline-offset: 2px; box-shadow: none; }
+.uw-card-main { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.uw-card-name { font-weight: 600; }
+.uw-card-main .uw-muted { margin: 0; }
+.uw-chevron { flex: none; color: var(--text-muted); transition: transform 0.2s; }
+.uw-card-head[aria-expanded="true"] .uw-chevron { transform: rotate(180deg); }
+.uw-card-body { padding: 0 14px 14px; }
+.uw-card-body[hidden] { display: none; }
+.uw-flag { flex: none; font-size: 12px; font-weight: 600; color: var(--warn-text); }
+.uw-badge { border: 1px solid var(--text-3); border-radius: 999px; padding: 3px 9px; font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.uw-badge-warn { color: var(--warn-text); border-color: var(--warn-text); }
+.uw-field-error { margin: 4px 0 0; font-size: 13px; color: var(--warn-text); }
+
+@media (prefers-reduced-motion: reduce) { .uw-chevron { transition: none; } }
+.uw-confirm-alert { flex: none; padding: 0 18px; }
+.uw-confirm-alert:has(.alert-presence) { padding-bottom: 12px; }
+
+/* The dialog itself takes focus on open so Tab starts inside; it is not a control, so it shows no ring. */
+.nt .upload-wizard-modal:focus-visible { outline: none; box-shadow: none; }

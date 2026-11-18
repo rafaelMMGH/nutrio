@@ -4,7 +4,7 @@ import { activePlan, listRecipes } from "@/lib/domain/plans";
 import { listGroceries, loadFor } from "@/lib/domain/queries";
 import { getPageSession } from "@/lib/server/session";
 
-export const metadata: Metadata = { title: "Compras · Nutritional Manager" };
+export const metadata: Metadata = { title: "Compras · NUTRIO" };
 
 export default async function GroceriesPage() {
   const { user } = await getPageSession();

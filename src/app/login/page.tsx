@@ -3,7 +3,7 @@ import { redirect } from "next/navigation";
 import { LoginForm } from "@/components/auth/LoginForm";
 import { getSessionUser } from "@/lib/http/auth";
 
-export const metadata: Metadata = { title: "Entrar · Nutritional Manager" };
+export const metadata: Metadata = { title: "Entrar · NUTRIO" };
 
 export default async function LoginPage() {
   if (await getSessionUser()) redirect("/");

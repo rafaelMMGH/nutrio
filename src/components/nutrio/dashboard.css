@@ -1,0 +1,357 @@
+/* Redesigned dashboard (alt-dashboard §4–§5): hero ≈43 %, data column ≈57 %. Colours and radii come from tokens.css. */
+.nt-dash {
+  position: relative;
+  display: grid;
+  grid-template-columns: 43fr 57fr;
+  grid-template-rows: minmax(0, 1fr);
+  gap: var(--nt-gap-lg);
+  /* One screen from 1280 px: the hero fills it; the data column stops short so the floating assistant covers no card. */
+  height: max(660px, calc(100dvh - var(--nt-top-h) - 24px));
+  color: var(--nt-ink);
+}
+.nt-dash h1 { margin: 0; font-size: 64px; font-weight: 500; line-height: 1; letter-spacing: -0.02em; }
+.nt-dash h2 { margin: 0; font-weight: 400; }
+.nt-dash p, .nt-dash dl, .nt-dash dd { margin: 0; color: inherit; }
+.nt-small { font-size: 12px; }
+
+/* ---------- Hero ---------- */
+.nt-hero { position: relative; display: flex; flex-direction: column; min-width: 0; padding: 20px 0 24px 12px; }
+.nt-hero > h1, .nt-hero-copy, .nt-prep, .nt-pager { position: relative; z-index: 2; }
+.nt-hero-copy { display: grid; justify-items: start; gap: 14px; margin-top: 40px; }
+.nt-hero-copy h2 {
+  font-size: 36px;
+  font-weight: 300;
+  line-height: 1.2;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.nt-hero-meal { margin-top: -8px; font-size: 14px; color: var(--nt-muted); }
+.nt-hero-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+/* Modo Cocina for the meal on screen (specs/cooking-mode REQ-4). */
+.nt-cook { height: 40px; padding: 0 16px; text-decoration: none; cursor: pointer; transition: transform 160ms ease; }
+.nt-cook:active { transform: scale(0.97); }
+.nt-cook:focus-visible { outline: none; box-shadow: var(--nt-focus); }
+.nt-rating { height: 40px; font-size: 15px; }
+.nt-done {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--nt-border);
+  border-radius: var(--nt-radius-pill);
+  background: var(--nt-surface);
+  color: var(--nt-ink);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+/* The ink inside comes from the hold fill (hold-to-confirm.css); only the border is left to colour. */
+.nt-done.is-done { border-color: var(--nt-ink); }
+.nt-hero-empty { margin-top: 20px; font-size: 28px; font-weight: 300; max-width: 320px; position: relative; z-index: 2; }
+.nt-hero.is-empty > .nt-pill { margin-top: 40px; align-self: flex-start; position: relative; z-index: 2; }
+.nt-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 16px; align-self: flex-start; color: var(--nt-ink); font-size: 14px; position: relative; z-index: 2; border-radius: 6px; }
+
+/* Same box as the hero so the plate's percentages resolve as before; no z-index, so it forms no stacking context. */
+.nt-plate-clip { position: absolute; inset: 0; pointer-events: none; }
+/* The plate stands in for the dish photo and runs behind the left edge of the data column, like the reference. */
+.nt-plate {
+  position: absolute;
+  z-index: 0;
+  left: 6%;
+  top: 50%;
+  width: 128%;
+  aspect-ratio: 1.12;
+  translate: 0 -46%;
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(closest-side, #000 82%, transparent 100%);
+  mask-image: radial-gradient(closest-side, #000 82%, transparent 100%);
+  animation: nt-plate-in 420ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+@keyframes nt-plate-in {
+  from { opacity: 0; scale: 0.97; }
+}
+.nt-plate-dish {
+  position: absolute;
+  inset: 16% 6%;
+  border-radius: 34% / 44%;
+  rotate: -30deg;
+  background: radial-gradient(120% 90% at 30% 20%, #ffffff 0%, #fafafb 40%, #e3e5ea 100%);
+  box-shadow: 0 50px 70px -30px rgb(20 24 40 / 0.4), 0 0 0 1px rgb(20 24 40 / 0.05), inset 0 0 0 14px rgb(255 255 255 / 0.75), inset 0 0 0 15px rgb(20 24 40 / 0.05), inset 0 0 60px rgb(20 24 40 / 0.1);
+}
+html.dark:not(:has([data-theme-lock])) .nt-plate-dish { background: radial-gradient(120% 90% at 30% 20%, #3a3c44 0%, #2a2c33 60%, #1f2026 100%); box-shadow: 0 40px 60px -30px rgb(0 0 0 / 0.6), inset 0 0 0 10px rgb(255 255 255 / 0.04); }
+.nt-plate-food { position: absolute; translate: -50% -50%; height: auto; filter: drop-shadow(0 14px 14px rgb(20 24 40 / 0.22)); }
+.nt-plate-dot {
+  position: absolute;
+  width: 22px;
+  height: 22px;
+  translate: -50% -50%;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.45);
+  border: 1px solid rgb(255 255 255 / 0.9);
+}
+.nt-plate-dot::after { content: ""; position: absolute; inset: 8px; border-radius: 50%; background: #fff; }
+/* Modo Cocina on the plate's middle dot (specs/cooking-mode REQ-4): a 44 px hit area around the 22 px dot, a soft
+   halo that breathes, and a tooltip that rises and fades in on hover or keyboard focus. */
+.nt-cook-dot {
+  z-index: 2;
+  pointer-events: auto;
+  cursor: pointer;
+  transition: scale 260ms var(--nt-spring), background 200ms ease;
+}
+.nt-cook-dot::before { content: ""; position: absolute; inset: -12px; border-radius: 50%; }
+.nt-cook-dot::after { transition: inset 260ms var(--nt-spring); }
+.nt-cook-dot { box-shadow: 0 0 0 0 rgb(255 255 255 / 0.55); animation: nt-cook-halo 2.6s ease-out infinite; }
+@keyframes nt-cook-halo {
+  0% { box-shadow: 0 0 0 0 rgb(255 255 255 / 0.55); }
+  70%, 100% { box-shadow: 0 0 0 14px rgb(255 255 255 / 0); }
+}
+.nt-cook-dot:hover, .nt-cook-dot:focus-visible { scale: 1.18; background: rgb(255 255 255 / 0.7); }
+.nt-cook-dot:hover::after, .nt-cook-dot:focus-visible::after { inset: 6px; }
+.nt-cook-dot:focus-visible { outline: none; box-shadow: var(--nt-focus); animation: none; }
+.nt-cook-tip {
+  position: absolute;
+  bottom: calc(100% + 12px);
+  left: 50%;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--nt-radius-pill);
+  background: var(--nt-ink);
+  color: var(--nt-on-ink);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 10px 24px -12px rgb(0 0 0 / 0.45);
+  opacity: 0;
+  translate: -50% 6px;
+  scale: 0.92;
+  transform-origin: 50% 100%;
+  pointer-events: none;
+  transition: opacity 180ms ease, translate 320ms var(--nt-spring), scale 320ms var(--nt-spring);
+}
+.nt-cook-tip::after { content: ""; position: absolute; top: 100%; left: 50%; translate: -50% -1px; border: 6px solid transparent; border-top-color: var(--nt-ink); }
+.nt-cook-dot:hover .nt-cook-tip, .nt-cook-dot:focus-visible .nt-cook-tip { opacity: 1; translate: -50% 0; scale: 1; }
+/* The tooltip sits outside the dot, so the scale on hover must not shrink it back: undo it on the tip. */
+.nt-cook-dot:hover .nt-cook-tip, .nt-cook-dot:focus-visible .nt-cook-tip { scale: calc(1 / 1.18); }
+@media (hover: none) { .nt-cook-tip { opacity: 1; translate: -50% 0; scale: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .nt-cook-dot { animation: none; transition: none; }
+  .nt-cook-tip { transition: opacity 120ms ease; translate: -50% 0; scale: 1; }
+}
+.nt-hero.is-empty .nt-plate { opacity: 0.6; }
+
+.nt-pager { position: absolute; right: 4%; top: 66%; display: grid; gap: 6px; padding: 6px; }
+.nt-pager button { width: 8px; height: 8px; min-width: 0; min-height: 0; box-sizing: border-box; padding: 0; border: 0; border-radius: 50%; background: color-mix(in srgb, var(--nt-ink) 22%, transparent); cursor: pointer; position: relative; }
+/* 24 px hit area around each 8 px dot. */
+.nt-pager button::before { content: ""; position: absolute; inset: -8px; }
+.nt-pager button.is-active { background: var(--nt-ink); }
+
+.nt-prep {
+  display: grid;
+  gap: 18px;
+  width: min(300px, 100%);
+  margin-top: auto;
+  padding: 18px 20px 20px;
+  box-sizing: border-box;
+  border-radius: var(--nt-radius-card);
+  background: var(--nt-surface);
+  color: var(--nt-ink);
+  text-decoration: none;
+  box-shadow: 0 24px 40px -24px rgb(20 24 40 / 0.25);
+  transition: translate 200ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+@media (hover: hover) { .nt-prep:hover { translate: 0 -2px; } }
+.nt-prep-head { display: flex; align-items: center; gap: 12px; }
+.nt-prep-text { display: grid; gap: 2px; min-width: 0; }
+.nt-prep-text strong { font-size: 14px; font-weight: 500; }
+.nt-prep-text small { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--nt-muted); }
+.nt-arrow { display: grid; place-items: center; width: 44px; height: 44px; flex: none; margin-left: auto; border-radius: 50%; background: var(--nt-ink); color: var(--nt-on-ink); }
+.nt-card.tone-sky .nt-arrow { background: #0e0e10; color: #fff; }
+.nt-prep-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.nt-prep-bar .nt-figure { font-size: 36px; }
+
+/* ---------- Data column ---------- */
+.nt-data {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: var(--nt-gap);
+  min-width: 0;
+  padding: 25px 0 76px;
+}
+.nt-card-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.nt-card-head h2 { font-size: 16px; white-space: nowrap; }
+.nt-push { margin-left: auto; }
+
+.nt-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--nt-gap); margin: 0; padding: 0; }
+.nt-kpi {
+  display: flex;
+  align-items: flex-start;
+  border-radius: 24px;
+  /* Pop in left to right (--i is the tile's position). Backwards fill only: the resting style stays the final state, so hover and press compose after the entrance and a tile is never stuck hidden. */
+  animation: nt-kpi-in 450ms cubic-bezier(0.34, 1.4, 0.64, 1) calc(var(--i, 0) * 60ms) backwards;
+  transition: translate 200ms cubic-bezier(0.23, 1, 0.32, 1), scale 120ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+.nt-kpi:active { scale: 0.97; }
+@keyframes nt-kpi-in {
+  from { opacity: 0; translate: 0 10px; scale: 0.94; }
+}
+@keyframes nt-kpi-wiggle {
+  25% { rotate: -9deg; }
+  60% { rotate: 6deg; }
+  85% { rotate: -2deg; }
+}
+@media (hover: hover) {
+  .nt-kpi:hover { translate: 0 -3px; }
+  .nt-kpi:hover .nt-icon-badge { animation: nt-kpi-wiggle 500ms ease-in-out 1; }
+}
+/* Label, rolling number and context, each on one line; the label and the context clip with an ellipsis. */
+.nt-kpi-text { display: grid; gap: 4px; min-width: 0; justify-items: center; text-align: center; width: 100% }
+.nt-kpi-label, .nt-kpi-context { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nt-kpi-label { font-size: 14.5px; line-height: 18px; }
+.nt-kpi-context { font-size: 12px; line-height: 16px; color: var(--nt-muted); }
+.nt-kpi .nt-roll { font-size: 40px; }
+
+.nt-metrics { display: grid; gap: 16px; padding: 20px 22px; }
+.nt-metrics .nt-tabs { margin-left: auto; }
+.nt-gauges { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.nt-gauge-tile {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  padding: 14px 8px 14px;
+  border: 0;
+  border-radius: var(--nt-radius-inner);
+  background: var(--nt-ink-sub);
+  color: #fff;
+  font: inherit;
+  min-width: 0;
+}
+button.nt-gauge-tile { cursor: pointer; transition: background-color 160ms ease; }
+button.nt-gauge-tile:hover { background: #202024; }
+.nt .nt-metrics :is(button, [role="slider"]):focus-visible { box-shadow: 0 0 0 3px color-mix(in srgb, #ffffff 70%, transparent); }
+.nt-gauge-value { font-size: 32px; }
+/* Dial tiles (specs/metric-dials): the tile is the container, so the dial's size can follow its width (cqi). Default: 938 to 1279 wide, a single
+   column; 64px is the room Peso's - / + will take beside its dial (US3). Wide and compact tiers below set the rest. The readout font is
+   inKnobFont of dial-logic: min(0.22, 0.8 * 0.64 / 0.42 / n) of the dial, n = characters of the dial's longest number, never below F_MIN (10px). */
+.nt-dial-tile {
+  container-type: inline-size;
+  --nt-dial-size: min(112px, calc(100cqi - 64px));
+  --nt-dial-readout: max(10px, calc(var(--nt-dial-size) * min(0.22, 1.219 / var(--nt-dial-n))));
+}
+/* The global border colour (oklch, from the base layer) would otherwise be computed on every element of the dial; the knob sets its own. */
+:where(.nt-dial-tile, .nt-dial-tile *) { border-color: transparent; }
+/* Two lines are reserved so the three tiles stay equally tall, whatever the line says. */
+.nt-dial-line { min-height: 30px; max-width: 100%; font-size: 12px; line-height: 15px; color: var(--nt-muted-on-ink); text-align: center; overflow-wrap: anywhere; }
+.nt-gauge-label { font-size: 13px; color: #d5d6da; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+
+.nt-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); gap: var(--nt-gap); min-height: 0; }
+.nt-pair .nt-card { display: flex; flex-direction: column; gap: 12px; padding: 18px 22px; min-height: 0; overflow: hidden; }
+
+.nt-cal-main { display: flex; align-items: flex-end; gap: 16px; }
+.nt-cal-total { font-size: 40px; line-height: 1.1; letter-spacing: -0.02em; white-space: nowrap; }
+.nt-cal-total small { font-size: 14px; margin-left: 4px; letter-spacing: 0; }
+.nt-cal-side { display: grid; gap: 8px; flex: 1; min-width: 0; padding-left: 16px; border-left: 1px solid rgb(14 14 16 / 0.35); font-size: 12px; align-self: center; }
+.nt-cal-side div { display: flex; justify-content: space-between; gap: 8px; }
+.nt-bars { flex: 1; min-height: 56px; display: grid; grid-template-columns: repeat(9, 1fr); align-items: end; gap: 8px; }
+.nt-bars i {
+  display: block;
+  border: 1px solid #0e0e10;
+  border-bottom: 0;
+  background: repeating-linear-gradient(90deg, transparent 0 5px, rgb(14 14 16 / 0.35) 5px 6px);
+}
+.nt-bars i.is-filled { background: radial-gradient(#0e0e10 0.9px, transparent 1.1px) 0 0 / 3px 3px; }
+.nt-hours { display: flex; justify-content: space-between; font-size: 12px; }
+
+.nt-arc { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 96px; }
+.nt-arc svg { flex: 1; min-height: 0; width: 100%; overflow: visible; }
+.nt-live { flex: none; }
+.nt-live { display: inline-flex; align-items: center; gap: 6px; height: 22px; padding: 0 10px; border-radius: var(--nt-radius-pill); background: rgb(255 255 255 / 0.55); font-size: 12px; }
+.nt-live i { width: 6px; height: 6px; border-radius: 50%; background: var(--nt-success); }
+.nt-arc-total { position: absolute; bottom: 0; display: grid; justify-items: center; }
+.nt-arc-total b { font-size: 30px; font-weight: 400; line-height: 1; }
+.nt-arc-total span { font-size: 12px; }
+.nt-comp-stats { display: grid; grid-template-columns: repeat(3, 1fr); text-align: center; }
+.nt-comp-stats dd { font-size: 30px; line-height: 1.1; }
+.nt-comp-stats dt { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; }
+.nt-comp-stats dt i { width: 6px; height: 6px; border-radius: 50%; }
+
+.nt-weight-form { display: grid; gap: 14px; }
+.nt-weight-form label { display: grid; gap: 6px; font-size: 14px; }
+.nt-weight-form input { height: 42px; padding: 0 12px; border: 1px solid var(--field-line, #d0d2d8); border-radius: 12px; background: transparent; color: inherit; font: inherit; }
+.nt-weight-error { color: var(--danger-text, #b42318); font-size: 13px; }
+
+/* ---------- One screen, no page scroll (from 1280 px wide) ---------- */
+@media (min-width: 1280px) {
+  /* The frame's usual bottom padding would push the page past the viewport: the dashboard already ends 24 px above it. */
+  .app-shell.nt > .content:has(> .nt-dash) { padding-bottom: 24px; }
+  /* The plate is taller than the hero and its lower part would add page height. Clip only the plate (through its wrapper, which has the
+     hero's box), so nothing else is cut: the prep card's shadow hangs below the box. x stays visible so the plate still runs behind the
+     data column. overflow-clip-margin does not apply with a single clipped axis, so it is not used. */
+  .nt-plate-clip { overflow-y: clip; }
+  /* 25 px of air above the KPIs when the screen is tall enough (about 917 px); it gives the 17 px back to the card row as the window shrinks, so the calories card is never cut. */
+  .nt-data { padding-top: clamp(8px, calc(100dvh - 892px), 25px); }
+}
+/* The dial takes the height the card has left: D = window height minus what the rest of the page needs (plan "Chosen (T006)"), at most what the tile's width allows. */
+@media (min-width: 1280px) {
+  .nt-dial-tile { --nt-dial-size: max(56px, min(100dvh - 824px, 100cqi - 64px)); }
+}
+@media (min-width: 1280px) and (max-height: 899px) {
+  .nt-dial-tile { --nt-dial-size: max(56px, min(100dvh - 707px, 100cqi - 64px)); }
+}
+/* Short screens (laptops with browser chrome): tighter cards so everything still fits without scrolling, down to ~768 px. */
+@media (min-width: 1280px) and (max-height: 899px) {
+  .nt-dash h1 { font-size: 52px; }
+  .nt-hero { padding-top: 12px; }
+  .nt-hero-copy { margin-top: 24px; gap: 10px; }
+  .nt-hero-copy h2 { font-size: 32px; }
+  .nt-kpi { padding: 10px 14px; }
+  .nt-kpi .nt-roll { font-size: 32px; }
+  .nt-metrics { gap: 12px; padding: 16px 20px; }
+  .nt-gauge-tile { gap: 4px; padding: 10px 8px; }
+  .nt-gauge-value { font-size: 26px; }
+  .nt-gauge { width: 60px; height: 60px; }
+  .nt-pair .nt-card { gap: 8px; padding: 14px 20px; }
+  .nt-cal-total { font-size: 32px; }
+  .nt-bars { min-height: 40px; }
+  .nt-arc { min-height: 64px; }
+  .nt-arc-total b, .nt-comp-stats dd { font-size: 24px; }
+  .nt-prep { gap: 12px; padding: 14px 18px 16px; }
+}
+
+/* ---------- Responsive (P15) ---------- */
+@media (max-width: 1279px) {
+  .nt-dash { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; height: auto; }
+  .nt-pair { grid-template-rows: none; }
+  .nt-pair .nt-card { min-height: 300px; }
+  .nt-hero { min-height: 620px; overflow: hidden; }
+  .nt-plate { left: 30%; width: 78%; }
+  .nt-data { grid-template-rows: none; padding-bottom: 0; }
+}
+@media (max-width: 937px) {
+  .nt-dash h1 { font-size: 44px; }
+  .nt-hero { min-height: 600px; padding-left: 0; }
+  .nt-hero-copy h2 { font-size: 30px; }
+  /* The h1 stays for assistive tech (it labels the hero) but is visually hidden; drop the gaps that separated it from its siblings. */
+  .nt-hero > h1 {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
+  }
+  .nt-hero-copy, .nt-hero-empty { margin-top: 0; }
+  .nt-plate { left: 8%; width: 120%; translate: 0 -38%; }
+  .nt-kpis, .nt-gauges { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .nt-pair { grid-template-columns: minmax(0, 1fr); }
+  .nt-metrics .nt-card-head { flex-wrap: wrap; }
+  .nt-metrics .nt-tabs { margin-left: 0; width: 100%; }
+  .nt-dial-tile { --nt-dial-size: min(140px, calc(100cqi - 16px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nt-plate { animation: none; }
+  .nt-prep, button.nt-gauge-tile { transition: none; }
+  .nt-prep:hover { translate: none; }
+}

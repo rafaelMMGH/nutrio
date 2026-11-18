@@ -1,0 +1,353 @@
+/* Frame of the redesigned layout: top bar + icon sidebar (alt-dashboard §4, §5.1, §5.2). */
+.app-shell.nt {
+  --nt-top-h: 84px;
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
+  min-height: 100dvh;
+  background: var(--nt-bg);
+}
+html.dark:not(:has([data-theme-lock])) .app-shell.nt { background: var(--nt-bg); }
+
+.nt-topbar {
+  grid-column: 1 / -1;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: var(--nt-top-h);
+  padding: 0 32px 0 28px;
+  background: var(--nt-bg);
+  view-transition-name: site-header;
+}
+.nt-brand { display: flex; align-items: center; gap: 12px; flex: none; margin-right: 12px; color: var(--nt-ink); text-decoration: none; }
+.nt-brand span { font-size: 20px; font-weight: 400; letter-spacing: 0.2em; }
+
+.nt-search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1 1 320px;
+  max-width: 440px;
+  min-width: 160px;
+  height: 48px;
+  margin-right: 12px;
+  padding: 0 14px 0 6px;
+  border-radius: var(--nt-radius-pill);
+}
+/* Border, fill and shadow of the pill, its sparkle circle and the avatar come from .nt-glass (primitives.css). */
+.nt-search-icon { display: grid; place-items: center; width: 36px; height: 36px; flex: none; box-sizing: border-box; border-radius: 50%; }
+.nt-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--nt-ink); font: inherit; font-size: 14px; }
+.nt-search input::placeholder { color: var(--nt-muted); }
+.nt-search.nt-glass:focus-within { box-shadow: inset 0 1px 0 var(--nt-glass-shine), var(--nt-focus); }
+
+.nt-chef {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+  /* Auto margins on this pill's left and on the CTA's right centre the pair between the search and the alerts button. */
+  margin: 0 12px 0 auto;
+  height: 52px;
+  padding: 0 8px 0 16px;
+  box-sizing: border-box;
+  border-radius: var(--nt-radius-pill);
+  text-decoration: none;
+}
+.nt-chef-text { display: grid; line-height: 1.25; }
+.nt-chef-text strong { font-size: 13px; font-weight: 500; }
+.nt-chef-text small { font-size: 11px; color: var(--nt-muted); }
+.nt-chef-thumbs { display: inline-flex; align-items: center; }
+.nt-chef-thumbs img, .nt-chef-thumbs b {
+  width: 34px;
+  height: 34px;
+  margin-left: -10px;
+  border-radius: 50%;
+  border: 2px solid var(--nt-glass-edge);
+  background: var(--nt-yellow);
+  object-fit: contain;
+  padding: 4px;
+  box-sizing: border-box;
+}
+.nt-chef-thumbs > :first-child { margin-left: 0; }
+.nt-chef-thumbs b { display: grid; place-items: center; background: var(--nt-muted); color: #fff; font-size: 11px; font-weight: 500; padding: 0; }
+
+.nt-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  height: 48px;
+  /* 84 px of air each side where the bar has room (1440 px and up); shrinks to 12 px by 1280 px so the bar does not overflow. */
+  margin-inline: clamp(12px, calc(12px + (100vw - 1280px) * 0.45), 84px);
+  padding: 0 24px;
+  box-sizing: border-box;
+  border-radius: var(--nt-radius-pill);
+  /* Fill, rim and shadow come from .nt-glass.is-ink (primitives.css): the ink glass of the active sidebar button. */
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  transition: transform 160ms ease, opacity 160ms ease;
+}
+.nt-cta:hover { opacity: 0.88; }
+.nt-cta:active { transform: scale(0.97); }
+/* The left margin mirrors the search pill's right margin, so the centred pair has equal air on both sides. */
+.nt-tools { display: flex; gap: 12px; flex: none; margin-inline: clamp(1.9rem, calc(1.9rem + (100vw - 1280px) * 0.05), 2.4rem); }
+
+.nt-profile { position: relative; flex: none; }
+.nt-profile-btn { display: flex; align-items: center; gap: 10px; padding: 0 10px 0 0; border: 0; background: transparent; color: var(--nt-ink); font: inherit; cursor: pointer; text-align: left; border-radius: var(--nt-radius-pill); box-shadow: 0 0 0 1px var(--nt-glass-line); }
+.nt-avatar { display: grid; place-items: center; width: 44px; height: 44px; box-sizing: border-box; border-radius: 50%; font-weight: 500; }
+.nt-profile-text { display: grid; line-height: 1.3; }
+.nt-profile-text strong { font-size: 14px; font-weight: 500; }
+.nt-profile-text small { max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--nt-muted); }
+/* A named view-transition element isolates its subtree, so the open menu could only blur the bar itself and the page
+   showed through sharp. While the menu is open the bar gives up its name; the menu closes before any navigation. */
+.nt-topbar:has(.nt-profile[data-open]) { view-transition-name: none; }
+
+/* Account menu, in the style of the sidebar's hover menu (see below): a glass panel that grows downward and rows made of
+   a 44 px glass circle, a title and a faint fill. The panel's material is the shared .nt-glass rule (primitives.css).
+   It is always in the DOM; closed it is visibility: hidden, so it is inert and out of the accessibility tree.
+   Rows are laid out at fixed 44 px with a 12 px gap and 6 px between them and every edge of the panel (as the sidebar's:
+   a 5 px margin plus the 1 px border), so its height is a constant (6 + 3 x 44 + 2 x 12 + 6 = 168 px) and --nt-open
+   scales it; overflow clips the rows until the lower edge reaches them.
+   From 1280 px the panel passes the pill by 6 px on the top, left and right and sits behind it (the pill is the first
+   row, painted above); below, where the pill is only the avatar, it opens under the avatar and the header takes the
+   first row. */
+.nt-profile { z-index: 40; }
+.nt-profile-menu {
+  --nt-open: 0;
+  position: absolute;
+  z-index: -1;
+  top: calc(100% + 12px);
+  right: 0;
+  display: grid;
+  grid-auto-rows: 44px;
+  align-content: start;
+  row-gap: 12px;
+  box-sizing: border-box;
+  /* 6 px at the top (5 + the border); the side margins are on the rows, the bottom one is in the height. */
+  padding-top: 5px;
+  width: 240px;
+  height: calc(var(--nt-open) * 168px);
+  overflow: hidden;
+  border-radius: 22px;
+  opacity: min(1, calc(var(--nt-open) * 4));
+  visibility: hidden;
+  /* Closing: a quick ease; the panel turns inert once it has finished. The hover delays are in TopBar.tsx. */
+  transition: --nt-open 180ms cubic-bezier(0.4, 0, 0.2, 1), visibility 0s linear 180ms;
+}
+.nt-profile[data-open] .nt-profile-menu {
+  --nt-open: 1;
+  visibility: visible;
+  transition: --nt-open 560ms var(--nt-spring), visibility 0s;
+}
+.nt-menu-head { display: grid; align-content: center; gap: 2px; margin: 0 5px; padding: 0 8px; line-height: 1.3; }
+.nt-menu-head strong { font-size: 14px; font-weight: 400; color: var(--nt-glass-ink); }
+.nt-menu-head small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; color: var(--nt-muted); }
+/* The row: the whole item is the click target. Its fill is a ::before under the circle, with the circle cut out of it
+   by a mask (as the sidebar's .nt-row-fill), so the circle is never tinted. */
+.nt-menu-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  margin: 0 5px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--nt-radius-pill);
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+  text-align: left;
+  text-decoration: none;
+  white-space: nowrap;
+  justify-self: stretch;
+  color: var(--nt-glass-ink);
+  cursor: pointer;
+}
+.nt-menu-item::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: var(--nt-radius-pill);
+  -webkit-mask-image: radial-gradient(circle at 22px 22px, transparent 23px, #000 23.5px);
+  mask-image: radial-gradient(circle at 22px 22px, transparent 23px, #000 23.5px);
+  transition: background-color 160ms ease;
+}
+.nt-menu-item:is(:hover, :focus-visible)::before { background-color: var(--nt-glass-hover); }
+.nt-menu-item.is-danger, .nt-menu-item.is-danger .nt-icon-btn { color: var(--nt-danger); }
+.nt-menu-item.is-danger:is(:hover, :focus-visible)::before { background-color: var(--nt-danger-bg); }
+@media (min-width: 1280px) {
+  .nt-profile-menu { top: -6px; right: -6px; width: max(200px, calc(100% + 12px)); }
+  /* The pill sits where the header would be. */
+  .nt-menu-head { visibility: hidden; }
+}
+/* Between the avatar and the panel there is a 12 px gap: a transparent strip keeps the hover from breaking across it. */
+@media (min-width: 938px) and (max-width: 1279px) and (hover: hover) and (pointer: fine) {
+  .nt-profile[data-open]::after { content: ""; position: absolute; top: 100%; right: 0; width: 240px; height: 12px; }
+}
+
+.nt-sidebar {
+  grid-column: 1;
+  grid-row: 2;
+  position: sticky;
+  top: var(--nt-top-h);
+  align-self: start;
+  /* Equal rows above and below keep the navigation group centred; the theme switch and Configuración sit at the bottom. */
+  display: grid;
+  grid-template-rows: 1fr auto 1fr;
+  justify-items: center;
+  height: calc(100dvh - var(--nt-top-h));
+  padding: 12px 0 28px;
+  box-sizing: border-box;
+}
+.nt-side-main, .nt-side-foot { display: flex; flex-direction: column; align-items: center; gap: 12px; }
+.nt-side-main { grid-row: 2; }
+.nt-side-foot { grid-row: 3; align-self: end; }
+/* The theme switch takes the glass look of the other sidebar buttons (primitives.css). */
+.nt-sidebar .theme-toggle:focus-visible { outline: none; }
+
+/* Hover/focus menu. Hovering or keyboard-focusing a navigation button opens the top group as a menu: one glass panel
+   grows to the right behind the group and every button of it shows its title in a row. The bottom group (theme switch
+   and Configuración) has no menu: its buttons keep only the glass hover lift of primitives.css. The controls keep their own glass exactly as primitives.css gives it; nothing here sets their background,
+   border, shadow, filter or transform. Nothing in the layout moves: panel, titles and row fills are absolutely
+   positioned, so every control keeps its 44 px box and the icons stay where they are.
+   Everything of the group hangs on its --nt-open (0 closed, 1 open), a number the group transitions: a delayed spring on
+   the way in, a quick ease on the way out. The delays are the hover intent (120 ms to open, 150 ms to close). Touch
+   devices and the bottom bar (up to 937 px) keep the plain icon buttons: the title and fill spans are rendered but display: none there. */
+@property --nt-open { syntax: "<number>"; inherits: true; initial-value: 0; }
+.nt-sidebar .nt-row-fill, .nt-sidebar .nt-row-title { display: none; }
+@media (min-width: 938px) and (hover: hover) and (pointer: fine) {
+  /* Above the page content and the hero (z-index up to 5), below the top bar (30) so its menus are never covered,
+     and far below the drawer (45), dialogs (50) and the assistant (60). */
+  .nt-sidebar { z-index: 20; }
+  .nt-sidebar .nt-side-main {
+    --nt-open: 0;
+    position: relative;
+    z-index: 0;
+    /* Closed, only a control opens its group: the gaps between the icons do not. Once open, the panel (which does
+       take the pointer) keeps it open, gaps and margins included. */
+    pointer-events: none;
+    transition: --nt-open 180ms cubic-bezier(0.4, 0, 0.2, 1) 150ms;
+  }
+  .nt-sidebar .nt-side-main :is(a, button) { pointer-events: auto; }
+  .nt-sidebar .nt-side-main:is(:hover, :has(:focus-visible)):not([data-dismissed]) {
+    --nt-open: 1;
+    /* The spring is --nt-spring (tokens.css). */
+    transition: --nt-open 560ms var(--nt-spring) 120ms;
+  }
+
+  /* Panel, row fills and titles are invisible, and so inert, until the group opens. The delays keep them hit-testable
+     only while the group is (or is about to be) open: 120 ms in, 150 + 180 ms out. */
+  .nt-sidebar .nt-side-main::before, .nt-sidebar .nt-row-fill, .nt-sidebar .nt-row-title { visibility: hidden; transition: visibility 0s linear 330ms; }
+  .nt-sidebar .nt-side-main:is(:hover, :has(:focus-visible)):not([data-dismissed])::before,
+  .nt-sidebar .nt-side-main:is(:hover, :has(:focus-visible)):not([data-dismissed]) .nt-row-title { visibility: visible; transition-delay: 120ms; }
+  .nt-sidebar .nt-side-main:is(:hover, :has(:focus-visible)):not([data-dismissed]) .nt-row-fill { visibility: visible; transition-delay: 120ms, 0s; }
+
+  /* The panel's material (background, blur, border, shadow) comes from primitives.css, shared with the buttons. */
+  .nt-sidebar .nt-side-main::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    left: -14px;
+    top: -6px;
+    box-sizing: border-box;
+    width: calc(var(--nt-open) * 200px);
+    height: calc(100% + 12px);
+    border-radius: 22px;
+    pointer-events: auto;
+    opacity: min(1, calc(var(--nt-open) * 4));
+  }
+
+  /* Row fill: the faint hover tint, spanning the panel's inner width. It is a descendant of the control, which has
+     its own background and so paints below it; a mask cuts the control's circle (and its 1 px ring) out of the fill,
+     so the circle is never tinted and the fill reads as one row behind it. The row is still the control's click area. */
+  .nt-sidebar .nt-row-fill {
+    display: block;
+    position: absolute;
+    top: -1px;
+    left: calc(-1px - var(--nt-open) * 8px);
+    width: calc(44px + var(--nt-open) * 144px);
+    height: 44px;
+    border-radius: var(--nt-radius-pill);
+    -webkit-mask-image: radial-gradient(circle at calc(22px + var(--nt-open) * 8px) 22px, transparent 23px, #000 23.5px);
+    mask-image: radial-gradient(circle at calc(22px + var(--nt-open) * 8px) 22px, transparent 23px, #000 23.5px);
+    transition-property: visibility, background-color;
+    transition-duration: 0s, 160ms;
+    transition-delay: 330ms, 0s;
+  }
+  .nt-sidebar .nt-icon-btn:not(.is-soon):is(:hover, :focus-visible) .nt-row-fill { background-color: var(--nt-glass-hover); }
+
+  /* Title: fades in just behind the panel's moving edge and is clipped to it, so no text ever shows outside the panel
+     (the edge, less a 6 px margin, sits at 200 px * open - 76 px from the title's left). */
+  .nt-sidebar .nt-row-title {
+    --nt-show: clamp(0, calc((var(--nt-open) - 0.4) * 3), 1);
+    display: flex;
+    align-items: center;
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 55px;
+    font: inherit;
+    font-size: 14px;
+    line-height: 1;
+    white-space: nowrap;
+    /* Not inherited: the current page's button has light ink for its dark circle. */
+    color: var(--nt-glass-ink);
+    clip-path: inset(0 calc(100% - (var(--nt-open) * 200px - 76px)) 0 0);
+    opacity: var(--nt-show);
+    transform: translateX(calc((1 - var(--nt-show)) * -8px));
+  }
+  .nt-sidebar .nt-icon-btn.is-soon .nt-row-title { color: var(--nt-muted); }
+  .nt-sidebar .nt-row-soon { margin-left: 8px; padding: 3px 8px; border: 1px solid var(--nt-glass-line); border-radius: var(--nt-radius-pill); font-size: 11px; color: var(--nt-muted); }
+}
+
+.app-shell.nt > .content { grid-column: 2; grid-row: 2; width: 100%; box-sizing: border-box; padding-right: 32px; padding-top: 0; }
+
+@media (max-width: 1279px) {
+  .nt-chef-text { display: none; }
+  .nt-profile-text { display: none; }
+  .nt-profile-btn > svg { display: none; }
+  /* The 10px right padding only exists for the name and chevron hidden here. */
+  .nt-profile-btn { padding: 0; }
+}
+@media (max-width: 1023px) {
+  .nt-chef { display: none; }
+  .nt-tools { display: none; }
+  .nt-cta { margin: 0 0 0 auto; }
+}
+@media (max-width: 937px) {
+  .app-shell.nt { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr; }
+  .nt-topbar { flex-wrap: wrap; gap: 8px; padding: 12px 16px; }
+  .nt-brand { margin-right: auto; gap: 8px; }
+  .nt-brand span { font-size: 17px; letter-spacing: 0.16em; }
+  .nt-cta { margin: 0; height: 44px; padding: 0 14px; gap: 6px; font-size: 13px; order: 2; }
+  .nt-profile { order: 3; }
+  .nt-search { order: 4; flex-basis: 100%; max-width: none; margin-right: 0; }
+  .nt-sidebar {
+    position: fixed;
+    inset: auto 0 0 0;
+    top: auto;
+    z-index: 40;
+    display: flex;
+    flex-direction: row;
+    justify-content: space-around;
+    height: auto;
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    background: var(--nt-bg);
+    border-top: 1px solid var(--nt-border);
+  }
+  .nt-side-main, .nt-side-foot { display: contents; }
+  .app-shell.nt > .content { grid-column: 1; padding: 0 16px 96px; }
+  .nt-topbar { position: static; }
+  /* The floating assistant clears the bottom bar. */
+  .app-shell.nt .assistant-fab { bottom: calc(88px + env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .nt-menu-item::before { transition: none; }
+  .nt-cta { transition: none; }
+  .nt-cta:active { transform: none; }
+}

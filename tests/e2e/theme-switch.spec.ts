@@ -8,7 +8,7 @@ import { blockThemeStorage, canvasColor, expectThemeMeta, inScopePages, seedThem
 const NAME = { light: "Cambiar a tema oscuro", dark: "Cambiar a tema claro" } as const; // the action, by current theme
 const ICON = { light: "sun", dark: "moon" } as const;
 
-const switchOf = (page: Page) => page.locator(".topbar .topbar-account").getByRole("button", { name: /^Cambiar a tema (oscuro|claro)$/ });
+const switchOf = (page: Page) => page.locator(".nt-sidebar").getByRole("button", { name: /^Cambiar a tema (oscuro|claro)$/ });
 const colorScheme = (page: Page) => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme);
 const stored = (page: Page) => page.evaluate((key) => localStorage.getItem(key), THEME_KEY);
 
@@ -50,7 +50,7 @@ test.describe("REQ-1: the switch in the topbar", () => {
   test("is operable with Tab and Enter or Space", async ({ page }) => {
     await open(page);
     const toggle = switchOf(page);
-    await page.locator(".user-chip").focus();
+    await page.locator(".nt-profile-btn").focus();
     for (let presses = 0; presses < 10 && !(await toggle.evaluate((element) => element === document.activeElement)); presses++) await page.keyboard.press("Tab");
     await expect(toggle).toBeFocused();
 
@@ -116,8 +116,8 @@ test.describe("REQ-2 and REQ-10: switching the page", () => {
 
   test("switching with a popover open gives no error", async ({ page }) => {
     await open(page);
-    await page.locator(".user-chip").click();
-    await expect(page.locator(".user-popover")).toBeVisible();
+    await page.locator(".nt-profile-btn").click();
+    await expect(page.locator(".nt-profile-menu")).toBeVisible();
     await switchOf(page).click();
     await expectTheme(page, "dark");
   });
@@ -154,7 +154,7 @@ test.describe("REQ-3: the choice persists", () => {
       await switchOf(page).click();
       await expectTheme(page, "dark");
 
-      await page.locator(".user-chip").click();
+      await page.locator(".nt-profile-btn").click();
       await page.getByRole("menuitem", { name: "Cerrar sesión" }).click();
       await page.waitForURL("**/login");
       await signIn();
@@ -224,7 +224,7 @@ test.describe("REQ-4: the theme is in the document before any app script runs", 
     await page.route(/\/_next\/static\/.*\.js(\?.*)?$/, (route) => route.fulfill({ status: 200, contentType: "application/javascript", body: "" }));
     await seedTheme(page, "dark");
     await page.goto("/");
-    const opacity = (icon: string) => page.locator(`.topbar .theme-toggle .theme-icon-${icon}`).evaluate((element) => getComputedStyle(element).opacity);
+    const opacity = (icon: string) => page.locator(`.nt-sidebar .theme-toggle .theme-icon-${icon}`).evaluate((element) => getComputedStyle(element).opacity);
     await expect.poll(() => colorScheme(page)).toBe("dark");
     await expect.poll(() => opacity("moon")).toBe("1");
     expect(await opacity("sun")).toBe("0");
@@ -263,14 +263,14 @@ test.describe("REQ-5: with no stored choice the theme follows the OS", () => {
     await expectTheme(page, "light");
 
     await page.getByRole("button", { name: "Abrir asistente" }).click();
-    await page.locator(".user-chip").click();
+    await page.locator(".nt-profile-btn").click();
     await page.emulateMedia({ colorScheme: "dark" });
     await expectTheme(page, "dark");
     await expect(page.locator("#assistant-chat-panel")).toHaveClass(/open/);
-    await expect(page.locator(".user-popover")).toBeVisible();
+    await expect(page.locator(".nt-profile-menu")).toBeVisible();
     await marker.expectSoft();
 
-    await page.locator(".user-chip").click();
+    await page.locator(".nt-profile-btn").click();
     await page.locator(".assistant-chat-close").click();
     await page.locator(".home-promo-btn").click();
     await expect(page.locator(".upload-wizard-modal")).toBeVisible();

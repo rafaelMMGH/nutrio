@@ -512,9 +512,9 @@ label.check input { width: auto; }
 
 .content {
   min-width: 0;
-  max-width: 1760px;
+  max-width: 100vw;
   margin: 0 auto;
-  padding: 10px 28px 36px;
+  padding: 10px 28px 36px 0;
 }
 /* Only ever focused by script (fallback after a navigation while the page loads): no ring on a whole region. */
 main[tabindex="-1"]:focus { outline: none; }
@@ -619,33 +619,6 @@ td select { min-width: 170px; }
 .bubble { border-radius: 16px; padding: 10px 12px; background: var(--bubble-bg); white-space: pre-wrap; font-size: 14px; }
 .bubble.user { background: var(--brand-50); color: var(--brand-ink); justify-self: end; max-width: 85%; }
 
-.modal-backdrop { position: fixed; inset: 0; z-index: 50; background: var(--overlay-modal); display: grid; place-items: center; padding: 18px; }
-.modal {
-  width: min(900px, 100%);
-  max-height: 90vh;
-  overflow: auto;
-  background: var(--surface);
-  border-radius: 24px;
-  box-shadow: var(--shadow);
-}
-.modal header, .modal footer { position: sticky; z-index: 1; background: var(--surface-raised); padding: 14px 18px; }
-.modal header { top: 0; border-bottom: 1px solid var(--hairline); }
-.modal footer { bottom: 0; border-top: 1px solid var(--hairline); }
-.modal main { padding: 18px; }
-.upload-wizard-modal { min-height: min(560px, 86vh); max-height: 86vh; overflow: auto; }
-.review-card { display: grid; gap: 12px; border-color: var(--accent-line); background: var(--accent-soft); }
-.review-card h3 { margin-bottom: 6px; }
-.review-status { margin: 0; color: var(--text-1); }
-.review-note { margin: 0; padding-top: 12px; border-top: 1px solid var(--hairline); color: var(--text-3); font-style: italic; }
-.steps { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; margin: 12px 0; }
-.steps span { height: 5px; border-radius: 999px; background: var(--hairline); }
-.steps span.done { background: var(--brand); }
-.ingredient-lines { margin: 8px 0 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 14px; color: var(--text-2); }
-.ingredient-lines strong { font-weight: 600; color: var(--text-1); }
-.ingredient-lines span { color: var(--text-3); }
-.wizard-muted { margin: 4px 0 0; font-size: 13px; }
-.pre-line { white-space: pre-line; }
-.wizard-note { color: var(--text-3); font-style: normal; }
 .loading { min-height: 100vh; display: flex; align-items: center; justify-content: center; gap: 10px; color: var(--text-3); }
 .spin { animation: spin 0.9s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -674,7 +647,7 @@ td select { min-width: 170px; }
   .content { padding: 6px 20px 32px; }
 }
 
-@media (max-width: 760px) {
+@media (max-width: 937px) {
   .split, .two, .metric-grid, .manual-form { grid-template-columns: 1fr; }
   .page-head { display: grid; }
 }
@@ -684,6 +657,8 @@ td select { min-width: 170px; }
 }
 
 @theme inline {
+  /* 938px; matches the plain-CSS `min-width: 938px` rule (compact layout ends at 937px). */
+  --breakpoint-md: 58.625rem;
   --font-heading: var(--font-sans);
   --font-sans: var(--font-body), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --color-sidebar-ring: var(--sidebar-ring);

@@ -8,14 +8,17 @@ export class ApiError extends Error {
   }
 }
 
+/** Message used when an error response has no readable `error` in its body. */
+export const REQUEST_FAILED = "Request failed";
+
 export async function api(path: string, options: RequestInit = {}) {
   const res = await fetch(path, {
     ...options,
     headers: options.body instanceof Blob ? options.headers : { "Content-Type": "application/json", ...(options.headers || {}) }
   });
   if (!res.ok) {
-    const body = await res.json().catch(() => ({ error: "Request failed" }));
-    throw new ApiError(body.error || "Request failed", res.status);
+    const body = await res.json().catch(() => ({ error: REQUEST_FAILED }));
+    throw new ApiError(body.error || REQUEST_FAILED, res.status);
   }
   const type = res.headers.get("content-type") || "";
   return type.includes("application/json") ? res.json() : res.text();

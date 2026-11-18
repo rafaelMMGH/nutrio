@@ -110,10 +110,9 @@
   width: 32px;
   height: 32px;
   border-radius: 9999px;
-  background: var(--lp-brand);
-  color: white;
-  font-size: 16px;
-  font-weight: 700;
+  /* Sky circle with the sprout in deep blue: the emblem of the signed-in layout (--nt-sky / --nt-sky-deep). */
+  background: #c8d9ef;
+  color: #2f4e8c;
 }
 .lp-island-tabs { position: relative; }
 .lp-island-links { display: flex; gap: 4px; }
@@ -569,7 +568,7 @@
   .lp-tagline p { font-size: 36px; line-height: 40px; }
 }
 
-@media (max-width: 767px) {
+@media (max-width: 937px) {
   .lp-wrap { padding: 0 16px; }
   .lp-island { gap: 12px; }
   .lp-island-links { display: none; }
@@ -590,7 +589,7 @@
   .lp-plain h1 { font-size: 36px; line-height: 40px; }
 }
 
-@media (min-width: 768px) {
+@media (min-width: 938px) {
   .lp-menu { display: none; }
 }
 
