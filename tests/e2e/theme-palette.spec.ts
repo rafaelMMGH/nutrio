@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Page } from "@playwright/test";
 import { expect, expectIssues, test } from "./fixtures";
+import { addPdf } from "./upload-wizard-helpers";
 import { inScopePages, oklch, THEME_KEY, toRgb, type Rgba, type Theme } from "./theme-helpers";
 import { auditNow, installToolkit, report, settle, visit, type StyleEntry } from "./theme-audit";
 
@@ -61,9 +62,7 @@ async function openWizard(page: Page, state: number) {
   await page.getByRole("button", { name: /Subir plan nuevo/ }).first().click();
   await expect(page.locator(".upload-wizard-modal")).toBeVisible();
   if (state > 0) {
-    await page.locator('input[name="pdf"]').setInputFiles({ name: "plan.pdf", mimeType: "application/pdf", buffer: Buffer.from("%PDF-1.4 e2e") });
-    await page.getByRole("button", { name: "Procesar PDF" }).click();
-    // The toast says "PDF procesado" too, so the result is found by its heading.
+    await addPdf(page);
     await expect(page.getByRole("heading", { name: "PDF procesado" })).toBeVisible();
     for (let current = 1; current < state; current++) await page.getByRole("button", { name: "Siguiente" }).click();
   }

@@ -1,7 +1,7 @@
 import type { Locator, Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { WIZARD_PLAN } from "../shared/wizard-plan-fixture";
-import { confirmButton, mockWizardApi, next, openWizard, previous, step, toConfirmar, toDatos, uploadPdf } from "./upload-wizard-helpers";
+import { confirmButton, expectNoToast, mockWizardApi, next, openWizard, previous, step, toConfirmar, toDatos, uploadPdf } from "./upload-wizard-helpers";
 
 // Confirmar summary (spec upload-wizard-stepper, US3: REQ-12, REQ-13). Every write is mocked.
 
@@ -116,6 +116,7 @@ test.describe("REQ-12: the Confirmar summary", () => {
     await toConfirmar(page);
     await confirmButton(page).click();
     await expect(page.locator(".upload-wizard-modal")).toHaveCount(0);
+    await expectNoToast(page);
     expect(calls.patches).toEqual([{ processing_status: "confirmed" }]);
   });
 });
