@@ -11,7 +11,7 @@ import { ComidasStep } from "./ComidasStep";
 import { ConfirmarStep } from "./ConfirmarStep";
 import { DatosStep } from "./DatosStep";
 import { SubirStep } from "./SubirStep";
-import { confirmChanges, goTo, nameMissing, next, prev, resetAfterChange, WIZARD_STEPS, type UploadResult, type WizardEdits, type WizardState } from "./upload-wizard-logic";
+import { confirmChanges, goTo, nameMissing, next, prev, resetAfterChange, wizardSteps, WIZARD_STEPS, type UploadResult, type WizardEdits, type WizardState } from "./upload-wizard-logic";
 import "./upload-wizard.css";
 
 const COMPACT_QUERY = "(max-width: 937px)";
@@ -104,7 +104,8 @@ export function UploadWizard({ onClose, refresh }: { onClose: () => void; refres
     setState(change);
   };
 
-  const steps = WIZARD_STEPS.map(({ id, label, description }) => ({ id, label, description }));
+  // The error shows as soon as there is data, even while Comidas is locked; it never blocks anything.
+  const steps = wizardSteps(data);
   const stepper = (
     <Stepper
       steps={steps}
@@ -143,7 +144,7 @@ export function UploadWizard({ onClose, refresh }: { onClose: () => void; refres
         <footer className="uw-footer row between">
           <Button variant="outline" disabled={locked || state.step === 0} onClick={() => move(prev)}>Anterior</Button>
           <div className="toolbar">
-            {data && state.step < LAST && <Button variant="secondary" disabled={locked} onClick={() => move(next)}>Siguiente</Button>}
+            {data && state.step < LAST && <Button variant="secondary" disabled={locked || (state.step === 1 && nameMissing(data, edits))} onClick={() => move(next)}>Siguiente</Button>}
             {data && state.step === LAST && (
               <Button ref={confirmRef} disabled={locked || nameMissing(data, edits)} aria-busy={busy === "confirm"} onClick={confirm}>
                 <CheckCircle2 size={16} />Confirmar plan

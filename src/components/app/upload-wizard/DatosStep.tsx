@@ -1,7 +1,7 @@
 "use client";
 
-import type { RefObject } from "react";
-import type { PlanData, WizardEdits } from "./upload-wizard-logic";
+import { useId, type RefObject } from "react";
+import { nameMissing, type PlanData, type WizardEdits } from "./upload-wizard-logic";
 
 type Props = {
   data: PlanData;
@@ -13,10 +13,13 @@ type Props = {
 
 export function DatosStep({ data, edits, setEdits, disabled, headingRef }: Props) {
   const summary = data.nutrition_summary || {};
+  const missing = nameMissing(data, edits);
+  const errorId = useId();
   return (
     <div className="list">
       <h3 ref={headingRef} tabIndex={-1}>Datos del plan</h3>
-      <label>Nombre<input value={edits.name ?? data.name ?? ""} disabled={disabled} onChange={(event) => setEdits({ ...edits, name: event.target.value })} /></label>
+      <label>Nombre<input value={edits.name ?? data.name ?? ""} disabled={disabled} aria-invalid={missing} aria-describedby={missing ? errorId : undefined} onChange={(event) => setEdits({ ...edits, name: event.target.value })} /></label>
+      {missing && <p id={errorId} className="uw-field-error">El nombre es obligatorio</p>}
       <label>Objetivo<input value={edits.objective ?? data.objective ?? ""} disabled={disabled} onChange={(event) => setEdits({ ...edits, objective: event.target.value })} /></label>
       {summary.kcal && (
         <div className="item">

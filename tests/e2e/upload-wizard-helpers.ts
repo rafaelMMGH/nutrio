@@ -2,7 +2,7 @@ import type { Locator, Page, Route } from "@playwright/test";
 import { expect } from "./fixtures";
 import { WIZARD_PLAN } from "../shared/wizard-plan-fixture";
 
-// Shared by upload-wizard.spec.ts and upload-wizard-checks.spec.ts. Every write the wizard makes is mocked here, so no
+// Shared by upload-wizard.spec.ts, upload-wizard-checks.spec.ts, upload-wizard-layout.spec.ts and upload-wizard-review.spec.ts. Every write the wizard makes is mocked here, so no
 // test creates, archives or confirms a real plan in the shared database clone.
 
 const PLAN_URL = /\/api\/plans\/plan-e2e$/;
@@ -101,3 +101,6 @@ export async function toDatos(page: Page) {
   await next(page).click();
   await expect(step(page, "Datos")).toHaveAttribute("aria-current", "step");
 }
+
+/** A meal card on Comidas, found by its header button. Unlike `cardHead` it is not rooted at `.uw-content`, so it works as a scope. */
+export const mealCard = (page: Page, meal: string): Locator => page.locator(".uw-card").filter({ has: page.getByRole("button", { name: new RegExp(`^${meal}\\b`) }) });

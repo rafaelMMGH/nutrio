@@ -2,7 +2,7 @@
 
 type Ingredient = { name: string; quantity: number; unit: string; notes?: string };
 type MealOption = { requires_review: boolean; confidence_score: number; recipe: { name: string; ingredients: Ingredient[] } };
-type Meal = {
+export type Meal = {
   name: string;
   time_window?: string;
   equivalents?: Record<string, number>;
@@ -32,6 +32,24 @@ export const WIZARD_STEPS = [
 ] as const;
 
 const LAST = WIZARD_STEPS.length - 1;
+
+export function reviewCount(meal: Pick<Meal, "options">): number {
+  return meal.options.filter((option) => option.requires_review).length;
+}
+
+/** The Comidas caption (REQ-10): no meals, or how many options need review; undefined when there is nothing to flag. */
+export function comidasError(data: Pick<PlanData, "meals">): string | undefined {
+  const meals = data.meals ?? [];
+  if (!meals.length) return "No se detectaron comidas en el PDF";
+  const count = meals.reduce((sum, meal) => sum + reviewCount(meal), 0);
+  if (count === 0) return undefined;
+  return count === 1 ? "1 opción necesita revisión" : `${count} opciones necesitan revisión`;
+}
+
+/** The steps handed to the Stepper: Comidas is the only one that can carry an error (REQ-6, REQ-10). */
+export function wizardSteps(data: Pick<PlanData, "meals"> | null) {
+  return WIZARD_STEPS.map(({ id, label, description }) => ({ id, label, description, error: id === "comidas" && data ? comidasError(data) : undefined }));
+}
 
 /** Stepper jump: only steps already reached can be selected; furthest never changes. */
 export function goTo(state: WizardState, target: number): WizardState {

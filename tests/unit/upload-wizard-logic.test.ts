@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { WIZARD_STEPS, confirmChanges, goTo, nameMissing, next, prev, resetAfterChange, uploadCounts, type WizardState } from "@/components/app/upload-wizard/upload-wizard-logic";
+import { WIZARD_STEPS, comidasError, confirmChanges, goTo, nameMissing, next, prev, resetAfterChange, reviewCount, uploadCounts, wizardSteps, type WizardState } from "@/components/app/upload-wizard/upload-wizard-logic";
 import { WIZARD_PLAN } from "../shared/wizard-plan-fixture";
 
 const data = WIZARD_PLAN.structured_data;
@@ -78,4 +78,42 @@ test("REQ-5: confirmChanges is the confirmed status plus trimmed, non-empty edit
   assert.deepEqual(confirmChanges({ name: "  Plan nuevo ", objective: " Ganar músculo " }), { processing_status: "confirmed", name: "Plan nuevo", objective: "Ganar músculo" });
   assert.deepEqual(confirmChanges({ name: "Plan", objective: "   " }), { processing_status: "confirmed", name: "Plan" });
   assert.deepEqual(confirmChanges({}), { processing_status: "confirmed" });
+});
+
+const [breakfast, lunch, snack] = data.meals;
+const reviewOnly = (count: number) => ({ meals: [{ ...snack, options: Array.from({ length: count }, () => ({ ...breakfast.options[0] })) }] });
+
+test("REQ-10: reviewCount counts the options that require review", () => {
+  assert.equal(reviewCount(breakfast), 1);
+  assert.equal(reviewCount(snack), 0);
+  assert.equal(reviewCount({ ...snack, options: [] }), 0);
+});
+
+test("REQ-10: comidasError says no meals were detected", () => {
+  assert.equal(comidasError({ meals: [] }), "No se detectaron comidas en el PDF");
+  assert.equal(comidasError({}), "No se detectaron comidas en el PDF");
+});
+
+test("REQ-10: comidasError uses the singular for one option and the plural for several", () => {
+  assert.equal(comidasError(reviewOnly(1)), "1 opción necesita revisión");
+  assert.equal(comidasError(reviewOnly(2)), "2 opciones necesitan revisión");
+  // The shared fixture has one option to review in Desayuno and one in Comida.
+  assert.equal(comidasError(data), "2 opciones necesitan revisión");
+});
+
+test("REQ-10: comidasError is undefined when nothing needs review", () => {
+  assert.equal(comidasError({ meals: [snack, { ...lunch, options: [] }] }), undefined);
+});
+
+test("REQ-6, REQ-10: wizardSteps puts the error on Comidas only", () => {
+  const steps = wizardSteps(data);
+  assert.deepEqual(steps.map((s) => [s.id, s.label, s.description]), WIZARD_STEPS.map((s) => [s.id, s.label, s.description]));
+  assert.deepEqual(steps.map((s) => s.error), [undefined, undefined, "2 opciones necesitan revisión", undefined]);
+  assert.equal(steps.filter((s) => "error" in s && s.error).length, 1);
+});
+
+test("REQ-10: wizardSteps has no error before a PDF is processed or when nothing needs review", () => {
+  assert.ok(wizardSteps(null).every((s) => !s.error));
+  assert.ok(wizardSteps({ meals: [snack] }).every((s) => !s.error));
+  assert.equal(wizardSteps({ meals: [] })[2].error, "No se detectaron comidas en el PDF");
 });
