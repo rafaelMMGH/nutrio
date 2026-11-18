@@ -1,0 +1,88 @@
+/* Stepper styles, adapted from the uiarc Stepper (MIT, see stepper.tsx). Every class is prefixed `stepper-` so
+   Tailwind v4 never mistakes one for a utility. Upstream `--accent` maps to the project `--brand` scale. */
+
+/* Colours resolve to project tokens, so both themes follow them; tests/unit/stepper-contrast.test.ts checks every pair. */
+.stepper-root {
+  --stepper-surface: var(--surface);
+  --stepper-label-current: var(--text-1);
+  --stepper-label: var(--text-muted);
+  --stepper-description: var(--text-muted);
+  --stepper-error-text: var(--danger-ink);
+  --stepper-fill: var(--brand-fill);
+  --stepper-line-fill: var(--brand-accent);
+  --stepper-on-fill: var(--on-brand);
+  --stepper-marker-line: var(--text-3);
+  --stepper-connector: var(--text-3);
+  --stepper-error-line: var(--danger-edge);
+  --stepper-focus: var(--brand-text);
+  --stepper-marker: 1.75rem;
+  --stepper-halo: 4px;
+  min-width: 0;
+  color: var(--stepper-label-current);
+}
+/* Dark: --text-3 is brighter than the accent fill, so the track would read as the filled part. --line-strong keeps 3:1 but sits below the fill. */
+@media screen {
+  html.dark:not(:has([data-theme-lock])) .stepper-root { --stepper-connector: var(--line-strong); }
+}
+.stepper-list { display: grid; margin: 0; padding: 0; list-style: none; }
+.stepper-item { position: relative; min-width: 0; }
+.stepper-horizontal .stepper-list { grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); }
+.stepper-horizontal .stepper-item:not(:last-child) { padding-inline-end: 0.75rem; }
+.stepper-vertical .stepper-item:not(:last-child) { padding-bottom: 1.25rem; }
+
+/* Buttons and the keyboard stay on one head, so a chosen step keeps focus as it becomes the current one. */
+.stepper-head { display: grid; margin: 0; padding: 0; border: 0; border-radius: 8px; background: none; color: inherit; font: inherit; text-align: start; cursor: default; -webkit-tap-highlight-color: transparent; }
+.stepper-head[data-selectable] { cursor: pointer; }
+.stepper-horizontal .stepper-head { width: fit-content; max-width: 100%; justify-items: start; row-gap: 0.5rem; }
+.stepper-vertical .stepper-head { width: 100%; grid-template-columns: var(--stepper-marker) minmax(0, 1fr); column-gap: 0.75rem; align-items: start; }
+.stepper-head:focus-visible { outline: 2px solid var(--stepper-focus); outline-offset: 4px; }
+.stepper-head:focus:not(:focus-visible) { outline: none; }
+
+.stepper-marker { position: relative; display: grid; width: var(--stepper-marker); height: var(--stepper-marker); flex: none; place-items: center; }
+.stepper-ring { position: absolute; inset: calc(var(--stepper-halo) * -1); border-radius: 999px; background: var(--brand-100); }
+.stepper-disc { position: relative; display: grid; width: 100%; height: 100%; place-items: center; border-radius: 999px; background: var(--stepper-surface); box-shadow: inset 0 0 0 1px var(--stepper-marker-line); color: var(--stepper-label); font-size: 0.75rem; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1; transition: background-color 0.2s, box-shadow 0.2s, color 0.2s, transform 0.2s; }
+.stepper-glyph { display: grid; grid-area: 1 / 1; place-items: center; }
+.stepper-icon { width: 0.875rem; height: 0.875rem; }
+.stepper-item[data-status="current"] .stepper-disc { box-shadow: inset 0 0 0 1.5px var(--stepper-fill); color: var(--stepper-label-current); }
+.stepper-item[data-status="completed"] .stepper-disc { background: var(--stepper-fill); box-shadow: inset 0 0 0 1px var(--stepper-fill); color: var(--stepper-on-fill); }
+.stepper-item[data-status="error"] .stepper-disc { box-shadow: inset 0 0 0 1.5px var(--stepper-error-line); color: var(--stepper-error-text); }
+.stepper-item[data-status="error"] .stepper-ring { background: var(--danger-soft); }
+
+/* The track stays put; only the fill scales along it, from the step that was just reached. */
+.stepper-connector { position: absolute; overflow: hidden; border-radius: 999px; background: var(--stepper-connector); pointer-events: none; }
+.stepper-horizontal .stepper-connector { top: calc(var(--stepper-marker) / 2 - 1px); inset-inline: calc(var(--stepper-marker) + var(--stepper-halo) + 4px) calc(var(--stepper-halo) + 4px); height: 2px; }
+.stepper-vertical .stepper-connector { top: calc(var(--stepper-marker) + var(--stepper-halo) + 2px); bottom: calc(var(--stepper-halo) + 2px); inset-inline-start: calc(var(--stepper-marker) / 2 - 1px); width: 2px; }
+.stepper-fill { position: absolute; inset: 0; border-radius: inherit; background: var(--stepper-line-fill); }
+.stepper-horizontal .stepper-fill { transform-origin: left center; }
+.stepper-vertical .stepper-fill { transform-origin: center top; }
+
+.stepper-text { display: grid; min-width: 0; }
+.stepper-vertical .stepper-text { padding-top: 0.25rem; }
+.stepper-label { display: block; color: var(--stepper-label); font-size: 0.875rem; font-weight: 500; line-height: 1.25rem; overflow-wrap: anywhere; transition: color 0.2s; }
+.stepper-item[data-status="current"] .stepper-label, .stepper-item[data-status="error"] .stepper-label { color: var(--stepper-label-current); }
+.stepper-slot { display: block; }
+.stepper-slot-inner { position: relative; display: block; }
+.stepper-description, .stepper-error { display: block; padding-top: 2px; font-size: 0.75rem; line-height: 1.4; overflow-wrap: anywhere; }
+.stepper-description { color: var(--stepper-description); }
+.stepper-error { color: var(--stepper-error-text); }
+
+.stepper-caption { display: none; margin-top: 0.75rem; }
+.stepper-caption-label { display: block; color: var(--stepper-label-current); font-size: 0.875rem; font-weight: 500; line-height: 1.25rem; overflow-wrap: anywhere; }
+.stepper-caption .stepper-error { font-size: 0.875rem; line-height: 1.25rem; }
+
+.stepper-sr, .stepper-compact .stepper-text { position: absolute; width: 1px; height: 1px; margin: 0; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.stepper-compact.stepper-horizontal .stepper-caption { display: block; }
+
+/* Compact: a pseudo-element grows the 28px marker to a 44px by 44px hit area without moving the marker off the connector. */
+.stepper-compact .stepper-head { position: relative; }
+.stepper-compact .stepper-head::after { content: ""; position: absolute; inset: -8px; }
+
+@media (hover: hover) and (pointer: fine) {
+  .stepper-head[data-selectable]:hover .stepper-label { color: var(--stepper-label-current); }
+}
+.stepper-head[data-selectable]:active .stepper-disc { transform: scale(0.96); }
+
+@media (prefers-reduced-motion: reduce) {
+  .stepper-disc, .stepper-label { transition: none; }
+  .stepper-head[data-selectable]:active .stepper-disc { transform: none; }
+}
