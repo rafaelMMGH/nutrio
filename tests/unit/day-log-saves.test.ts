@@ -149,3 +149,80 @@ test("different dates do not wait for each other", async () => {
   await tick();
   assert.equal(calls.length, 2);
 });
+
+test("F1: unmark fails late (stale), then mark fails: rolls back to what the server has (done)", async () => {
+  const { logs, calls, saves, tick } = setup({ [DAY]: { meals_done: ["a"], water_glasses: 0 } });
+  const unmark = saves.setMeal(DAY, "a", false);
+  await tick();
+  const mark = saves.setMeal(DAY, "a", true); // accepted; wasDone read from optimistic state is false
+  calls[0].reject(); // late failure of the older request: stale, no rollback
+  assert.equal(await unmark, "stale");
+  await tick();
+  calls[1].reject();
+  assert.equal(await mark, "failed");
+  assert.deepEqual(logs[DAY].meals_done, ["a"]);
+});
+
+test("F1: mark fails late (stale), then unmark fails: rolls back to what the server has (pending)", async () => {
+  const { logs, calls, saves, tick } = setup();
+  const mark = saves.setMeal(DAY, "a", true);
+  await tick();
+  const unmark = saves.setMeal(DAY, "a", false);
+  calls[0].reject();
+  assert.equal(await mark, "stale");
+  await tick();
+  calls[1].reject();
+  assert.equal(await unmark, "failed");
+  assert.deepEqual(logs[DAY].meals_done, []);
+});
+
+test("F1: a stale success updates what the server has, so the next failure rolls back to it", async () => {
+  const { logs, calls, saves, tick } = setup();
+  const mark = saves.setMeal(DAY, "a", true);
+  await tick();
+  const unmark = saves.setMeal(DAY, "a", false);
+  calls[0].resolve(); // server now has "a" done
+  assert.equal(await mark, "stale");
+  await tick();
+  calls[1].reject();
+  assert.equal(await unmark, "failed");
+  assert.deepEqual(logs[DAY].meals_done, ["a"]);
+});
+
+test("F5: a failed save of another key leaves a meal change made meanwhile intact", async () => {
+  const { logs, calls, saves, tick } = setup({ [DAY]: { meals_done: [], water_glasses: 0, weight_kg: 70 } });
+  const weight = saves.save(DAY, { weight_kg: 71 });
+  await tick();
+  const meal = saves.setMeal(DAY, "a", true);
+  calls[0].reject();
+  assert.equal(await weight, false);
+  assert.equal(logs[DAY].weight_kg, 70);
+  assert.deepEqual(logs[DAY].meals_done, ["a"]);
+  await tick();
+  calls[1].resolve();
+  assert.equal(await meal, "saved");
+});
+
+test("F5: a failed save for a date with no prior log rolls back to the empty values", async () => {
+  const { logs, calls, saves, tick } = setup();
+  const result = saves.save(DAY, { water_glasses: 3 });
+  assert.equal(logs[DAY].water_glasses, 3);
+  await tick();
+  calls[0].reject();
+  assert.equal(await result, false);
+  assert.equal(logs[DAY].water_glasses, 0);
+  assert.deepEqual(logs[DAY].meals_done, []);
+});
+
+test("a throwing task does not break the queue", async () => {
+  const saves = createDaySaves({
+    send: (_d, body) => (body.water_glasses === 1 ? Promise.reject(new Error("x")) : Promise.resolve()),
+    read: () => ({ meals_done: [], water_glasses: 0 }),
+    write: () => {},
+    onError: () => {
+      throw new Error("toast broke");
+    },
+  });
+  await assert.rejects(saves.save(DAY, { water_glasses: 1 }));
+  assert.equal(await saves.save(DAY, { water_glasses: 2 }), true);
+});

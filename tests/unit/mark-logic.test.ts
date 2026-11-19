@@ -19,7 +19,7 @@ test("REQ-25b: taps are ignored until the lockout ends", () => {
   assert.equal(acceptTap({ pending: false, lockedUntil: 1400, now: 1400 }), true);
 });
 
-test("REQ-25d: meals are independent (each has its own lock)", () => {
+test("a lock on one meal does not block another", () => {
   const locks = new Map([["a", 2000]]);
   assert.equal(acceptTap({ pending: false, lockedUntil: locks.get("a") ?? 0, now: 1000 }), false);
   assert.equal(acceptTap({ pending: false, lockedUntil: locks.get("b") ?? 0, now: 1000 }), true);
