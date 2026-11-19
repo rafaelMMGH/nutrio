@@ -23,10 +23,9 @@ _Last updated: 2026-11-15 (alt-dashboard: KPI motion, scrollbar fix, 937px break
 - [ ] **Manual phone check** for the assistant (13 items, `specs/assistant-chat-polish/tasks.md` T041): iPhone Safari + VoiceOver, Android Chrome + TalkBack.
 
 - [ ] **Open the PR for `fix/e2e-run-guard`** (base `main`), already pushed.
-- [ ] **Restart Claude Code** so the new speed rules load. These are scout and size triage before grilling, sub-batches of about 300 lines, running only the affected tests while iterating plus one full run per batch, tests shown failing on purpose, and minor findings folded into the next batch. They live in `.claude/agents/*.md`, which is gitignored and local only, and in `docs/agent-workflow.md`.
+- [ ] **Restart Claude Code** so the new speed rules load. These are scout and size triage before grilling, sub-batches of about 300 lines, running only the affected tests while iterating plus one full run per batch, tests shown failing on purpose, and minor findings folded into the next batch. They live in `.claude/agents/*.md` and `docs/agent-workflow.md`, both versioned since 2026-11-18.
 - [ ] **Decide on uncommitted local changes** that have been kept out of every commit so far:
   - the deletion of `src/server.js` and `package.json` dropping the `legacy:dev` script (both currently inside `stash@{0}`, see the run guard above)
-  - `.claude/`, which is gitignored; un-ignore it to share the agents with the repo
 
 ## Assistant chat (follow-ups)
 
@@ -53,6 +52,8 @@ Findings, with file:line references: `specs/bugs/shopping-list-findings.md`.
 - [ ] Optional: in `src/lib/client/theme.ts`, after a real reveal-update failure, call `applyTheme(next)` as a fallback so the stored choice and the page agree.
 
 ## Done
+
+- 2026-11-18: **`specs/`, `docs/` and `.claude/` versioned** (`refactor/version-specs-docs-agents`): they were gitignored since `c006995`, so specs for cooking-mode, metric-dials and upload-wizard-stepper, the PRD and the agent definitions existed only on this machine. Note: `specs/refactors/version-specs-docs-agents.md`.
 
 - 2026-11-15: **`alt-dashboard` session** (all on the branch, not pushed): KPI tiles in glass (`05e2f46`); the `prefers-reduced-motion` rule removed from `CLAUDE.md` at the user's request (`2046b9c`); playful KPI tile motion, CSS only, with three e2e tests (`1caee72`); hairline on the profile pill (`c0ffcd2`); dashboard fits wide, short windows without a page scrollbar (`a2560ec`, note `specs/bugs/dashboard-fit-scroll.md`); "Notas" button removed (`e6e7708`); compact breakpoint moved from 767px to 937px project-wide with a `CLAUDE.md` rule and Tailwind `md` at 938px (`f3a71b7`).
 

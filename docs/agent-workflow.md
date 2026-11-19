@@ -26,7 +26,7 @@ specs/_templates/             spec, plan, tasks, bug, refactor, checklist
 1. Agents, settings, the `grilling` skill (from https://github.com/mattpocock/skills/blob/main/skills/productivity/grilling/SKILL.md) and `specs/_templates/` are installed.
 2. `CLAUDE.md` keeps its existing project context; the "Principles", "Always ask" and "Spec-driven workflow" sections were appended.
 3. **To do:** edit `CONSTITUTION.md` so it holds 5–10 principles the team agrees on.
-4. **To do:** `.gitignore` ignores `.claude/`, so agents and settings are local only until that is changed.
+4. `.claude/` is versioned (agents, `settings.json`, the `grilling` and `landing-page-design` skills). `settings.local.json`, `worktrees/` and the third-party skills (symlinks into `.agents/`, listed in `skills-lock.json`) stay local.
 5. Prerequisites: Git, and the GitHub CLI (`gh`) for PR reviews and design PRs.
 6. Start Claude Code in the project. You should be talking to the orchestrator; `/agents` lists all seven.
 
