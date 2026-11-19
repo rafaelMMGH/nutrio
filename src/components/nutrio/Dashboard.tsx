@@ -40,8 +40,7 @@ export function Dashboard({ meals, dailyLogs, kcalGoal, proteinPct, weightGoal: 
   const todayLog = logs.get(today);
 
   function toggleMeal(mealId: string, done: boolean) {
-    const rest = todayLog.meals_done.filter((id) => id !== mealId);
-    void logs.save(today, { meals_done: done ? [...rest, mealId] : rest });
+    return logs.setMeal(today, mealId, done);
   }
 
   async function saveWeight(weight: number | null, goal: number | null) {
