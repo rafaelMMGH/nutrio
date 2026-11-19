@@ -2,17 +2,13 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { ArrowUpRight, Check, ChefHat, Clock, CookingPot, Star } from "lucide-react";
+import { ArrowUpRight, Beef, Clock, CookingPot, Star } from "lucide-react";
 import { foodIcon, mealLabel, mealTitle, type Meal } from "@/components/dashboard/food";
 import { prepMinutes, recipeRating } from "@/lib/metrics";
-import { HoldToConfirm } from "./HoldToConfirm";
-import { CookingModeIcon } from "@/components/cooking/CookingModeIcon";
+import { ActionButton } from "@/components/arc/action-button/action-button";
+import type { MealResult } from "./day-log-saves";
+import { TAP_LOCK_MS, acceptTap, createAdvance } from "./mark-logic";
 import { DottedProgress, Figure, IconBadge, Pill } from "./primitives";
-
-// How long after the hold completes the carousel waits before moving to the next pending meal, so the drawn check and "Cumplida" are seen first.
-const ADVANCE_DELAY = 900;
-// How long "Marcar cumplida" must be held.
-const HOLD_MS = 800;
 
 // Fixed until the real logic exists (alt-dashboard P9).
 const PREP_PROGRESS = 0.68;
@@ -26,15 +22,13 @@ const SPOTS = [
   { x: 36, y: 32, size: 96 },
   { x: 52, y: 76, size: 88 }
 ];
-/** Where the Modo Cocina dot sits, near the plate's centre (% of the plate). */
-const COOK_DOT = { x: 44, y: 55 };
 
 function plateIcons(meal: Meal) {
   const icons = (meal.recipe?.ingredients ?? []).map((item) => foodIcon(item.name, item.category));
   return [...new Set(icons)].slice(0, SPOTS.length);
 }
 
-type Props = { meals: Meal[]; doneIds: string[]; onToggle: (mealId: string, done: boolean) => void };
+type Props = { meals: Meal[]; doneIds: string[]; onToggle: (mealId: string, done: boolean) => Promise<MealResult> };
 
 // Left column (alt-dashboard §5.3): one slide per meal option of today, in the plan's order. No autoplay.
 export function Hero({ meals, doneIds, onToggle }: Props) {
@@ -42,23 +36,64 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
   const [index, setIndex] = useState(() => Math.max(0, meals.findIndex((meal) => !doneIds.includes(meal.id))));
   const meal = meals[Math.min(index, meals.length - 1)];
 
-  // After marking a meal done the carousel moves on to the next pending one. The short wait lets "Cumplida" show first.
-  const advance = useRef<number | undefined>(undefined);
-  const cancelAdvance = () => window.clearTimeout(advance.current);
-  useEffect(() => cancelAdvance, []);
-  function go(next: number) {
-    cancelAdvance();
-    setIndex(next);
+  // Meals whose mark is being saved, and until when each ignores further taps (specs/dashboard-polish REQ-25).
+  const [saving, setSaving] = useState<ReadonlySet<string>>(new Set());
+  const lockedUntil = useRef(new Map<string, number>());
+  // What the status region says (REQ-24); empty after a failure, which only the toast reports.
+  const [said, setSaid] = useState("");
+  // Read when a timer or a save settles, after the render that started it.
+  const live = useRef({ mealId: meal?.id, doneIds, saving });
+  live.current = { mealId: meal?.id, doneIds, saving };
+
+  // After a mark is saved the carousel moves on to the next pending meal (REQ-6); the wait lets "Cumplida" show first.
+  const [advance] = useState(createAdvance);
+  // The meal the pending advance was armed for: only a rollback of that meal cancels it (REQ-25d).
+  const advanceFor = useRef<string | null>(null);
+  const mounted = useRef(false);
+  const reannounce = useRef<ReturnType<typeof setTimeout>>(undefined);
+  // Set on every mount, not just initially: strict mode runs effect, cleanup, effect.
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      advance.cancel();
+      clearTimeout(reannounce.current);
+    };
+  }, [advance]);
+  function say(text: string) {
+    clearTimeout(reannounce.current);
+    setSaid(text);
   }
-  function toggle(mealId: string, done: boolean) {
-    cancelAdvance();
-    onToggle(mealId, done);
-    if (!done) return;
-    // The next meal after this one that is still pending, wrapping around; with none left the slide stays.
-    const pending = (id: string) => id !== mealId && !doneIds.includes(id);
-    const steps = meals.map((_, step) => (index + step) % meals.length).slice(1);
-    const next = steps.find((position) => pending(meals[position].id));
-    if (next !== undefined) advance.current = window.setTimeout(() => setIndex(next), ADVANCE_DELAY);
+  function go(next: number) {
+    advance.cancel();
+    setIndex(next);
+    const target = meals[next].id;
+    if (live.current.saving.has(target)) return say("Guardando");
+    if (!live.current.doneIds.includes(target)) return say("");
+    // Moving between two done meals would leave the same text, which a screen reader does not announce again: clear first.
+    say("");
+    reannounce.current = setTimeout(() => setSaid("Cumplida"), 80);
+  }
+
+  async function press(mealId: string) {
+    if (!acceptTap({ pending: saving.has(mealId), lockedUntil: lockedUntil.current.get(mealId) ?? 0, now: Date.now() })) return;
+    lockedUntil.current.set(mealId, Date.now() + TAP_LOCK_MS);
+    advance.cancel();
+    const marking = !doneIds.includes(mealId);
+    if (marking) setSaving((current) => new Set(current).add(mealId));
+    say(marking ? "Guardando" : "Comida desmarcada");
+    const result = await onToggle(mealId, marking);
+    if (!mounted.current) return;
+    if (marking) setSaving((current) => new Set([...current].filter((id) => id !== mealId)));
+    const onScreen = live.current.mealId === mealId;
+    if (result === "failed") {
+      if (advanceFor.current === mealId) advance.cancel();
+      if (onScreen) say("");
+    } else if (result === "saved" && marking && onScreen) {
+      say("Cumplida");
+      advanceFor.current = mealId;
+      advance.start(meals.findIndex((item) => item.id === mealId), meals, () => live.current.doneIds, go);
+    }
   }
 
   if (!meal) {
@@ -80,6 +115,7 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
   }
 
   const title = mealTitle(meal);
+  const dish = title.trim();
   const icons = plateIcons(meal);
   const done = doneIds.includes(meal.id);
   const recipeHref = meal.recipe ? `/recipes/${meal.recipe.id}` : "/recipes";
@@ -104,23 +140,19 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
           <Pill tone="surface" className="nt-rating" aria-label={`Puntuación ${rating} de 5`}>
             <Star size={16} fill="var(--nt-yellow-accent)" stroke="var(--nt-yellow-accent)" aria-hidden /> {rating}
           </Pill>
-          <HoldToConfirm
-            key={meal.id}
-            className={`nt-done${done ? " is-done" : ""}`}
+          <ActionButton
             label="Marcar cumplida"
-            confirmedLabel="Cumplida"
-            duration={HOLD_MS}
-            icon={<Check size={16} aria-hidden />}
-            confirmed={done}
-            onConfirm={() => toggle(meal.id, true)}
-            onUndo={() => toggle(meal.id, false)}
+            pendingLabel="Guardando"
+            successLabel="Cumplida"
+            state={saving.has(meal.id) ? "pending" : done ? "success" : "idle"}
+            instantKey={meal.id}
+            onPress={() => void press(meal.id)}
           />
-          {meal.recipe && (
-            <Link href={`/recipes/${meal.recipe.id}/cook`} className="nt-pill tone-ink nt-cook">
-              <ChefHat size={16} aria-hidden /> Modo Cocina
-            </Link>
-          )}
         </div>
+      </div>
+      {/* Outside .nt-hero-copy, which is already a live region: nested regions are announced twice. */}
+      <div role="status" className="sr-only">
+        {said}
       </div>
 
       {/* Plate drawn in CSS with the recipe's ingredient icons: the recipes have no photos yet (ronda 2, R1). */}
@@ -132,15 +164,21 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
           ) : (
             <img src="/food/plate.png" alt="" className="nt-plate-food" style={{ left: "50%", top: "48%", width: "26%" }} aria-hidden />
           )}
-          {/* The only dot on the plate opens Modo Cocina for the meal on screen (specs/cooking-mode REQ-4). */}
-          {meal.recipe && (
-            <Link href={`/recipes/${meal.recipe.id}/cook`} className="nt-plate-dot nt-cook-dot" style={{ left: `${COOK_DOT.x}%`, top: `${COOK_DOT.y}%` }} aria-label={`Modo Cocina: ${title}`}>
-              <span className="nt-cook-tip" aria-hidden>
-                <CookingModeIcon size={14} /> Modo Cocina
+        </div>
+        {/* A sibling of the plate, not inside it: unkeyed, unmasked and unanimated, so the pill stays still while the plate animates in
+            (specs/dashboard-polish REQ-30). It opens Modo Cocina for the meal on screen (specs/cooking-mode REQ-4). */}
+        {meal.recipe && (
+          <div className="nt-cook-layer">
+            <Link href={`/recipes/${meal.recipe.id}/cook`} className="nt-cook-pill" aria-label={dish ? `Modo Cocina: ${dish}` : "Modo Cocina"}>
+              <span className="nt-cook-badge" aria-hidden>
+                <Beef size={18} />
+              </span>
+              <span className="nt-cook-text">
+                <span className="nt-cook-title">Abrir Modo Cocina</span>
               </span>
             </Link>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {meals.length > 1 && (

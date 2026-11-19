@@ -51,6 +51,14 @@
   --nt-dial-knob: #232428;
   --nt-dial-line: #7a7d86;
   --nt-dial-focus: #ffffff;
+  /* "Modo Cocina" pill on the plate (specs/dashboard-polish REQ-17, 19): smoked dark glass with white text, the same in both
+     themes. The glass is translucent, so tests/unit/cook-pill-contrast.test.ts measures it over every colour that can sit behind it
+     (worst case a white plate: title 7.2:1, subtitle 5.0:1, edge 4.0:1); --nt-cook-opaque is the variant for reduced transparency. */
+  --nt-cook-glass: #14151a;
+  --nt-cook-glass-alpha: 72%;
+  --nt-cook-opaque: #1c1d23;
+  --nt-cook-edge: #bfc1c8;
+  --nt-cook-sub: #d6d8de;
   color: var(--nt-ink);
 }
 /* The geometric sans only applies to the new frame and the dashboard; inner pages keep their own typeface. */
@@ -81,4 +89,6 @@ html.dark:not(:has([data-theme-lock])) .nt {
   --nt-glass-hover: rgb(255 255 255 / 0.08);
   --nt-danger: #ff8f82;
   --nt-danger-bg: rgb(255 143 130 / 0.12);
+  --nt-cook-glass: #0c0d10;
+  --nt-cook-opaque: #17181d;
 }

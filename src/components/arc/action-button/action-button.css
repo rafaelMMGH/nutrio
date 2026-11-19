@@ -1,0 +1,67 @@
+/* Colours come from the --nt-* tokens through --arc-ab-* (checked in tests/unit/action-button-contrast.test.ts, REQ-26). */
+.arc-ab {
+  --arc-ab-fg: var(--nt-ink);
+  --arc-ab-bg: var(--nt-surface);
+  --arc-ab-border: var(--nt-border);
+  --arc-ab-icon: var(--arc-ab-fg);
+  --arc-ab-spinner: var(--arc-ab-fg);
+  --arc-ab-ring-inner: var(--nt-surface);
+  --arc-ab-ring-outer: var(--nt-ink);
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--arc-ab-border);
+  border-radius: var(--nt-radius-pill);
+  background: var(--arc-ab-bg);
+  color: var(--arc-ab-fg);
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+/* The done look is today's ink fill with inverse text. */
+.arc-ab[data-state="success"] {
+  --arc-ab-fg: var(--nt-on-ink);
+  --arc-ab-bg: var(--nt-ink);
+  --arc-ab-border: var(--nt-ink);
+}
+.arc-ab[data-state="pending"] { cursor: progress; }
+/* A 44x44 hit area around the 40 px pill without changing the layout (REQ-2). */
+.arc-ab::before {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: max(100%, 44px);
+  height: 44px;
+  translate: -50% -50%;
+}
+/* The element in the selector lifts it to (0,3,1), above the shell's .nt :is(a, button, [tabindex]):focus-visible (0,3,0), which would
+   otherwise replace this ring and the forced-colors outline below. */
+.nt button.arc-ab:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--arc-ab-ring-inner), 0 0 0 4px var(--arc-ab-ring-outer);
+}
+/* The slot clips the rising letters, not the button, so the focus ring and hit area stay whole. */
+.arc-ab-slot { display: inline-flex; overflow: hidden; padding: 0.2em 0; margin: -0.2em 0; }
+.arc-ab-text { display: inline-flex; white-space: pre; }
+.arc-ab-letter { display: inline-block; white-space: pre; }
+/* The visible label is aria-hidden; this one copy names the button in every state. */
+.arc-ab-name { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.arc-ab-icon { display: inline-grid; width: 16px; height: 16px; place-items: center; color: var(--arc-ab-icon); }
+.arc-ab-icon > * { grid-area: 1 / 1; display: grid; place-items: center; }
+.arc-ab-spinner { color: var(--arc-ab-spinner); }
+@media (prefers-reduced-motion: no-preference) {
+  .arc-ab-spinner svg { animation: arc-ab-spin 800ms linear infinite; }
+}
+@keyframes arc-ab-spin { to { transform: rotate(360deg); } }
+@media (forced-colors: active) {
+  .arc-ab { border: 1px solid CanvasText; }
+  .nt button.arc-ab:focus-visible { outline: 2px solid Highlight; outline-offset: 2px; box-shadow: none; }
+  .arc-ab-icon path { stroke: CanvasText; }
+}
