@@ -36,3 +36,10 @@ export function kpiContexts({ planned, plan, newRecipes, recipes, pending, groce
     groceries: pending === 0 ? "sin pendientes" : groceries.source === "list" ? `de ${groceries.total} en lista` : "en el carrito"
   };
 }
+
+// The Racha tile's number and line (REQ-14).
+export function streakText({ current, best }: { current: number; best: number }) {
+  const value = `${current} ${current === 1 ? "día" : "días"}`;
+  const context = current === 0 ? "Empieza hoy" : current === best ? "¡Tu mejor racha!" : `mejor: ${best}`;
+  return { value, context };
+}

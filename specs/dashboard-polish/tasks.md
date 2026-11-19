@@ -57,12 +57,12 @@ None. Each story's groundwork is inside its own batch.
 
 ### Batch US2a: streak rules (≈200 lines)
 
-- [ ] T019 [P] [US2] Unit tests for `streaks`: the REQ-11, REQ-12 and REQ-13 Givens except the free-day ones (unreachable with today's static schedule, Q7): complete, incomplete, unknown ids ignored, plan grows, earliest-log start, today incomplete not breaking, best never below current, unmark lowering best; plus empty `slotIds` gives `{ current: 0, best: 0 }` (tests/unit/streak.test.ts)
-- [ ] T020 [P] [US2] Unit tests for `streakText`: all REQ-14 Givens, "1 día" (tests/unit/kpis.test.ts)
-- [ ] T021 [P] [US2] Unit tests for `nextToday(current, now)`: same local day returns `current` unchanged; past local midnight returns the new key (REQ-28) (tests/unit/use-today.test.ts)
-- [ ] T022 [US2] Implement `streaks({ logs, slotIds, today })` (src/lib/streak.ts)
-- [ ] T023 [US2] Add `streakText` (src/lib/kpis.ts)
-- [ ] T024 [US2] `useToday()` with exported `nextToday`, recomputed on `focus` and `visibilitychange` (REQ-28) (src/components/nutrio/useToday.ts)
+- [x] T019 [P] [US2] Unit tests for `streaks`: the REQ-11, REQ-12 and REQ-13 Givens except the free-day ones (unreachable with today's static schedule, Q7): complete, incomplete, unknown ids ignored, plan grows, earliest-log start, today incomplete not breaking, best never below current, unmark lowering best; plus empty `slotIds` gives `{ current: 0, best: 0 }` (tests/unit/streak.test.ts)
+- [x] T020 [P] [US2] Unit tests for `streakText`: all REQ-14 Givens, "1 día" (tests/unit/kpis.test.ts)
+- [x] T021 [P] [US2] Unit tests for `nextToday(current, now)`: same local day returns `current` unchanged; past local midnight returns the new key (REQ-28) (tests/unit/use-today.test.ts)
+- [x] T022 [US2] Implement `streaks({ logs, slotIds, today })` (src/lib/streak.ts)
+- [x] T023 [US2] Add `streakText` (src/lib/kpis.ts)
+- [x] T024 [US2] `useToday()` with exported `nextToday`, recomputed on `focus` and `visibilitychange` (REQ-28) (src/components/nutrio/useToday.ts)
 
 **Checkpoint:** US2a reviewed and committed; unit tests green, screen unchanged.
 

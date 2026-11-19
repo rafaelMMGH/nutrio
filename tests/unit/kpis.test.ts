@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { countDoneToday, countSince, kpiContexts, planContext } from "@/lib/kpis";
+import { countDoneToday, countSince, kpiContexts, planContext, streakText } from "@/lib/kpis";
 
 describe("countDoneToday", () => {
   it("counts only done ids that belong to today's meals", () => {
@@ -68,5 +68,19 @@ describe("kpiContexts", () => {
   });
   it("says cart when there is no list", () => {
     assert.equal(kpiContexts({ ...base, groceries: { source: "cart", total: 4 }, pending: 4 }).groceries, "en el carrito");
+  });
+});
+
+describe("streakText (REQ-14)", () => {
+  it("shows the best run normally", () => {
+    assert.deepEqual(streakText({ current: 3, best: 9 }), { value: "3 días", context: "mejor: 9" });
+  });
+  it("celebrates when the current streak is the best and above 0", () => {
+    assert.deepEqual(streakText({ current: 9, best: 9 }), { value: "9 días", context: "¡Tu mejor racha!" });
+    assert.deepEqual(streakText({ current: 1, best: 1 }), { value: "1 día", context: "¡Tu mejor racha!" });
+  });
+  it("invites to start at 0, with or without a past best", () => {
+    assert.deepEqual(streakText({ current: 0, best: 9 }), { value: "0 días", context: "Empieza hoy" });
+    assert.deepEqual(streakText({ current: 0, best: 0 }), { value: "0 días", context: "Empieza hoy" });
   });
 });
