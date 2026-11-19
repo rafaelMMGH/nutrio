@@ -17,20 +17,20 @@ Per batch:
   - First, `DESIGN.md` and `PRODUCT.md` as they are in the working tree, alone ("docs: track DESIGN.md and PRODUCT.md").
   - Then the annotations: the D14 notes in `specs/metric-dials/spec.md`, `specs/dashboard-polish/spec.md`, `specs/alt-dashboard/plan.md` and `specs/alt-dashboard/entrega.md`, `specs/BACKLOG.md`, and `specs/dashboard-real-data/`. First fix the alt-dashboard plan note's "(borrador, …)" to read approved.
   - Leave `.claude/agents/impeccable-*` and `.codex/` untracked and out of both commits (DESIGN.md, PRODUCT.md, specs/)
-- [ ] T002 [Setup] Measure the current `.nt-cal` card with the e2e harness. Use a throwaway spec run once and deleted, never committed. Alternatively, use an isolated `next dev` on a cloned DB with `NEXT_DIST_DIR=.next-e2e-measure`. Never `next build`.
+- [x] T002 [Setup] Measure the current `.nt-cal` card with the e2e harness. Use a throwaway spec run once and deleted, never committed. Alternatively, use an isolated `next dev` on a cloned DB with `NEXT_DIST_DIR=.next-e2e-measure`. Never `next build`.
   - Viewports: 1440×900, 1440×780, 1280×768, 1920×1080, 1920×800, 937×900 and 390×844.
   - Measure: card height, padding, header height plus gap, and the resulting list height.
   - Record the numbers in plan.md §Measurements and fix the row default, phone cap and fade height (44px minimum fixed) (REQ-7) (specs/dashboard-real-data/plan.md)
 
 ## Phase 2: Foundational (blocks all stories)
 
-- [ ] T003 [P] [Foundational] Contrast unit test, light and dark (NFR, REQ-7, REQ-18). Read tokens.css and fail while the tokens are missing:
+- [x] T003 [P] [Foundational] Contrast unit test, light and dark (NFR, REQ-7, REQ-18). Read tokens.css and fail while the tokens are missing:
   - Against `--nt-yellow`, `--nt-yellow-hover` and `--nt-yellow-press`: `--nt-on-accent` ≥4.5:1 and `--nt-on-accent-sub` ≥4.5:1.
   - Against `--nt-yellow`: focus ring, selected marker and check icon (`--nt-on-accent`) ≥3:1, and `--nt-on-accent-line` ≥3:1.
   - Against `--nt-sky`: `--nt-on-accent` and `--nt-on-accent-sub` ≥4.5:1, and the arc fill `--nt-sky-deep` ≥3:1.
   (tests/unit/real-data-contrast.test.ts)
-- [ ] T004 [Foundational] Add `--nt-on-accent`, `--nt-on-accent-sub`, `--nt-on-accent-line`, `--nt-yellow-hover` and `--nt-yellow-press` to `.nt` so T003 passes. Values per plan §Tokens: `--nt-yellow-press: var(--nt-yellow-accent)` and `--nt-on-accent-line: var(--nt-on-accent-sub)`; the other three are hex with the primitive named in a comment (neutral-900, neutral-600, butter-100), because no primitive variables exist in `src` (DESIGN §11 is a proposal only) and `--nt-ink` flips in dark. Add a comment with the measured ratios (src/components/nutrio/tokens.css)
-- [ ] T005 [P] [Foundational] Pass `planCreatedAt` (the current version's `created_at` when `summary.schedule` is non-null, else `null`) from the page. Add it to `DashboardProps`; it is unused until T015 (REQ-10, REQ-12) (src/app/(dashboard)/page.tsx, src/components/nutrio/Dashboard.tsx)
+- [x] T004 [Foundational] Add `--nt-on-accent`, `--nt-on-accent-sub`, `--nt-on-accent-line`, `--nt-yellow-hover` and `--nt-yellow-press` to `.nt` so T003 passes. Values per plan §Tokens: `--nt-yellow-press: var(--nt-yellow-accent)` and `--nt-on-accent-line: var(--nt-on-accent-sub)`; the other three are hex with the primitive named in a comment (neutral-900, neutral-600, butter-100), because no primitive variables exist in `src` (DESIGN §11 is a proposal only) and `--nt-ink` flips in dark. Add a comment with the measured ratios (src/components/nutrio/tokens.css)
+- [x] T005 [P] [Foundational] Pass `planCreatedAt` (the current version's `created_at` when `summary.schedule` is non-null, else `null`) from the page. Add it to `DashboardProps`; it is unused until T015 (REQ-10, REQ-12) (src/app/(dashboard)/page.tsx, src/components/nutrio/Dashboard.tsx)
 
 **Checkpoint:** Foundation reviewed and committed; screen unchanged; tsc and unit tests green.
 

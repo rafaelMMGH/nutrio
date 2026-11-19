@@ -101,9 +101,27 @@ The arc fill stays `--nt-sky-deep` (~5.6:1 on sky, ≥3:1 required). DESIGN.md r
 
 The spec defaults are a 56px row, 44px minimum, 336px cap and 16px fade. The available list height in the current `.nt-cal` card (card content box minus header and gap) was never measured. The scout's estimate is about 200px at 1440×900, consistent with the 273px card in `specs/bugs/dashboard-fit-scroll.md`. T002 measures the card at 1440×900, 1440×780, 1280×768, 1920×1080, 1920×800, 937×900 and 390×844 and records the results here. It then fixes `<row>`, `<cap>` and `<fade>` (the 44px minimum is fixed) before any CSS is written.
 
-| Viewport | card h | header + gap | list h | rows at 56 | Chosen |
-|---|---|---|---|---|---|
-| (to fill in T002) | | | | | |
+Measured with a throwaway e2e spec (deleted afterwards) on the current `.nt-cal` card, the e2e clone of the real data. List height = card height minus padding top and bottom minus header (36px) minus the row gap. "Rows at 56" is list height / 56; "5 meals" is the row height 5 meals get when they share the list, before the 44px floor.
+
+| Viewport | card h | padding (v / h) | header + gap | list h | rows at 56 | 5 meals share | Page scrolls |
+|---|---|---|---|---|---|---|---|
+| 1440×900 | 278.5 | 18 / 22 | 36 + 12 | 194.5 | 3.5 | 38.9 (floor 44, scrolls) | no |
+| 1440×780 | 227.5 | 14 / 20 | 36 + 8 | 155.5 | 2.8 | 31.1 (floor 44, scrolls) | no |
+| 1280×768 | 227.5 | 14 / 20 | 36 + 8 | 155.5 | 2.8 | 31.1 (floor 44, scrolls) | no |
+| 1920×1080 | 374.5 | 18 / 22 | 36 + 12 | 290.5 | 5.2 | 58.1 (fits at 56) | no |
+| 1920×800 | 227.5 | 14 / 20 | 36 + 8 | 155.5 | 2.8 | 31.1 (floor 44, scrolls) | no |
+| 937×900 | 300 (min-height) | 18 / 22 | 36 + 12 | 216 | 3.9 | not applicable (list has its own height) | yes |
+| 390×844 | 300 (min-height) | 18 / 22 | 36 + 12 | 216 | 3.9 | not applicable (list has its own height) | yes |
+
+Card width is 312.6px at 1280, 358.2px at 1440 and 495px at 1920. Heights of 1440×780, 1280×768 and 1920×800 are identical because the short-screen rules (`max-height: 899px`) take over and the card row is the same.
+
+**Chosen (the spec defaults hold):**
+- `<row>` = 56px (rows stay at 56px while they fit and shrink evenly down to 44px).
+- `<cap>` = 336px (6 rows of 56px) for `max-width: 1279px`; the list has its own height there because the page scrolls, so the card's 300px min-height does not limit it (216px of list would show only 3.9 rows).
+- `<fade>` = 16px (well under the 44px row floor, so a row is never fully hidden by it).
+- Minimum row = 44px (fixed).
+
+**What this means on desktop:** at 1280 to 1440px wide and 768 to 900px tall the list is 155 to 195px, so it shows 3.5 to 4.4 rows at the 44px floor. A plan of 5 or more meals scrolls there (REQ-7 accepts this; the fade and edge cues carry it); 3 meals fit at 51 to 56px each, 4 meals fit at 900px high (48.6px) but not at 768px high (38.9px, so the floor and scrolling apply). At 1920×1080 up to 5 meals fit at 56px.
 
 ## Dependencies
 
