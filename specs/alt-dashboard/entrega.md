@@ -36,7 +36,7 @@ Otras decisiones menores:
 
 1. Fotos reales de platillos (API de imágenes, R1): hoy el plato muestra iconos.
 2. Calorías y proteína reales: requieren kcal y macros por receta o un registro de consumo.
-3. Lógica real de las tarjetas amarilla y celeste y del 68 % de «Preparación actual» (marcadas `TODO: solo visual`).
+3. Lógica real de las tarjetas amarilla y celeste y del 68 % de «Preparación actual» (marcadas `TODO: solo visual`). Las dos tarjetas: ver `specs/dashboard-real-data/`; el 68 % sigue pendiente (backlog de esa spec).
 4. Análisis, alertas, notas y bandeja siguen sin acción.
 5. ¿Deben volver al dashboard el registro de agua y ejercicio y la edición de horarios?
 6. El carrusel muestra la primera opción de cada comida (lo mismo que el calendario anterior). ¿Debe mostrar todas las opciones?

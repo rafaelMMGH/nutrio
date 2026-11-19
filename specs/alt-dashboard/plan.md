@@ -192,6 +192,8 @@ Si un valor supera el 100 % (por ejemplo, calorías por encima del objetivo), el
 
 ### 5.6 Tarjetas amarilla y celeste (fila 3) — solo visuales
 
+> Superseded by `specs/dashboard-real-data/` (aprobado, 19 nov 2026): las dos tarjetas dejan de ser estáticas y pasan a mostrar datos reales («Comidas de hoy» y conteos de «Cumplimiento del plan»). Lo que sigue describe el diseño original.
+
 Réplica exacta de la imagen en estructura, proporciones y estilo, con datos ficticios fijos y sin interacción. Textos según P6. Elementos a reproducir:
 
 - **Amarilla:** icono en círculo, título, selector «Hoy» con `chevron-down` (no abre), cifra grande, insignia de variación con `arrow-up`, dos métricas secundarias a la derecha con separador vertical, gráfica de 9 barras con relleno de trama y eje horario.

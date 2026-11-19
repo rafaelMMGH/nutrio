@@ -6,7 +6,11 @@ _Last updated: 2026-11-18 (PRs #12 and #13 merged: upload wizard, cooking mode, 
 
 ## In progress
 
-- [ ] **Dashboard polish (`specs/dashboard-polish/`, spec v1.0 `draft`, local, not committed yet).** "Marcar cumplida" becomes a one-tap button, KPI 1 "Comidas" becomes "Racha", and the hero's Modo Cocina dot becomes a frosted-glass pill. Next: verify, Gate 1. It supersedes cooking-mode REQ-4/D1 and alt-dashboard plan §5.4 KPI 1 (notes already added to those specs, uncommitted).
+- [ ] **Dashboard polish follow-ups** (spec `implemented`, PR #16): T037 (US3 screenshots for the user) and T038 (regenerate the home visual snapshot and `specs/alt-dashboard/screenshots/` after the user approves the visuals) were never ticked.
+- [ ] **Real data on the dashboard cards** (`specs/dashboard-real-data/`, spec v1.2 `planned`, Feature route, size large): today's meal timeline replaces the fake Calorías card (US1), real plan-compliance counts in Cumplimiento (US2). Next: implement on `feature/dashboard-real-data`, starting with setup (T001-T002).
+- [ ] **Hero placeholders (later phases, by decision 2026-11-19):** star rating from shared recipes (multi-user phase); prep progress from Modo Cocina's stepper. They stay unmarked until then.
+- [ ] **Parser keeps the full time window** ("Entre 7 a 8 am" → 07:00–08:00); today only the start is stored (`pdf-plan.ts` parseTimeWindow).
+- [ ] **Possible bug (hero pager):** if the last meal is removed while it's shown, the index clamp leaves no pager dot selected. Kept as-is by Gate 2 decision (dashboard-real-data REQ-22); needs a bug-fix route if the user wants it fixed.
 
 ## Dashboard redesign (on `main` since PR #13; follow-ups)
 
@@ -62,6 +66,7 @@ Findings, with file:line references: `specs/bugs/shopping-list-findings.md`.
 
 ## Done
 
+- 2026-11-19: **Dashboard polish** merged as PR #16 (spec `implemented`): one-tap "Marcar cumplida", Racha KPI, Modo Cocina glass pill.
 - 2026-11-18: **E2E database and server per worker** (`refactor/e2e-db-per-worker`): 3 workers by default (`E2E_WORKERS`), full suite 32.9 → about 18 min with the same results. Note: `specs/refactors/e2e-db-per-worker.md`.
 - 2026-11-18: **Upload wizard stepper** merged as PR #12 (spec v1.3.4 `implemented`; T016 e2e gate passed). **Dashboard redesign, Modo Cocina and metric dials (US1)** merged as PR #13 (`alt-dashboard`).
 - 2026-11-18: **`specs/`, `docs/` and `.claude/` versioned** (`refactor/version-specs-docs-agents`): they were gitignored since `c006995`, so specs for cooking-mode, metric-dials and upload-wizard-stepper, the PRD and the agent definitions existed only on this machine. Note: `specs/refactors/version-specs-docs-agents.md`.
