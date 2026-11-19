@@ -174,8 +174,7 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
                 <Beef size={18} />
               </span>
               <span className="nt-cook-text">
-                <span className="nt-cook-title">Modo Cocina</span>
-                {dish && <span className="nt-cook-sub">{dish}</span>}
+                <span className="nt-cook-title">Abrir Modo Cocina</span>
               </span>
             </Link>
           </div>
