@@ -24,12 +24,14 @@
   line-height: 1.2;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 .nt-hero-meal { margin-top: -8px; font-size: 14px; color: var(--nt-muted); }
 .nt-hero-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
-.nt-rating { height: 40px; font-size: 15px; }
+/* Scoped so the height does not depend on whether primitives.css or this file is injected last: both are one class deep. */
+.nt-hero-actions .nt-rating { height: 40px; font-size: 15px; }
 .nt-hero-empty { margin-top: 20px; font-size: 28px; font-weight: 300; max-width: 320px; position: relative; z-index: 2; }
 .nt-hero.is-empty > .nt-pill { margin-top: 40px; align-self: flex-start; position: relative; z-index: 2; }
 .nt-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 16px; align-self: flex-start; color: var(--nt-ink); font-size: 14px; position: relative; z-index: 2; border-radius: 6px; }
