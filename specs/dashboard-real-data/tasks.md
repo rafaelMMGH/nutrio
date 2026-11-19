@@ -38,14 +38,14 @@ Per batch:
 
 ### Batch US1a: timeline rules (≈150 lines)
 
-- [ ] T006 [US1] Unit tests (tests/unit/timeline-logic.test.ts):
+- [x] T006 [US1] Unit tests (tests/unit/timeline-logic.test.ts):
   - `timelineRows`:
     - REQ-2: 4 meals with the 1st and 3rd done read done, next, done, pending; all done gives no "next"; foreign and duplicate done ids are ignored.
     - REQ-3: no times gives `hasTimes` false; only the 2nd meal timed gives `null` time elsewhere and the order unchanged; never sorted by time.
     - Names go through `mealLabel`.
   - `rowLabel`: "07:00, Desayuno, Siguiente", "Cena, Cumplida", and a 60-character name kept whole (REQ-4).
   - `listScrollTop`: a row above or below the view scrolls by the fade pad; a visible row keeps `scrollTop`; the result is clamped to 0 and the maximum (REQ-5, REQ-19).
-- [ ] T007 [US1] Implement `timelineRows` ("next" found inline), `rowLabel` and `listScrollTop` so T006 passes. No `firstPending` or `resolveShown` (plan, spec v1.2) (src/components/nutrio/timeline-logic.ts)
+- [x] T007 [US1] Implement `timelineRows` ("next" found inline), `rowLabel` and `listScrollTop` so T006 passes. No `firstPending` or `resolveShown` (plan, spec v1.2) (src/components/nutrio/timeline-logic.ts)
 
 **Checkpoint:** US1a reviewed and committed; screen unchanged.
 
@@ -142,6 +142,7 @@ Per batch:
   - REQ-18: hover in 150 ms only under no-preference; pressed `transition: none`; inset 2px focus ring.
   - REQ-5: forced-colours marker in `CanvasText`.
   - REQ-1: no horizontal scroll at 360px.
+  - Also check one width in 938–1279 (e.g. 1100×900).
 - [ ] T026 [US1] `MealTimeline` behaviour (src/components/nutrio/MealTimeline.tsx):
   - REQ-7: edge fades from `scroll` and `ResizeObserver`.
   - REQ-5: an effect on `shownId` calls `list.scrollTo(listScrollTop(...))`, instant under reduced motion.
