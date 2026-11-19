@@ -16,6 +16,8 @@ import "./dashboard.css";
 
 export type DashboardProps = {
   meals: Meal[];
+  /** When the active plan version was created; null without an active schedule ("Sin plan activo"). Unused until the counts card. */
+  planCreatedAt: string | null;
   dailyLogs: ServerLog[];
   kcalGoal: number | null;
   proteinPct: number | null;

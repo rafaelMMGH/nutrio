@@ -23,6 +23,7 @@ export default async function HomePage() {
   return (
     <Dashboard
       meals={summary.schedule?.meals ?? []}
+      planCreatedAt={summary.schedule ? (summary.activePlan?.current_version?.created_at ?? null) : null}
       dailyLogs={summary.dailyLogs}
       kcalGoal={summary.schedule?.kcal_goal ?? null}
       proteinPct={summary.schedule?.protein_pct ?? null}
