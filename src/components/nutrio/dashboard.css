@@ -76,7 +76,9 @@ html.dark:not(:has([data-theme-lock])) .nt-plate-dish { background: radial-gradi
   top: 55%;
   translate: -50% -50%;
   width: max-content;
-  max-width: 70%;
+  /* 70% of the plate is the spec limit (REQ-21), but from 1280px the plate is 128% of the hero: the pill is cut at 58% so it ends
+     inside the hero and never sits over the data column. Below 1280px the plate is narrower than the hero and 70% applies (below). */
+  max-width: 58%;
   min-height: 44px;
   box-sizing: border-box;
   display: flex;
@@ -110,7 +112,8 @@ html.dark:not(:has([data-theme-lock])) .nt-plate-dish { background: radial-gradi
 .nt-cook-sub { font-size: 13px; color: var(--nt-cook-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (hover: hover) { .nt-cook-pill:hover { scale: 1.03; } }
 .nt-cook-pill:active { scale: 0.97; }
-.nt-cook-pill:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--nt-surface), 0 0 0 4px var(--nt-ink); }
+/* a.nt-cook-pill: the element lifts this above the shell's .nt :is(a, button, [tabindex]):focus-visible (0,3,0), which would replace the ring. */
+.nt a.nt-cook-pill:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--nt-surface), 0 0 0 4px var(--nt-ink); }
 @media (prefers-reduced-motion: reduce) {
   .nt-cook-pill { transition: none; }
   .nt-cook-pill:hover, .nt-cook-pill:active { scale: none; }
@@ -122,7 +125,7 @@ html.dark:not(:has([data-theme-lock])) .nt-plate-dish { background: radial-gradi
   .nt-cook-pill { border-color: CanvasText; background: Canvas; color: CanvasText; backdrop-filter: none; }
   .nt-cook-sub { color: CanvasText; }
   .nt-cook-badge { border-color: CanvasText; }
-  .nt-cook-pill:focus-visible { outline: 2px solid Highlight; outline-offset: 2px; box-shadow: none; }
+  .nt a.nt-cook-pill:focus-visible { outline: 2px solid Highlight; outline-offset: 2px; box-shadow: none; }
 }
 .nt-hero.is-empty .nt-plate { opacity: 0.6; }
 
@@ -318,6 +321,7 @@ button.nt-gauge-tile:hover { background: #202024; }
   .nt-pair .nt-card { min-height: 300px; }
   .nt-hero { min-height: 620px; overflow: hidden; }
   .nt-plate, .nt-cook-layer { left: 30%; width: 78%; }
+  .nt-cook-pill { max-width: 70%; }
   .nt-data { grid-template-rows: none; padding-bottom: 0; }
 }
 @media (max-width: 937px) {

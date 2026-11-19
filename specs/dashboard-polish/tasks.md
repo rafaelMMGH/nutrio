@@ -49,7 +49,7 @@ None. Each story's groundwork is inside its own batch.
 
 - [x] T016 [US1] Hero uses `ActionButton` (no `key` per meal; `instantKey={meal.id}`), per-meal `saving` and lockout via `acceptTap`, `createAdvance` started on "saved" and cancelled on switch, unmark or rollback, status region outside `.nt-hero-copy` (REQ-1 to REQ-9, REQ-24, REQ-25) (src/components/nutrio/Hero.tsx)
 - [x] T017 [US1] Delete HoldToConfirm, its logic, CSS and unit test; drop the `.nt-done` hold rules (D19, REQ-1) (src/components/nutrio/HoldToConfirm.tsx, hold-to-confirm-logic.ts, hold-to-confirm.css, tests/unit/hold-to-confirm.test.ts, src/components/nutrio/dashboard.css)
-- [ ] T018 [US1] Run tsc, unit tests and the US1 e2e titles (T013 to T015); `grep -r "Mantén presionado\|HoldToConfirm" src` is empty (REQ-1)
+- [x] T018 [US1] Run tsc, unit tests and the US1 e2e titles (T013 to T015); `grep -r "Mantén presionado\|HoldToConfirm" src` is empty (REQ-1)
 
 **Checkpoint:** US1 complete. Review, commit US1c+US1d, then continue.
 
@@ -73,7 +73,7 @@ None. Each story's groundwork is inside its own batch.
 - [x] T027 [US2] KpiRow: Racha tile first with `Flame`, `RollingNumber` (`minDigits` 1, no dash) plus unit, one hidden phrase, visible parts `aria-hidden`; Planes, Recetas, Compras unchanged (REQ-10, 14, 29) (src/components/nutrio/DataColumn.tsx)
 - [x] T028 [US2] Dashboard computes `streaks` from the optimistic `logs.list()` with `useToday()`; remove `countDoneToday`, `contexts.meals` and their test cases (REQ-10, 15, 28) (src/components/nutrio/Dashboard.tsx, src/lib/kpis.ts, tests/unit/kpis.test.ts)
 - [x] T029 [US2] Tile fit for "999 días" plus "¡Tu mejor racha!" at 360 px and 200% zoom (REQ-29) (src/components/nutrio/dashboard.css)
-- [ ] T030 [US2] Run tsc, unit tests and the US2 e2e titles (T025, T026)
+- [x] T030 [US2] Run tsc, unit tests and the US2 e2e titles (T025, T026)
 
 **Checkpoint:** US2 complete. Review, commit, then continue.
 

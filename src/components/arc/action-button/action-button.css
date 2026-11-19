@@ -41,7 +41,9 @@
   height: 44px;
   translate: -50% -50%;
 }
-.arc-ab:focus-visible {
+/* The element in the selector lifts it to (0,3,1), above the shell's .nt :is(a, button, [tabindex]):focus-visible (0,3,0), which would
+   otherwise replace this ring and the forced-colors outline below. */
+.nt button.arc-ab:focus-visible {
   outline: none;
   box-shadow: 0 0 0 2px var(--arc-ab-ring-inner), 0 0 0 4px var(--arc-ab-ring-outer);
 }
@@ -60,6 +62,6 @@
 @keyframes arc-ab-spin { to { transform: rotate(360deg); } }
 @media (forced-colors: active) {
   .arc-ab { border: 1px solid CanvasText; }
-  .arc-ab:focus-visible { outline: 2px solid Highlight; outline-offset: 2px; box-shadow: none; }
+  .nt button.arc-ab:focus-visible { outline: 2px solid Highlight; outline-offset: 2px; box-shadow: none; }
   .arc-ab-icon path { stroke: CanvasText; }
 }

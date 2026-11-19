@@ -78,7 +78,9 @@ export function ActionButton({ label, pendingLabel, successLabel, state, onPress
       onClick={() => {
         if (!pending) onPress();
       }}
-      whileTap={pressScale({ reduced, pending })}
+      // Always set, even when empty: whileTap makes motion render tabindex, and useReducedMotion differs between the server and the
+      // client, so a prop that came and went would be a hydration mismatch.
+      whileTap={pressScale({ reduced, pending }) ?? {}}
     >
       <motion.span className="arc-ab-slot" style={{ width }} aria-hidden>
         <span ref={textRef} className="arc-ab-text">

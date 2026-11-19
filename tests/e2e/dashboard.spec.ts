@@ -104,7 +104,8 @@ test("KPI tiles show real counts with at least two digits", async ({ page }) => 
   }
 });
 
-const settle = (page: Page) => page.evaluate(() => Promise.all(document.getAnimations().map((animation) => animation.finished)).then(() => undefined));
+// A cancelled animation (an element that left the page, such as the plate that slid away) counts as settled.
+const settle = (page: Page) => page.evaluate(() => Promise.all(document.getAnimations().map((animation) => animation.finished.catch(() => undefined))).then(() => undefined));
 const style = (tile: Locator, selector: string | null, property: string) =>
   (selector ? tile.locator(selector) : tile).evaluate((node, name) => getComputedStyle(node).getPropertyValue(name), property);
 
@@ -395,6 +396,8 @@ test("Racha goes up by one when today's last meal is marked", async ({ page }) =
     const racha = streakTile(page).locator(".nt-roll");
     await expect(racha).toHaveText("9");
     await expect(streakPhrase(page)).toHaveText("Racha, 9 días, ¡Tu mejor racha!");
+    // Let the first view's roll finish first: it waits 450 ms before it starts, and that start would be recorded below.
+    await page.evaluate(() => Promise.all(document.querySelector(".nt-kpis")!.getAnimations({ subtree: true }).map((animation) => animation.finished.catch(() => undefined))).then(() => undefined));
     // Record the columns that start rolling from now on (the roll outlasts a late poll). Going from 9 to 10 mounts one new column
     // on the left; it must roll at once, not wait for the first-view delay.
     await page.evaluate(() => {
@@ -649,6 +652,8 @@ test.describe("failed saves", () => {
       expect((await heroLog(page)).said).toEqual(["Comida desmarcada"]);
 
       // Unmarking before the advance fires cancels it: mark, wait for "Cumplida", unmark after the lockout, and the slide never moves.
+      // The unmark above may have settled within the 400 ms lockout, which would swallow this tap, so wait it out first.
+      await waitSinceTap(page, 450);
       await dots.nth(0).click();
       await Promise.all([saved(page), mark(button)]);
       await expect(label(button)).toHaveText("Cumplida");
@@ -861,12 +866,23 @@ test("Modo Cocina pill: layout, truncation and states", async ({ page }) => {
     await expect(pill.locator(".nt-cook-title")).toHaveText("Modo Cocina");
     await expect(pill.locator(".nt-cook-sub")).toHaveText(title);
     const dots = page.locator(".nt-pager button");
-    if ((await dots.count()) > 1) {
-      await dots.nth(1).click();
+    const startIndex = await dots.evaluateAll((nodes) => nodes.findIndex((node) => node.classList.contains("is-active")));
+    // Clicking the active step is a no-op, so every click goes to a step that is not active.
+    const stepAt = (index: number) => dots.nth(index).and(page.locator(":not(.is-active)"));
+    // The first other meal that has a recipe (and so a pill); -1 when there is none.
+    let otherIndex = -1;
+    for (let index = 0; index < (await dots.count()) && otherIndex < 0; index += 1) {
+      if (await dots.nth(index).evaluate((node) => node.classList.contains("is-active"))) continue;
+      await stepAt(index).click();
+      await expect(dots.nth(index)).toHaveClass(/is-active/);
+      if ((await pill.count()) > 0) otherIndex = index;
+    }
+    if (otherIndex >= 0) {
       const next = (await page.locator(".nt-hero-copy h2").textContent())!.trim();
       await expect(pill.locator(".nt-cook-sub")).toHaveText(next);
-      await dots.nth(0).click();
     }
+    if (!(await dots.nth(startIndex).evaluate((node) => node.classList.contains("is-active")))) await stepAt(startIndex).click();
+    await expect(dots.nth(startIndex)).toHaveClass(/is-active/);
 
     // REQ-21: one limit per range, measured at rest. REQ-20: at least 44 px tall.
     const sizes = [{ width: 1280, height: 900, max: 0.7, sub: true }, { width: 938, height: 800, max: 0.7, sub: true }, { width: 937, height: 800, max: 0.6, sub: false }, { width: 390, height: 844, max: 0.6, sub: false }, { width: 360, height: 740, max: 0.6, sub: false }];
@@ -900,6 +916,13 @@ test("Modo Cocina pill: layout, truncation and states", async ({ page }) => {
       expect(seen.pill.width).toBeLessThanOrEqual(seen.layer.width * 0.7 + 1);
       expect(seen.pill.right).toBeLessThanOrEqual(seen.layer.right + 1);
       await expect(pill).toHaveAttribute("aria-label", `Modo Cocina: ${longName}`);
+      // The pill's right end is not covered by the data cards: the topmost element there is the pill itself.
+      const covered = await page.evaluate(() => {
+        const box = document.querySelector(".nt-cook-pill")!.getBoundingClientRect();
+        const top = document.elementFromPoint(box.right - 8, box.top + box.height / 2);
+        return top && !top.closest(".nt-cook-pill") ? `${top.tagName}.${top.className}` : null;
+      });
+      expect(covered, `${width}px: what covers the pill's right end`).toBeNull();
     }
     sql(`update recipes set name = '${original.replace(/'/g, "''")}' where id = '${recipeId}'`);
     await page.setViewportSize({ width: 1280, height: 900 });
@@ -909,17 +932,21 @@ test("Modo Cocina pill: layout, truncation and states", async ({ page }) => {
     await page.emulateMedia({ reducedMotion: "no-preference" });
     await expect(page.locator(".nt-cook-layer")).toHaveCSS("mask-image", "none");
     await expect(page.locator(".nt-plate")).not.toHaveCSS("mask-image", "none");
-    if ((await dots.count()) > 1) {
+    if (otherIndex >= 0) {
       const frames = await page.evaluate(
-        () =>
-          new Promise<{ plateAnimating: number; pillAnimations: number; centres: string[] }>((done) => {
+        (stepIndex) =>
+          new Promise<{ plateAnimating: number; pillAnimations: number; centres: string[] }>((done, fail) => {
             const centre = () => {
               const box = document.querySelector(".nt-cook-pill")!.getBoundingClientRect();
               return `${(box.left + box.width / 2).toFixed(2)},${(box.top + box.height / 2).toFixed(2)}`;
             };
             const out = { plateAnimating: 0, pillAnimations: 0, centres: [] as string[] };
-            (document.querySelectorAll(".nt-pager button")[1] as HTMLElement).click();
+            const target = document.querySelectorAll<HTMLElement>(".nt-pager button:not(.is-active)");
+            const step = Array.from(target).find((node) => node === document.querySelectorAll(".nt-pager button")[stepIndex]);
+            if (!step) return fail(new Error(`pager step ${stepIndex} is missing or already active`));
+            step.click();
             const tick = () => {
+              if (!document.querySelector(".nt-cook-pill")) return fail(new Error("the Modo Cocina pill is missing, the next meal has no recipe"));
               const animating = document.querySelector(".nt-plate")!.getAnimations().some((animation) => animation.playState === "running");
               if (animating) {
                 out.plateAnimating += 1;
@@ -931,12 +958,13 @@ test("Modo Cocina pill: layout, truncation and states", async ({ page }) => {
             };
             const start = performance.now();
             requestAnimationFrame(tick);
-          })
+          }),
+        otherIndex
       );
       expect(frames.plateAnimating, "frames sampled while the plate animates in").toBeGreaterThanOrEqual(3);
       expect(frames.pillAnimations).toBe(0);
       expect(new Set(frames.centres).size).toBe(1);
-      await dots.nth(0).click();
+      await stepAt(startIndex).click();
     }
 
     // REQ-20: a keyboard stop with a visible two-tone ring.
@@ -972,12 +1000,15 @@ test("Modo Cocina pill: layout, truncation and states", async ({ page }) => {
     await page.emulateMedia({ forcedColors: "none" });
 
     // REQ-19: with reduced transparency the capsule is opaque, where the engine reports the preference.
+    // CDP rather than page.emulateMedia: Playwright's emulated media features do not include prefers-reduced-transparency.
     const client = await page.context().newCDPSession(page);
     await client.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-transparency", value: "reduce" }] });
     if (await page.evaluate(() => matchMedia("(prefers-reduced-transparency: reduce)").matches)) {
       const opaque = await pill.evaluate((node) => ({ fill: getComputedStyle(node).backgroundColor, blur: getComputedStyle(node).backdropFilter }));
       expect(opaque.fill).toMatch(/^rgb\(\d+, \d+, \d+\)$/);
       expect(opaque.blur).toBe("none");
+    } else {
+      test.info().annotations.push({ type: "skip", description: "this engine does not report prefers-reduced-transparency; the opaque-capsule check did not run" });
     }
     await client.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-transparency", value: "no-preference" }] });
 
