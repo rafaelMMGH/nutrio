@@ -193,7 +193,13 @@ test("REQ-21/22/23/25: voice commands move, go back and repeat; each new step is
 
 test("REQ-4/5: the dashboard hero links to Modo Cocina, and an unknown recipe is a 404", async ({ page }) => {
   await page.goto("/");
-  await expect(page.locator(".nt-hero").getByRole("link", { name: "Modo Cocina" })).toHaveAttribute("href", /\/recipes\/.+\/cook$/);
+  // One link, the pill on the plate (specs/dashboard-polish REQ-16, 18, 20): the hero has no text link beside "Marcar cumplida".
+  const hero = page.locator(".nt-hero");
+  const links = hero.getByRole("link", { name: /Modo Cocina/ });
+  await expect(links).toHaveCount(1);
+  await expect(links).toHaveAttribute("href", /\/recipes\/.+\/cook$/);
+  const dish = (await hero.locator(".nt-hero-copy h2").textContent())!.trim();
+  await expect(hero.getByRole("link", { name: `Modo Cocina: ${dish}`, exact: true })).toHaveCount(1);
   const response = await page.request.get("/recipes/no-such-recipe/cook");
   expect(response.status()).toBe(404);
 });

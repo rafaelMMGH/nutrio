@@ -29,10 +29,6 @@
 }
 .nt-hero-meal { margin-top: -8px; font-size: 14px; color: var(--nt-muted); }
 .nt-hero-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
-/* Modo Cocina for the meal on screen (specs/cooking-mode REQ-4). */
-.nt-cook { height: 40px; padding: 0 16px; text-decoration: none; cursor: pointer; transition: transform 160ms ease; }
-.nt-cook:active { transform: scale(0.97); }
-.nt-cook:focus-visible { outline: none; box-shadow: var(--nt-focus); }
 .nt-rating { height: 40px; font-size: 15px; }
 .nt-hero-empty { margin-top: 20px; font-size: 28px; font-weight: 300; max-width: 320px; position: relative; z-index: 2; }
 .nt-hero.is-empty > .nt-pill { margin-top: 40px; align-self: flex-start; position: relative; z-index: 2; }
@@ -40,8 +36,9 @@
 
 /* Same box as the hero so the plate's percentages resolve as before; no z-index, so it forms no stacking context. */
 .nt-plate-clip { position: absolute; inset: 0; pointer-events: none; }
-/* The plate stands in for the dish photo and runs behind the left edge of the data column, like the reference. */
-.nt-plate {
+/* The plate stands in for the dish photo and runs behind the left edge of the data column, like the reference.
+   .nt-cook-layer shares its geometry (the three grouped rules), not its mask or animation. */
+.nt-plate, .nt-cook-layer {
   position: absolute;
   z-index: 0;
   left: 6%;
@@ -50,6 +47,8 @@
   aspect-ratio: 1.12;
   translate: 0 -46%;
   pointer-events: none;
+}
+.nt-plate {
   -webkit-mask-image: radial-gradient(closest-side, #000 82%, transparent 100%);
   mask-image: radial-gradient(closest-side, #000 82%, transparent 100%);
   animation: nt-plate-in 420ms cubic-bezier(0.23, 1, 0.32, 1);
@@ -67,64 +66,63 @@
 }
 html.dark:not(:has([data-theme-lock])) .nt-plate-dish { background: radial-gradient(120% 90% at 30% 20%, #3a3c44 0%, #2a2c33 60%, #1f2026 100%); box-shadow: 0 40px 60px -30px rgb(0 0 0 / 0.6), inset 0 0 0 10px rgb(255 255 255 / 0.04); }
 .nt-plate-food { position: absolute; translate: -50% -50%; height: auto; filter: drop-shadow(0 14px 14px rgb(20 24 40 / 0.22)); }
-.nt-plate-dot {
+/* Modo Cocina pill (specs/dashboard-polish REQ-17 to 22, 30): a sibling layer with the plate's box, so the pill sits at the old
+   dot's point (44%, 55% of the plate) and follows its offsets, but without the plate's mask (it would fade the glass) and its
+   entrance animation (the pill stays still while the plate animates in). Only the pill takes pointer events. */
+.nt-cook-layer { z-index: 1; }
+.nt-cook-pill {
   position: absolute;
-  width: 22px;
-  height: 22px;
+  left: 44%;
+  top: 55%;
   translate: -50% -50%;
-  border-radius: 50%;
-  background: rgb(255 255 255 / 0.45);
-  border: 1px solid rgb(255 255 255 / 0.9);
-}
-.nt-plate-dot::after { content: ""; position: absolute; inset: 8px; border-radius: 50%; background: #fff; }
-/* Modo Cocina on the plate's middle dot (specs/cooking-mode REQ-4): a 44 px hit area around the 22 px dot, a soft
-   halo that breathes, and a tooltip that rises and fades in on hover or keyboard focus. */
-.nt-cook-dot {
-  z-index: 2;
+  width: max-content;
+  max-width: 70%;
+  min-height: 44px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 5px 20px 5px 5px;
+  border: 1px solid var(--nt-cook-edge);
+  border-radius: var(--nt-radius-pill);
+  background: color-mix(in srgb, var(--nt-cook-glass) var(--nt-cook-glass-alpha), transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.3);
+  backdrop-filter: blur(14px) saturate(1.3);
+  box-shadow: 0 14px 30px -14px rgb(0 0 0 / 0.5);
+  color: #fff;
+  text-decoration: none;
   pointer-events: auto;
   cursor: pointer;
-  transition: scale 260ms var(--nt-spring), background 200ms ease;
+  transition: scale 120ms ease;
 }
-.nt-cook-dot::before { content: ""; position: absolute; inset: -12px; border-radius: 50%; }
-.nt-cook-dot::after { transition: inset 260ms var(--nt-spring); }
-.nt-cook-dot { box-shadow: 0 0 0 0 rgb(255 255 255 / 0.55); animation: nt-cook-halo 2.6s ease-out infinite; }
-@keyframes nt-cook-halo {
-  0% { box-shadow: 0 0 0 0 rgb(255 255 255 / 0.55); }
-  70%, 100% { box-shadow: 0 0 0 14px rgb(255 255 255 / 0); }
+.nt-cook-badge {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1.5px solid #fff;
+  background: rgb(255 255 255 / 0.14);
 }
-.nt-cook-dot:hover, .nt-cook-dot:focus-visible { scale: 1.18; background: rgb(255 255 255 / 0.7); }
-.nt-cook-dot:hover::after, .nt-cook-dot:focus-visible::after { inset: 6px; }
-.nt-cook-dot:focus-visible { outline: none; box-shadow: var(--nt-focus); animation: none; }
-.nt-cook-tip {
-  position: absolute;
-  bottom: calc(100% + 12px);
-  left: 50%;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 7px 12px;
-  border-radius: var(--nt-radius-pill);
-  background: var(--nt-ink);
-  color: var(--nt-on-ink);
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  box-shadow: 0 10px 24px -12px rgb(0 0 0 / 0.45);
-  opacity: 0;
-  translate: -50% 6px;
-  scale: 0.92;
-  transform-origin: 50% 100%;
-  pointer-events: none;
-  transition: opacity 180ms ease, translate 320ms var(--nt-spring), scale 320ms var(--nt-spring);
-}
-.nt-cook-tip::after { content: ""; position: absolute; top: 100%; left: 50%; translate: -50% -1px; border: 6px solid transparent; border-top-color: var(--nt-ink); }
-.nt-cook-dot:hover .nt-cook-tip, .nt-cook-dot:focus-visible .nt-cook-tip { opacity: 1; translate: -50% 0; scale: 1; }
-/* The tooltip sits outside the dot, so the scale on hover must not shrink it back: undo it on the tip. */
-.nt-cook-dot:hover .nt-cook-tip, .nt-cook-dot:focus-visible .nt-cook-tip { scale: calc(1 / 1.18); }
-@media (hover: none) { .nt-cook-tip { opacity: 1; translate: -50% 0; scale: 1; } }
+.nt-cook-text { display: grid; min-width: 0; line-height: 1.25; }
+.nt-cook-title { font-size: 15px; font-weight: 700; white-space: nowrap; }
+.nt-cook-sub { font-size: 13px; color: var(--nt-cook-sub); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (hover: hover) { .nt-cook-pill:hover { scale: 1.03; } }
+.nt-cook-pill:active { scale: 0.97; }
+.nt-cook-pill:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--nt-surface), 0 0 0 4px var(--nt-ink); }
 @media (prefers-reduced-motion: reduce) {
-  .nt-cook-dot { animation: none; transition: none; }
-  .nt-cook-tip { transition: opacity 120ms ease; translate: -50% 0; scale: 1; }
+  .nt-cook-pill { transition: none; }
+  .nt-cook-pill:hover, .nt-cook-pill:active { scale: none; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .nt-cook-pill { background: var(--nt-cook-opaque); -webkit-backdrop-filter: none; backdrop-filter: none; }
+}
+@media (forced-colors: active) {
+  .nt-cook-pill { border-color: CanvasText; background: Canvas; color: CanvasText; backdrop-filter: none; }
+  .nt-cook-sub { color: CanvasText; }
+  .nt-cook-badge { border-color: CanvasText; }
+  .nt-cook-pill:focus-visible { outline: 2px solid Highlight; outline-offset: 2px; box-shadow: none; }
 }
 .nt-hero.is-empty .nt-plate { opacity: 0.6; }
 
@@ -319,7 +317,7 @@ button.nt-gauge-tile:hover { background: #202024; }
   .nt-pair { grid-template-rows: none; }
   .nt-pair .nt-card { min-height: 300px; }
   .nt-hero { min-height: 620px; overflow: hidden; }
-  .nt-plate { left: 30%; width: 78%; }
+  .nt-plate, .nt-cook-layer { left: 30%; width: 78%; }
   .nt-data { grid-template-rows: none; padding-bottom: 0; }
 }
 @media (max-width: 937px) {
@@ -332,7 +330,9 @@ button.nt-gauge-tile:hover { background: #202024; }
     overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; border: 0;
   }
   .nt-hero-copy, .nt-hero-empty { margin-top: 0; }
-  .nt-plate { left: 8%; width: 120%; translate: 0 -38%; }
+  .nt-plate, .nt-cook-layer { left: 8%; width: 120%; translate: 0 -38%; }
+  .nt-cook-pill { max-width: 60%; }
+  .nt-cook-sub { display: none; }
   .nt-kpis, .nt-gauges { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   /* Badge and text share a ~160px tile at 360px: three digits at 40px plus the unit would not fit. */
   .nt-kpi-streak .nt-roll { font-size: 32px; }

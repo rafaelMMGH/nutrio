@@ -182,8 +182,8 @@ test("KPI tiles still animate when the OS asks for reduced motion", async ({ pag
   await openHome(page);
   const tile = page.locator(".nt-kpi").first();
   expect(await style(tile, null, "animation-name")).toBe("nt-kpi-in");
-  // Racha, the first tile, always has digit columns: its zero is a real 0, not a dash.
-  expect(await style(tile, ".nt-roll-strip", "animation-name")).toBe("nt-roll-in");
+  // Racha, the first tile, always has digit columns: its zero is a real 0, not a dash. Several digits means several strips.
+  expect(await style(tile, ".nt-roll-strip >> nth=0", "animation-name")).toBe("nt-roll-in");
 });
 
 test("KPI tile lifts 3px and wiggles its icon on hover, squashes on press", async ({ page }) => {
@@ -820,6 +820,206 @@ test("screenshot in the dark theme", async ({ page }) => {
   await openHome(page);
   await page.waitForLoadState("networkidle");
   await page.screenshot({ path: `${SHOTS}/dashboard-dark-1440x900.png` });
+});
+
+/* ---------- Modo Cocina pill (specs/dashboard-polish US3) ---------- */
+
+/** Where the pill is, in px, next to the plate box it belongs to (the layer shares the plate's geometry). */
+const pillGeometry = (page: Page) =>
+  page.evaluate(() => {
+    const pill = document.querySelector(".nt-cook-pill")!.getBoundingClientRect();
+    const layer = document.querySelector(".nt-cook-layer")!.getBoundingClientRect();
+    const hero = document.querySelector(".nt-hero")!.getBoundingClientRect();
+    const sub = document.querySelector(".nt-cook-sub");
+    return {
+      pill: pill.toJSON() as DOMRect,
+      layer: layer.toJSON() as DOMRect,
+      hero: hero.toJSON() as DOMRect,
+      sub: sub && { display: getComputedStyle(sub).display, cut: sub.scrollWidth > sub.clientWidth, height: sub.getBoundingClientRect().height, lineHeight: parseFloat(getComputedStyle(sub).lineHeight) },
+      viewport: innerWidth
+    };
+  });
+
+test("Modo Cocina pill: layout, truncation and states", async ({ page }) => {
+  const pill = page.locator(".nt-cook-pill");
+  test.skip((await pill.count()) === 0, "the meal on screen has no recipe");
+  const href = (await pill.getAttribute("href"))!;
+  const recipeId = href.split("/")[2];
+  const original = sql(`select name from recipes where id = '${recipeId}'`);
+  const longName = "Ensalada de pollo asado con aguacate, jitomate y queso panela fresco sobre cama de lechuga";
+  expect(longName.length).toBeGreaterThanOrEqual(80);
+  try {
+    // REQ-16, 23: no text link beside the action button, no dot, no tooltip; the beef icon exists only in the pill.
+    await expect(page.locator(".nt-hero-copy").getByRole("link", { name: /Modo Cocina/ })).toHaveCount(0);
+    await expect(page.locator(".nt-plate-dot, .nt-cook-dot, .nt-cook-tip, .nt-cook")).toHaveCount(0);
+    await expect(page.locator(".lucide-beef")).toHaveCount(1);
+    await expect(pill.locator(".lucide-beef")).toHaveCount(1);
+
+    // REQ-17, 20: the name is "Modo Cocina: <dish>", the subtitle is that dish, and it follows the meal on screen.
+    const title = (await page.locator(".nt-hero-copy h2").textContent())!.trim();
+    await expect(pill).toHaveAttribute("aria-label", `Modo Cocina: ${title}`);
+    await expect(pill.locator(".nt-cook-title")).toHaveText("Modo Cocina");
+    await expect(pill.locator(".nt-cook-sub")).toHaveText(title);
+    const dots = page.locator(".nt-pager button");
+    if ((await dots.count()) > 1) {
+      await dots.nth(1).click();
+      const next = (await page.locator(".nt-hero-copy h2").textContent())!.trim();
+      await expect(pill.locator(".nt-cook-sub")).toHaveText(next);
+      await dots.nth(0).click();
+    }
+
+    // REQ-21: one limit per range, measured at rest. REQ-20: at least 44 px tall.
+    const sizes = [{ width: 1280, height: 900, max: 0.7, sub: true }, { width: 938, height: 800, max: 0.7, sub: true }, { width: 937, height: 800, max: 0.6, sub: false }, { width: 390, height: 844, max: 0.6, sub: false }, { width: 360, height: 740, max: 0.6, sub: false }];
+    for (const size of sizes) {
+      await page.setViewportSize({ width: size.width, height: size.height });
+      await openHome(page);
+      await settle(page);
+      const seen = await pillGeometry(page);
+      const where = `${size.width}px`;
+      expect(seen.pill.width, where).toBeLessThanOrEqual(seen.layer.width * size.max + 1);
+      expect(seen.pill.height, where).toBeGreaterThanOrEqual(44);
+      expect(seen.pill.left, where).toBeGreaterThanOrEqual(seen.layer.left - 1);
+      expect(seen.pill.right, where).toBeLessThanOrEqual(seen.layer.right + 1);
+      // The pill is part of the plate: it never leaves the screen (the hero clips what leaves its box).
+      expect(seen.pill.left, where).toBeGreaterThanOrEqual(0);
+      expect(seen.pill.right, where).toBeLessThanOrEqual(seen.viewport + 1);
+      expect(seen.sub!.display === "none", where).toBe(!size.sub);
+      await expect(pill, where).toHaveAttribute("aria-label", `Modo Cocina: ${title}`);
+    }
+    await page.setViewportSize({ width: 1280, height: 900 });
+
+    // REQ-22: an 80-character name is one cut line and the pill stays inside its limit; the accessible name keeps all of it.
+    sql(`update recipes set name = '${longName}' where id = '${recipeId}'`);
+    for (const width of [1280, 938]) {
+      await page.setViewportSize({ width, height: 900 });
+      await openHome(page);
+      await settle(page);
+      const seen = await pillGeometry(page);
+      expect(seen.sub!.cut, `${width}px cut`).toBe(true);
+      expect(seen.sub!.height, `${width}px one line`).toBeLessThan(seen.sub!.lineHeight * 1.5);
+      expect(seen.pill.width).toBeLessThanOrEqual(seen.layer.width * 0.7 + 1);
+      expect(seen.pill.right).toBeLessThanOrEqual(seen.layer.right + 1);
+      await expect(pill).toHaveAttribute("aria-label", `Modo Cocina: ${longName}`);
+    }
+    sql(`update recipes set name = '${original.replace(/'/g, "''")}' where id = '${recipeId}'`);
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await openHome(page);
+
+    // REQ-30: the plate animates in on a meal change while the pill stays still and runs no animation of its own.
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await expect(page.locator(".nt-cook-layer")).toHaveCSS("mask-image", "none");
+    await expect(page.locator(".nt-plate")).not.toHaveCSS("mask-image", "none");
+    if ((await dots.count()) > 1) {
+      const frames = await page.evaluate(
+        () =>
+          new Promise<{ plateAnimating: number; pillAnimations: number; centres: string[] }>((done) => {
+            const centre = () => {
+              const box = document.querySelector(".nt-cook-pill")!.getBoundingClientRect();
+              return `${(box.left + box.width / 2).toFixed(2)},${(box.top + box.height / 2).toFixed(2)}`;
+            };
+            const out = { plateAnimating: 0, pillAnimations: 0, centres: [] as string[] };
+            (document.querySelectorAll(".nt-pager button")[1] as HTMLElement).click();
+            const tick = () => {
+              const animating = document.querySelector(".nt-plate")!.getAnimations().some((animation) => animation.playState === "running");
+              if (animating) {
+                out.plateAnimating += 1;
+                out.pillAnimations += document.querySelector(".nt-cook-layer")!.getAnimations({ subtree: true }).length;
+                out.centres.push(centre());
+              }
+              if (out.plateAnimating < 6 && performance.now() < start + 3000) requestAnimationFrame(tick);
+              else done(out);
+            };
+            const start = performance.now();
+            requestAnimationFrame(tick);
+          })
+      );
+      expect(frames.plateAnimating, "frames sampled while the plate animates in").toBeGreaterThanOrEqual(3);
+      expect(frames.pillAnimations).toBe(0);
+      expect(new Set(frames.centres).size).toBe(1);
+      await dots.nth(0).click();
+    }
+
+    // REQ-20: a keyboard stop with a visible two-tone ring.
+    await page.mouse.move(0, 0);
+    for (let tabs = 0; tabs < 40 && !(await pill.evaluate((node) => node === document.activeElement)); tabs += 1) await page.keyboard.press("Tab");
+    await expect(pill).toBeFocused();
+    const ring = await pill.evaluate((node) => getComputedStyle(node).boxShadow);
+    expect(ring).toMatch(/0px 0px 0px 2px/);
+    expect(ring).toMatch(/0px 0px 0px 4px/);
+    await page.mouse.move(0, 0);
+
+    // REQ-30: hover and press change the pill within 150 ms under normal motion, and nothing under reduced motion.
+    const motion = () => pill.evaluate((node) => ({ scale: getComputedStyle(node).scale, duration: parseFloat(getComputedStyle(node).transitionDuration) }));
+    expect((await motion()).scale).toBe("none");
+    await pill.hover();
+    await expect.poll(async () => (await motion()).scale).not.toBe("none");
+    expect((await motion()).duration).toBeLessThanOrEqual(0.15);
+    await page.mouse.move(0, 0);
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await pill.hover();
+    expect(await motion()).toEqual({ scale: "none", duration: 0 });
+    await page.mouse.move(0, 0);
+
+    // REQ-19: forced colours keep an edge and a text colour apart from the pill's own background.
+    await page.emulateMedia({ reducedMotion: "no-preference", forcedColors: "active" });
+    const forced = await pill.evaluate((node) => {
+      const style = getComputedStyle(node);
+      return { width: style.borderTopWidth, edge: style.borderTopColor, fill: style.backgroundColor, text: style.color };
+    });
+    expect(forced.width).toBe("1px");
+    expect(forced.edge).not.toBe(forced.fill);
+    expect(forced.text).not.toBe(forced.fill);
+    await page.emulateMedia({ forcedColors: "none" });
+
+    // REQ-19: with reduced transparency the capsule is opaque, where the engine reports the preference.
+    const client = await page.context().newCDPSession(page);
+    await client.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-transparency", value: "reduce" }] });
+    if (await page.evaluate(() => matchMedia("(prefers-reduced-transparency: reduce)").matches)) {
+      const opaque = await pill.evaluate((node) => ({ fill: getComputedStyle(node).backgroundColor, blur: getComputedStyle(node).backdropFilter }));
+      expect(opaque.fill).toMatch(/^rgb\(\d+, \d+, \d+\)$/);
+      expect(opaque.blur).toBe("none");
+    }
+    await client.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-transparency", value: "no-preference" }] });
+
+    // Non-functional: nothing clipped at 200% browser zoom (half the viewport in CSS px), light and dark.
+    for (const scheme of ["light", "dark"] as const) {
+      await page.emulateMedia({ colorScheme: scheme });
+      for (const size of [{ width: 960, height: 540 }, { width: 640, height: 450 }]) {
+        await page.setViewportSize(size);
+        await openHome(page);
+        await settle(page);
+        const seen = await pillGeometry(page);
+        const where = `${scheme} ${size.width}px`;
+        expect(seen.pill.left, where).toBeGreaterThanOrEqual(0);
+        expect(seen.pill.right, where).toBeLessThanOrEqual(seen.viewport + 1);
+        expect(seen.pill.right, where).toBeLessThanOrEqual(seen.layer.right + 1);
+        const button = await page.locator(".nt-hero-actions button[aria-pressed]").evaluate((node) => {
+          const box = node.getBoundingClientRect();
+          return { left: box.left, right: box.right, clipped: node.scrollWidth > node.clientWidth + 1 };
+        });
+        expect(button.left, where).toBeGreaterThanOrEqual(0);
+        expect(button.right, where).toBeLessThanOrEqual(seen.viewport + 1);
+        expect(button.clipped, where).toBe(false);
+      }
+    }
+    await page.emulateMedia({ colorScheme: "light" });
+    await page.setViewportSize({ width: 1280, height: 900 });
+
+    // REQ-23: the recipe page keeps its ring-and-dot icon and has no beef.
+    await page.goto(`/recipes/${recipeId}`);
+    const recipeButton = page.getByRole("link", { name: "Modo Cocina" });
+    await expect(recipeButton).toHaveAttribute("href", `/recipes/${recipeId}/cook`);
+    await expect(recipeButton.locator("svg circle")).toHaveCount(2);
+    await expect(page.locator(".lucide-beef")).toHaveCount(0);
+
+    // Enter on the pill opens the cooking mode of that dish.
+    await openHome(page);
+    await pill.focus();
+    await page.keyboard.press("Enter");
+    await expect(page).toHaveURL(new RegExp(`/recipes/${recipeId}/cook$`));
+  } finally {
+    sql(`update recipes set name = '${original.replace(/'/g, "''")}' where id = '${recipeId}'`);
+  }
 });
 
 test("empty state: a day without a plan shows the message and a link to Planes", async ({ page }) => {

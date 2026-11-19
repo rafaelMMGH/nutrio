@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
-import { ArrowUpRight, ChefHat, Clock, CookingPot, Star } from "lucide-react";
+import { ArrowUpRight, Beef, Clock, CookingPot, Star } from "lucide-react";
 import { foodIcon, mealLabel, mealTitle, type Meal } from "@/components/dashboard/food";
 import { prepMinutes, recipeRating } from "@/lib/metrics";
 import { ActionButton } from "@/components/arc/action-button/action-button";
 import type { MealResult } from "./day-log-saves";
 import { TAP_LOCK_MS, acceptTap, createAdvance } from "./mark-logic";
-import { CookingModeIcon } from "@/components/cooking/CookingModeIcon";
 import { DottedProgress, Figure, IconBadge, Pill } from "./primitives";
 
 // Fixed until the real logic exists (alt-dashboard P9).
@@ -23,8 +22,6 @@ const SPOTS = [
   { x: 36, y: 32, size: 96 },
   { x: 52, y: 76, size: 88 }
 ];
-/** Where the Modo Cocina dot sits, near the plate's centre (% of the plate). */
-const COOK_DOT = { x: 44, y: 55 };
 
 function plateIcons(meal: Meal) {
   const icons = (meal.recipe?.ingredients ?? []).map((item) => foodIcon(item.name, item.category));
@@ -118,6 +115,7 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
   }
 
   const title = mealTitle(meal);
+  const dish = title.trim();
   const icons = plateIcons(meal);
   const done = doneIds.includes(meal.id);
   const recipeHref = meal.recipe ? `/recipes/${meal.recipe.id}` : "/recipes";
@@ -150,11 +148,6 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
             instantKey={meal.id}
             onPress={() => void press(meal.id)}
           />
-          {meal.recipe && (
-            <Link href={`/recipes/${meal.recipe.id}/cook`} className="nt-pill tone-ink nt-cook">
-              <ChefHat size={16} aria-hidden /> Modo Cocina
-            </Link>
-          )}
         </div>
       </div>
       {/* Outside .nt-hero-copy, which is already a live region: nested regions are announced twice. */}
@@ -171,15 +164,22 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
           ) : (
             <img src="/food/plate.png" alt="" className="nt-plate-food" style={{ left: "50%", top: "48%", width: "26%" }} aria-hidden />
           )}
-          {/* The only dot on the plate opens Modo Cocina for the meal on screen (specs/cooking-mode REQ-4). */}
-          {meal.recipe && (
-            <Link href={`/recipes/${meal.recipe.id}/cook`} className="nt-plate-dot nt-cook-dot" style={{ left: `${COOK_DOT.x}%`, top: `${COOK_DOT.y}%` }} aria-label={`Modo Cocina: ${title}`}>
-              <span className="nt-cook-tip" aria-hidden>
-                <CookingModeIcon size={14} /> Modo Cocina
+        </div>
+        {/* A sibling of the plate, not inside it: unkeyed, unmasked and unanimated, so the pill stays still while the plate animates in
+            (specs/dashboard-polish REQ-30). It opens Modo Cocina for the meal on screen (specs/cooking-mode REQ-4). */}
+        {meal.recipe && (
+          <div className="nt-cook-layer">
+            <Link href={`/recipes/${meal.recipe.id}/cook`} className="nt-cook-pill" aria-label={dish ? `Modo Cocina: ${dish}` : "Modo Cocina"}>
+              <span className="nt-cook-badge" aria-hidden>
+                <Beef size={18} />
+              </span>
+              <span className="nt-cook-text">
+                <span className="nt-cook-title">Modo Cocina</span>
+                {dish && <span className="nt-cook-sub">{dish}</span>}
               </span>
             </Link>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       {meals.length > 1 && (
