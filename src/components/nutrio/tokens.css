@@ -68,7 +68,7 @@
   --nt-on-accent: #0e0e10;
   --nt-on-accent-sub: #4b4e55;
   --nt-on-accent-line: var(--nt-on-accent-sub);
-  --nt-yellow-hover: #faf1cc;
+  --nt-yellow-hover: #faf1cc; /* butter-100 */
   --nt-yellow-press: var(--nt-yellow-accent);
   color: var(--nt-ink);
 }
