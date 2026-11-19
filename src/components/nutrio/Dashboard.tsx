@@ -3,11 +3,13 @@
 import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { useShell } from "@/components/app/AppShell";
-import { dateKey, type Meal } from "@/components/dashboard/food";
-import { countDoneToday, kpiContexts, type GroceriesSource } from "@/lib/kpis";
+import { type Meal } from "@/components/dashboard/food";
+import { kpiContexts, type GroceriesSource } from "@/lib/kpis";
 import { dashboardMetrics, type Period } from "@/lib/metrics";
+import { streaks } from "@/lib/streak";
 import { CaloriesCard, ComplianceCard, KpiRow, MetricsCard } from "./DataColumn";
 import { Hero } from "./Hero";
+import { useToday } from "./useToday";
 import { send, useDailyLogs, type ServerLog } from "./useDailyLogs";
 import "./primitives.css";
 import "./dashboard.css";
@@ -26,7 +28,7 @@ export type DashboardProps = {
 // Redesigned dashboard (specs/alt-dashboard/plan.md): hero carousel on the left, data column on the right.
 export function Dashboard({ meals, dailyLogs, kcalGoal, proteinPct, weightGoal: serverGoal, counts, kpiContext }: DashboardProps) {
   const { refresh } = useShell();
-  const today = dateKey(new Date());
+  const today = useToday();
   const logs = useDailyLogs(dailyLogs, refresh);
   const [period, setPeriod] = useState<Period>("week");
 
@@ -38,6 +40,8 @@ export function Dashboard({ meals, dailyLogs, kcalGoal, proteinPct, weightGoal: 
   const allLogs = logs.list();
   const metrics = dashboardMetrics({ logs: allLogs, slotIds, today, period, kcalGoal, proteinPct, weightGoal });
   const todayLog = logs.get(today);
+  // From the optimistic logs, so marking, unmarking and a rollback move Racha with no extra request (REQ-15).
+  const streak = streaks({ logs: allLogs, slotIds, today });
 
   function toggleMeal(mealId: string, done: boolean) {
     return logs.setMeal(today, mealId, done);
@@ -62,8 +66,8 @@ export function Dashboard({ meals, dailyLogs, kcalGoal, proteinPct, weightGoal: 
       <Hero meals={meals} doneIds={todayLog.meals_done} onToggle={toggleMeal} />
       <div className="nt-data">
         <KpiRow
-          kpis={{ mealsDone: countDoneToday(slotIds, todayLog.meals_done), ...counts }}
-          contexts={kpiContexts({ planned: meals.length, plan: kpiContext.plan, newRecipes: kpiContext.newRecipes, recipes: counts.recipes, pending: counts.pendingGroceries, groceries: kpiContext.groceries })}
+          kpis={{ streak, ...counts }}
+          contexts={kpiContexts({ plan: kpiContext.plan, newRecipes: kpiContext.newRecipes, recipes: counts.recipes, pending: counts.pendingGroceries, groceries: kpiContext.groceries })}
           planName={kpiContext.planName}
         />
         <MetricsCard period={period} onPeriod={setPeriod} metrics={metrics} weightToday={todayLog.weight_kg ?? null} weightGoal={weightGoal} onSaveWeight={saveWeight} />

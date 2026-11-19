@@ -1,16 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { countDoneToday, countSince, kpiContexts, planContext, streakText } from "@/lib/kpis";
-
-describe("countDoneToday", () => {
-  it("counts only done ids that belong to today's meals", () => {
-    assert.equal(countDoneToday(["a", "b", "c"], ["b", "c", "gone"]), 2);
-  });
-  it("ignores repeated ids and handles no meals", () => {
-    assert.equal(countDoneToday(["a"], ["a", "a"]), 1);
-    assert.equal(countDoneToday([], ["a"]), 0);
-  });
-});
+import { countSince, kpiContexts, planContext, streakText } from "@/lib/kpis";
 
 describe("countSince", () => {
   const now = new Date("2026-11-15T12:00:00Z");
@@ -48,13 +38,12 @@ describe("planContext", () => {
 });
 
 describe("kpiContexts", () => {
-  const base = { planned: 5, plan: "desde 12 nov", newRecipes: 3, recipes: 20, pending: 12, groceries: { source: "list" as const, total: 12 } };
+  const base = { plan: "desde 12 nov", newRecipes: 3, recipes: 20, pending: 12, groceries: { source: "list" as const, total: 12 } };
   it("describes a full day", () => {
-    assert.deepEqual(kpiContexts(base), { meals: "de 5 hoy", plan: "desde 12 nov", recipes: "+3 esta semana", groceries: "de 12 en lista" });
+    assert.deepEqual(kpiContexts(base), { plan: "desde 12 nov", recipes: "+3 esta semana", groceries: "de 12 en lista" });
   });
   it("describes empty states", () => {
-    assert.deepEqual(kpiContexts({ planned: 0, plan: "sin planes", newRecipes: 0, recipes: 0, pending: 0, groceries: { source: "none", total: 0 } }), {
-      meals: "Día libre",
+    assert.deepEqual(kpiContexts({ plan: "sin planes", newRecipes: 0, recipes: 0, pending: 0, groceries: { source: "none", total: 0 } }), {
       plan: "sin planes",
       recipes: "sin recetas",
       groceries: "sin pendientes"
@@ -73,14 +62,14 @@ describe("kpiContexts", () => {
 
 describe("streakText (REQ-14)", () => {
   it("shows the best run normally", () => {
-    assert.deepEqual(streakText({ current: 3, best: 9 }), { value: "3 días", context: "mejor: 9" });
+    assert.deepEqual(streakText({ current: 3, best: 9 }), { value: "3 días", unit: "días", context: "mejor: 9" });
   });
   it("celebrates when the current streak is the best and above 0", () => {
-    assert.deepEqual(streakText({ current: 9, best: 9 }), { value: "9 días", context: "¡Tu mejor racha!" });
-    assert.deepEqual(streakText({ current: 1, best: 1 }), { value: "1 día", context: "¡Tu mejor racha!" });
+    assert.deepEqual(streakText({ current: 9, best: 9 }), { value: "9 días", unit: "días", context: "¡Tu mejor racha!" });
+    assert.deepEqual(streakText({ current: 1, best: 1 }), { value: "1 día", unit: "día", context: "¡Tu mejor racha!" });
   });
   it("invites to start at 0, with or without a past best", () => {
-    assert.deepEqual(streakText({ current: 0, best: 9 }), { value: "0 días", context: "Empieza hoy" });
-    assert.deepEqual(streakText({ current: 0, best: 0 }), { value: "0 días", context: "Empieza hoy" });
+    assert.deepEqual(streakText({ current: 0, best: 9 }), { value: "0 días", unit: "días", context: "Empieza hoy" });
+    assert.deepEqual(streakText({ current: 0, best: 0 }), { value: "0 días", unit: "días", context: "Empieza hoy" });
   });
 });

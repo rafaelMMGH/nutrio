@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
-import { ArrowUp, ArrowUpRight, ChevronDown, ClipboardList, ConciergeBell, Flame, Gauge, HandPlatter, Package, Utensils } from "lucide-react";
+import { ArrowUp, ArrowUpRight, ChevronDown, ClipboardList, ConciergeBell, Flame, Gauge, Package, Utensils } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { metricReadouts, type DialReadout, type Metrics, type Period } from "@/lib/metrics";
-import { kpiContexts } from "@/lib/kpis";
+import { kpiContexts, streakText } from "@/lib/kpis";
 import { Card, Figure, IconBadge, Pill, RadialGauge, SegmentedTabs } from "./primitives";
 import DetentDial from "./DetentDial";
 import { showEndLabels } from "./dial-logic";
@@ -13,30 +13,41 @@ import { RollingNumber } from "./RollingNumber";
 
 /* ---------- KPI tiles (§5.4) ---------- */
 
-export type Kpis = { mealsDone: number; plans: number; recipes: number; pendingGroceries: number };
+export type Kpis = { streak: { current: number; best: number }; plans: number; recipes: number; pendingGroceries: number };
 export type KpiContexts = ReturnType<typeof kpiContexts>;
+
+type Tile = { label: string; value: number; context: string; title?: string; icon: ReactNode; unit?: string; phrase?: string };
 
 /** `planName` is the full name of the active plan, shown on hover of the Planes line (which only says since when it exists). */
 export function KpiRow({ kpis, contexts, planName }: { kpis: Kpis; contexts: KpiContexts; planName: string | null }) {
-  const tiles: { label: string; value: number; context: string; title?: string; icon: ReactNode }[] = [
-    { label: "Comidas", value: kpis.mealsDone, context: contexts.meals, icon: <HandPlatter /> },
+  const streak = streakText(kpis.streak);
+  const tiles: Tile[] = [
+    // The flame is decorative: the tile reads as one phrase (REQ-29), so its visible parts are aria-hidden.
+    { label: "Racha", value: kpis.streak.current, context: streak.context, unit: streak.unit, phrase: `Racha, ${streak.value}, ${streak.context}`, icon: <Flame /> },
     { label: "Planes", value: kpis.plans, context: contexts.plan, title: planName ?? undefined, icon: <ClipboardList /> },
     { label: "Recetas", value: kpis.recipes, context: contexts.recipes, icon: <ConciergeBell /> },
     { label: "Compras", value: kpis.pendingGroceries, context: contexts.groceries, icon: <Package /> }
   ];
   return (
     <div className="nt-kpis" role="list" aria-label="Resumen">
-      {tiles.map((tile, index) => (
-        <Card as="div" tone="glass" key={tile.label} className="nt-kpi" role="listitem" style={{ "--i": index } as CSSProperties}>
-          <IconBadge>{tile.icon}</IconBadge>
-          <span className="nt-kpi-text">
-            <span className="nt-kpi-label">{tile.label}</span>
-            {/* The number rolls once its own tile has landed (450 ms entrance). */}
-            <RollingNumber value={tile.value} minDigits={2} delay={index * 60 + 450} dashForZero />
-            <span className="nt-kpi-context" title={tile.title ?? tile.context}>{tile.context}</span>
-          </span>
-        </Card>
-      ))}
+      {tiles.map((tile, index) => {
+        const hidden = tile.phrase ? true : undefined;
+        return (
+          <Card as="div" tone="glass" key={tile.label} className={tile.phrase ? "nt-kpi nt-kpi-streak" : "nt-kpi"} role="listitem" style={{ "--i": index } as CSSProperties}>
+            <IconBadge>{tile.icon}</IconBadge>
+            <span className="nt-kpi-text">
+              {tile.phrase && <span className="sr-only">{tile.phrase}</span>}
+              <span className="nt-kpi-label" aria-hidden={hidden}>{tile.label}</span>
+              {/* The number rolls once its own tile has landed (450 ms entrance). Racha shows a real zero, not a dash. */}
+              <span className="nt-kpi-figure" aria-hidden={hidden}>
+                <RollingNumber value={tile.value} minDigits={tile.unit ? 1 : 2} delay={index * 60 + 450} dashForZero={!tile.unit} />
+                {tile.unit && <span className="nt-kpi-unit">{tile.unit}</span>}
+              </span>
+              <span className="nt-kpi-context" title={tile.title ?? tile.context} aria-hidden={hidden}>{tile.context}</span>
+            </span>
+          </Card>
+        );
+      })}
     </div>
   );
 }

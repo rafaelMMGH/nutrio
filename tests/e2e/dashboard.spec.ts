@@ -82,14 +82,17 @@ test("KPI tiles show real counts with at least two digits", async ({ page }) => 
   // The Recetario's rule: a recipe has more than one live ingredient row.
   const recipes = count("select count(*) from recipes r where r.deleted_at is null and (select count(*) from ingredient_usages u where u.source_type = 'recipe' and u.source_id = r.id and u.deleted_at is null) > 1");
   const tiles = page.locator(".nt-kpi");
-  await expect(tiles.locator(".nt-kpi-label")).toHaveText(["Comidas", "Planes", "Recetas", "Compras"]);
+  await expect(tiles.locator(".nt-kpi-label")).toHaveText(["Racha", "Planes", "Recetas", "Compras"]);
   await expect(tiles.nth(1).locator(".nt-roll")).toHaveText(kpiText(plans));
   await expect(tiles.nth(2).locator(".nt-roll")).toHaveText(kpiText(recipes));
   // The accessible text is the padded number (or 0 behind the dash), not the glyphs of the digit columns.
-  for (const text of await tiles.locator(".nt-roll").allTextContents()) expect(text).toMatch(/^(\d{2,}|0)$/);
-  // Comidas is how many of today's meals are marked done.
-  const doneIds = sql(`select array_to_string(meals_done, ',') from daily_logs where date = '${TODAY}'`).split(",");
-  await expect(tiles.nth(0).locator(".nt-roll")).toHaveText(kpiText(slotIds().filter((id) => doneIds.includes(id)).length));
+  for (const text of await tiles.locator(".nt-roll").allTextContents()) expect(text).toMatch(/^\d+$/);
+  for (const index of [1, 2, 3]) expect(await tiles.nth(index).locator(".nt-roll").textContent()).toMatch(/^(\d{2,}|0)$/);
+  // Racha is "N días" with a context line, read as one phrase, and its zero is a real digit (REQ-10, 14, 29).
+  await expect(tiles.first().locator(".nt-roll")).toHaveText(/^\d+$/);
+  await expect(tiles.first().locator(".nt-roll-dash")).toHaveCount(0);
+  await expect(tiles.first().locator(".nt-kpi-unit")).toHaveText(/^(día|días)$/);
+  await expect(streakPhrase(page)).toHaveText(/^Racha, \d+ (día|días), (mejor: \d+|¡Tu mejor racha!|Empieza hoy)$/);
   for (const context of await tiles.locator(".nt-kpi-context").allTextContents()) expect(context.length).toBeGreaterThan(0);
   // Planes says since when the active plan exists, and keeps its full name for hover.
   const planContext = tiles.nth(1).locator(".nt-kpi-context");
@@ -125,10 +128,21 @@ test("KPI tiles pop in one after another, then rest fully visible", async ({ pag
 
   // The digits roll from zero once their own tile has landed, and the text is the real padded value.
   const rolls = await tiles.locator(".nt-roll-strip").evaluateAll((nodes) => nodes.map((node) => ({ name: getComputedStyle(node).animationName, delay: parseFloat(getComputedStyle(node).animationDelay) * 1000, tile: [...document.querySelectorAll(".nt-kpi")].indexOf(node.closest(".nt-kpi")!) })));
-  // A tile at zero shows a dash and has no columns, so count the tiles that do; each digit tile has at least two columns.
-  // If every tile is at zero there are no columns to check: the digit parts are skipped and the tile checks above and below still run.
+  // Planes, Recetas and Compras show a dash at zero and have no columns, so count the ones that do; each has at least two columns.
+  // Racha always has columns (its zero is a real 0), at least one, and as many as its number has digits.
+  // If those three are all at zero only Racha's columns are checked.
   const digitTiles = await tiles.locator(".nt-roll:not(:has(.nt-roll-dash))").count();
-  expect(rolls.length).toBeGreaterThanOrEqual(digitTiles * 2);
+  const countTiles = await Promise.all([1, 2, 3].map((index) => tiles.nth(index).locator(".nt-roll:not(:has(.nt-roll-dash))").count()));
+  expect(digitTiles).toBe(1 + countTiles.reduce((sum, n) => sum + n, 0));
+  const rachaText = await tiles.first().locator(".nt-roll").textContent();
+  expect(rachaText).toMatch(/^\d+$/);
+  const columnsOf = (tile: number) => rolls.filter((roll) => roll.tile === tile).length;
+  expect(columnsOf(0)).toBe(rachaText!.length);
+  for (const index of [1, 2, 3]) {
+    if (countTiles[index - 1] === 0) continue;
+    expect(columnsOf(index)).toBeGreaterThanOrEqual(2);
+    expect(columnsOf(index)).toBe((await tiles.nth(index).locator(".nt-roll").textContent())!.length);
+  }
   expect(new Set(rolls.map((roll) => roll.tile)).size).toBe(digitTiles);
   for (const roll of rolls) {
     expect(roll.name).toBe("nt-roll-in");
@@ -150,12 +164,12 @@ test("KPI tiles pop in one after another, then rest fully visible", async ({ pag
   );
   for (const roll of resting) {
     if (roll.digits.length === 0) {
-      // A tile at zero: "0" for assistive tech, a visible dash, no columns.
+      // Planes, Recetas or Compras at zero: "0" for assistive tech, a visible dash, no columns.
       expect(roll.text).toBe("0");
       expect(roll.dashVisible).toBe(true);
       continue;
     }
-    expect(roll.text).toMatch(/^\d{2,}$/);
+    expect(roll.text).toMatch(/^\d+$/);
     expect(roll.digits.map((digit) => digit.wanted.trim()).join("")).toBe(roll.text);
     for (const digit of roll.digits) expect(Math.abs(digit.glyphTop - digit.top)).toBeLessThan(1);
   }
@@ -168,11 +182,8 @@ test("KPI tiles still animate when the OS asks for reduced motion", async ({ pag
   await openHome(page);
   const tile = page.locator(".nt-kpi").first();
   expect(await style(tile, null, "animation-name")).toBe("nt-kpi-in");
-  // The first tile may be a dash (Comidas at zero) with no columns, so look for a strip across all tiles.
-  const strip = page.locator(".nt-kpi .nt-roll-strip").first();
-  // If every tile is at zero there is no digit roll to observe; the tile entrance above is still checked.
-  if ((await strip.count()) === 0) return;
-  expect(await style(strip, null, "animation-name")).toBe("nt-roll-in");
+  // Racha, the first tile, always has digit columns: its zero is a real 0, not a dash.
+  expect(await style(tile, ".nt-roll-strip", "animation-name")).toBe("nt-roll-in");
 });
 
 test("KPI tile lifts 3px and wiggles its icon on hover, squashes on press", async ({ page }) => {
@@ -265,6 +276,28 @@ const slotIds = () =>
 const setDone = (ids: string[]) =>
   sql(`insert into daily_logs (id, user_id, date, meals_done, water_glasses, created_at, updated_at) select 'e2e-' || '${TODAY}', id, '${TODAY}', '{}', 0, now(), now() from users order by seq limit 1 on conflict do nothing; update daily_logs set meals_done = '{${ids.join(",")}}' where date = '${TODAY}'`);
 
+/* ---------- Racha: daily_logs replaced by SQL, restored in `finally` ---------- */
+
+const daysAgo = (days: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return dayKey(date);
+};
+const LOGS_BACKUP = "e2e_racha_logs";
+const FIRST_USER = "(select id from users order by seq limit 1)";
+/** Replaces every daily log with `rows` (`ago` days back, `done` meal ids); `restoreLogs` puts the originals back. */
+function seedLogs(rows: { ago: number; done: string[] }[]) {
+  sql(`create table if not exists ${LOGS_BACKUP} as select * from daily_logs`);
+  const values = rows.map(({ ago, done }) => `('e2e-racha-${ago}', ${FIRST_USER}, '${daysAgo(ago)}', '{${done.join(",")}}', 0, now(), now())`);
+  sql(`delete from daily_logs${values.length ? `; insert into daily_logs (id, user_id, date, meals_done, water_glasses, created_at, updated_at) values ${values.join(",")}` : ""}`);
+}
+function restoreLogs() {
+  if (!sql(`select to_regclass('${LOGS_BACKUP}')`)) return;
+  sql(`delete from daily_logs; insert into daily_logs select * from ${LOGS_BACKUP}; drop table ${LOGS_BACKUP}`);
+}
+const streakTile = (page: Page) => page.locator(".nt-kpi").first();
+const streakPhrase = (page: Page) => streakTile(page).locator(".nt-kpi-text > .sr-only");
+
 test('"Marcar cumplida" saves the meal, moves the adherence and slides to the next pending meal', async ({ page }) => {
   const slots = slotIds();
   test.skip(slots.length < 2, "the active plan has fewer than two meals today");
@@ -352,20 +385,18 @@ test('"Marcar cumplida" on the last pending meal stays on that slide', async ({ 
   }
 });
 
-test('"Marcar cumplida" makes the Comidas number go up by one', async ({ page }) => {
+test("Racha goes up by one when today's last meal is marked", async ({ page }) => {
   const slots = slotIds();
   test.skip(slots.length < 2, "the active plan has fewer than two meals today");
-  const original = sql(`select array_to_string(meals_done, ',') from daily_logs where date = '${TODAY}'`);
   try {
-    setDone([]);
+    // Nine complete days up to yesterday and today one meal short: Racha 9, which is also the best. Marking makes it 10.
+    seedLogs([9, 8, 7, 6, 5, 4, 3, 2, 1].map((ago) => ({ ago, done: slots })).concat([{ ago: 0, done: slots.slice(0, -1) }]));
     await openHome(page);
-    const comidas = page.locator(".nt-kpi").first().locator(".nt-roll");
-    // Nothing done: one dash, "0" for screen readers, no digit columns.
-    await expect(comidas).toHaveText("0");
-    await expect(comidas.locator(".nt-roll-dash")).toHaveCount(1);
-    await expect(comidas.locator(".nt-roll-digit")).toHaveCount(0);
-    // Record the columns that start rolling from now on: the roll lasts 650ms and the text check below can poll later than that,
-    // so reading getAnimations() afterwards would race it. animationstart fires once per column, whenever the check runs.
+    const racha = streakTile(page).locator(".nt-roll");
+    await expect(racha).toHaveText("9");
+    await expect(streakPhrase(page)).toHaveText("Racha, 9 días, ¡Tu mejor racha!");
+    // Record the columns that start rolling from now on (the roll outlasts a late poll). Going from 9 to 10 mounts one new column
+    // on the left; it must roll at once, not wait for the first-view delay.
     await page.evaluate(() => {
       const started: { name: string; delay: string }[] = [];
       (window as unknown as { __rollStarts: typeof started }).__rollStarts = started;
@@ -374,25 +405,97 @@ test('"Marcar cumplida" makes the Comidas number go up by one', async ({ page })
         if (target.matches(".nt-roll-strip")) started.push({ name: (event as AnimationEvent).animationName, delay: getComputedStyle(target).animationDelay });
       });
     });
+    // The last pending meal is the one open on the hero. One request, and the tile moves with no reload.
+    const requests = puts(page);
     await Promise.all([saved(page), mark(markButton(page))]);
-    await expect(comidas).toHaveText("01");
-    // Both new columns rolled in with nt-roll-in and no first-view delay (a later-mounted column must not wait).
+    await expect(racha).toHaveText("10");
+    await expect(streakTile(page).locator(".nt-kpi-unit")).toHaveText("días");
+    await expect(streakPhrase(page)).toHaveText("Racha, 10 días, ¡Tu mejor racha!");
+    expect(requests).toHaveLength(1);
     const started = await page.evaluate(() => (window as unknown as { __rollStarts: { name: string; delay: string }[] }).__rollStarts);
-    expect(started).toEqual([{ name: "nt-roll-in", delay: "0s" }, { name: "nt-roll-in", delay: "0s" }]);
-    await expect(page.locator(".nt-kpi-context").first()).toHaveText(`de ${slots.length} hoy`);
-    // The digits are there and come to rest on 0 and 1 (each glyph level with its cell).
-    await expect(comidas.locator(".nt-roll-dash")).toHaveCount(0);
+    expect(started).toEqual([{ name: "nt-roll-in", delay: "0s" }]);
+    // The digits come to rest on 1 and 0 (each glyph level with its cell).
     await settle(page);
-    const columns = await comidas.locator(".nt-roll-digit").evaluateAll((nodes) =>
+    const columns = await racha.locator(".nt-roll-digit").evaluateAll((nodes) =>
       nodes.map((digit) => {
         const wanted = getComputedStyle(digit).getPropertyValue("--nt-roll-d").trim();
-        return { wanted, top: digit.getBoundingClientRect().top, glyphTop: digit.querySelector(`i[data-glyph="${wanted}"]`)!.getBoundingClientRect().top };
+        return { wanted, offset: Math.abs(digit.querySelector(`i[data-glyph="${wanted}"]`)!.getBoundingClientRect().top - digit.getBoundingClientRect().top) };
       })
     );
-    expect(columns.map((column) => column.wanted).join("")).toBe("01");
-    for (const column of columns) expect(Math.abs(column.glyphTop - column.top)).toBeLessThan(1);
+    expect(columns.map((column) => column.wanted).join("")).toBe("10");
+    for (const column of columns) expect(column.offset).toBeLessThan(1);
   } finally {
-    setDone(original ? original.split(",") : []);
+    restoreLogs();
+  }
+});
+
+test("Racha: streak rules, 999 at 360px and midnight", async ({ page }) => {
+  const slots = slotIds();
+  test.skip(slots.length < 1, "the active plan has no meals");
+  const phrase = (text: string) => expect(streakPhrase(page)).toHaveText(text);
+  try {
+    // Best run 4 (six to three days ago), a day with nothing done, yesterday done, and today still empty: an unfinished
+    // today is neither counted nor a break, so Racha is 1 and the best is 4 (REQ-12, 13, 14).
+    seedLogs([6, 5, 4, 3].map((ago) => ({ ago, done: slots })).concat([{ ago: 2, done: [] }, { ago: 1, done: slots }]));
+    await openHome(page);
+    await expect(streakTile(page).locator(".nt-roll")).toHaveText("1");
+    await phrase("Racha, 1 día, mejor: 4");
+    // One phrase for assistive tech: the icon and the visible parts are hidden from it (REQ-29).
+    await expect(streakTile(page)).toMatchAriaSnapshot('- listitem: "Racha, 1 día, mejor: 4"');
+
+    // 999 consecutive complete days ending today: the current run is the best run.
+    sql(`delete from daily_logs; insert into daily_logs (id, user_id, date, meals_done, water_glasses, created_at, updated_at) select 'e2e-racha-' || to_char(d, 'YYYY-MM-DD'), ${FIRST_USER}, d::date, '{${slots.join(",")}}', 0, now(), now() from generate_series('${daysAgo(998)}'::date, '${TODAY}'::date, interval '1 day') d`);
+    const sizes = [{ width: 360, height: 740 }, { width: 1280, height: 900 }, { width: 1280, height: 720 }];
+    for (const [size, scheme] of sizes.flatMap((size) => (["light", "dark"] as const).map((scheme) => [size, scheme] as const))) {
+      const where = `${size.width}x${size.height} ${scheme}`;
+      await page.setViewportSize(size);
+      await page.emulateMedia({ colorScheme: scheme });
+      await openHome(page);
+      await phrase("Racha, 999 días, ¡Tu mejor racha!");
+      await expect(streakTile(page).locator(".nt-roll")).toHaveText("999");
+      // Measure at rest: the tiles pop in with a scale.
+      await settle(page);
+      // The row is the 2x2 grid up to 937px and four across from 938px.
+      const boxes = await page.locator(".nt-kpi").evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().toJSON()));
+      expect(boxes[1].x).toBeGreaterThan(boxes[0].x + 20);
+      expect(Math.abs(boxes[1].y - boxes[0].y)).toBeLessThan(2);
+      if (size.width <= 937) {
+        expect(Math.abs(boxes[2].x - boxes[0].x)).toBeLessThan(2);
+        expect(boxes[2].y).toBeGreaterThan(boxes[0].y + 20);
+      } else {
+        expect(Math.abs(boxes[3].y - boxes[0].y), where).toBeLessThan(2);
+      }
+      // Nothing is clipped, nothing leaves the tile, and the number and its unit do not overlap.
+      const fit = await streakTile(page).evaluate((tile) => {
+        const tileBox = tile.getBoundingClientRect();
+        const parts = [".nt-kpi-label", ".nt-kpi-figure", ".nt-kpi-context", ".nt-roll", ".nt-kpi-unit"].map((selector) => {
+          const node = tile.querySelector(selector)!;
+          const box = node.getBoundingClientRect();
+          return { selector, truncated: node.scrollWidth > node.clientWidth + 1 || node.scrollHeight > node.clientHeight + 1, inside: box.left >= tileBox.left - 1 && box.right <= tileBox.right + 1 && box.bottom <= tileBox.bottom + 1 };
+        });
+        const roll = tile.querySelector(".nt-roll")!.getBoundingClientRect();
+        const unit = tile.querySelector(".nt-kpi-unit")!.getBoundingClientRect();
+        const apart = roll.right <= unit.left + 1 || unit.right <= roll.left + 1 || roll.bottom <= unit.top + 1 || unit.bottom <= roll.top + 1;
+        return { parts, apart, pageScrolls: document.documentElement.scrollWidth > window.innerWidth };
+      });
+      for (const part of fit.parts) expect(part, `${where}: ${part.selector}`).toEqual({ selector: part.selector, truncated: false, inside: true });
+      expect(fit.apart, `${where}: number and unit overlap`).toBe(true);
+      expect(fit.pageScrolls, `${where}: the page scrolls sideways`).toBe(false);
+    }
+
+    // Midnight: the page was loaded before the clock is installed, so server and client agree on the date during hydration.
+    seedLogs([6, 5, 4, 3].map((ago) => ({ ago, done: slots })).concat([{ ago: 2, done: [] }, { ago: 1, done: slots }]));
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await openHome(page);
+    await phrase("Racha, 1 día, mejor: 4");
+    await page.clock.install({ time: new Date() });
+    // The next day arrives while the tab is open: yesterday's gap became today's past and breaks the run (REQ-28).
+    await page.clock.setSystemTime(new Date(Date.now() + 86_400_000));
+    await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    await phrase("Racha, 0 días, Empieza hoy");
+    await expect(streakTile(page).locator(".nt-roll")).toHaveText("0");
+  } finally {
+    restoreLogs();
   }
 });
 
@@ -727,9 +830,11 @@ test("empty state: a day without a plan shows the message and a link to Planes",
     await openHome(page);
     await expect(page.locator(".nt-hero-empty")).toHaveText("Hoy no tienes comidas planificadas");
     await expect(page.locator(".nt-hero").getByRole("link", { name: "Ir a Planes" })).toHaveAttribute("href", "/plans");
+    // Racha does not depend on today's plan: a real 0 (no dash) with its own line, read as one phrase.
     await expect(page.locator(".nt-kpi").first().locator(".nt-roll")).toHaveText("0");
-    await expect(page.locator(".nt-kpi").first().locator(".nt-roll-dash")).toHaveAttribute("data-glyph", "—");
-    await expect(page.locator(".nt-kpi-context").first()).toHaveText("Día libre");
+    await expect(page.locator(".nt-kpi").first().locator(".nt-roll-dash")).toHaveCount(0);
+    await expect(page.locator(".nt-kpi-context").first()).toHaveText("Empieza hoy");
+    await expect(streakPhrase(page)).toHaveText("Racha, 0 días, Empieza hoy");
     // No plan means no meals and no targets: every dial reads "—" and "Sin datos" (metric-dials REQ-6, REQ-43); Peso keeps its gauge.
     for (const name of ["Adherencia", "Calorías", "Proteína"]) {
       const dial = page.locator(".nt-metrics").getByRole("meter", { name, exact: true });

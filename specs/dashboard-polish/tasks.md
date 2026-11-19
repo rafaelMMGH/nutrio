@@ -68,11 +68,11 @@ None. Each story's groundwork is inside its own batch.
 
 ### Batch US2b: Racha tile and e2e (≈300 lines)
 
-- [ ] T025 [US2] Rewrite "KPI tiles show real counts with at least two digits" (order Racha first, "N días" and context), the first-tile comment in "KPI tiles still animate when the OS asks for reduced motion", and "makes the Comidas number go up by one" → "Racha goes up by one when today's last meal is marked" (REQ-10, 14, 15) (tests/e2e/dashboard.spec.ts)
-- [ ] T026 [US2] New title "Racha: streak rules, 999 at 360px and midnight": SQL-seeded past logs restored in `finally`, 2×2 at 360 px, "999 días" with "¡Tu mejor racha!" not clipped, `ariaSnapshot` phrase, midnight via `page.clock` and `focus` (REQ-10 to 14, 28, 29) (tests/e2e/dashboard.spec.ts)
-- [ ] T027 [US2] KpiRow: Racha tile first with `Flame`, `RollingNumber` (`minDigits` 1, no dash) plus unit, one hidden phrase, visible parts `aria-hidden`; Planes, Recetas, Compras unchanged (REQ-10, 14, 29) (src/components/nutrio/DataColumn.tsx)
-- [ ] T028 [US2] Dashboard computes `streaks` from the optimistic `logs.list()` with `useToday()`; remove `countDoneToday`, `contexts.meals` and their test cases (REQ-10, 15, 28) (src/components/nutrio/Dashboard.tsx, src/lib/kpis.ts, tests/unit/kpis.test.ts)
-- [ ] T029 [US2] Tile fit for "999 días" plus "¡Tu mejor racha!" at 360 px and 200% zoom (REQ-29) (src/components/nutrio/dashboard.css)
+- [x] T025 [US2] Rewrite "KPI tiles show real counts with at least two digits" (order Racha first, "N días" and context), the first-tile comment in "KPI tiles still animate when the OS asks for reduced motion", and "makes the Comidas number go up by one" → "Racha goes up by one when today's last meal is marked" (REQ-10, 14, 15) (tests/e2e/dashboard.spec.ts)
+- [x] T026 [US2] New title "Racha: streak rules, 999 at 360px and midnight": SQL-seeded past logs restored in `finally`, 2×2 at 360 px, "999 días" with "¡Tu mejor racha!" not clipped, `ariaSnapshot` phrase, midnight via `page.clock` and `focus` (REQ-10 to 14, 28, 29) (tests/e2e/dashboard.spec.ts)
+- [x] T027 [US2] KpiRow: Racha tile first with `Flame`, `RollingNumber` (`minDigits` 1, no dash) plus unit, one hidden phrase, visible parts `aria-hidden`; Planes, Recetas, Compras unchanged (REQ-10, 14, 29) (src/components/nutrio/DataColumn.tsx)
+- [x] T028 [US2] Dashboard computes `streaks` from the optimistic `logs.list()` with `useToday()`; remove `countDoneToday`, `contexts.meals` and their test cases (REQ-10, 15, 28) (src/components/nutrio/Dashboard.tsx, src/lib/kpis.ts, tests/unit/kpis.test.ts)
+- [x] T029 [US2] Tile fit for "999 días" plus "¡Tu mejor racha!" at 360 px and 200% zoom (REQ-29) (src/components/nutrio/dashboard.css)
 - [ ] T030 [US2] Run tsc, unit tests and the US2 e2e titles (T025, T026)
 
 **Checkpoint:** US2 complete. Review, commit, then continue.

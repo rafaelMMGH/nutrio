@@ -200,6 +200,11 @@ html.dark:not(:has([data-theme-lock])) .nt-plate-dish { background: radial-gradi
 .nt-kpi-label { font-size: 14.5px; line-height: 18px; }
 .nt-kpi-context { font-size: 12px; line-height: 16px; color: var(--nt-muted); }
 .nt-kpi .nt-roll { font-size: 40px; }
+/* Number and unit ("999 días") share a line and wrap rather than clip when the tile is narrow. */
+.nt-kpi-figure { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: center; column-gap: 6px; max-width: 100%; }
+.nt-kpi-unit { font-size: 14.5px; line-height: 1; padding-bottom: 4px; }
+/* The Racha line is the longest ("¡Tu mejor racha!"): it wraps instead of ending in an ellipsis (REQ-29). */
+.nt-kpi-streak .nt-kpi-context { white-space: normal; overflow-wrap: anywhere; }
 
 .nt-metrics { display: grid; gap: 16px; padding: 20px 22px; }
 .nt-metrics .nt-tabs { margin-left: auto; }
@@ -329,6 +334,8 @@ button.nt-gauge-tile:hover { background: #202024; }
   .nt-hero-copy, .nt-hero-empty { margin-top: 0; }
   .nt-plate { left: 8%; width: 120%; translate: 0 -38%; }
   .nt-kpis, .nt-gauges { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  /* Badge and text share a ~160px tile at 360px: three digits at 40px plus the unit would not fit. */
+  .nt-kpi-streak .nt-roll { font-size: 32px; }
   .nt-pair { grid-template-columns: minmax(0, 1fr); }
   .nt-metrics .nt-card-head { flex-wrap: wrap; }
   .nt-metrics .nt-tabs { margin-left: 0; width: 100%; }
