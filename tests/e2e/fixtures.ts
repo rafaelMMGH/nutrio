@@ -1,4 +1,5 @@
 import { expect, test as base, type Page } from "@playwright/test";
+import { authStatePath, workerBaseUrl } from "./database";
 
 export { expect };
 
@@ -30,6 +31,11 @@ export function watch(page: Page, issues: string[]) {
 
 export const test = base.extend<Options & { issues: string[] }>({
   expectedIssues: [[], { option: true }],
+  // Every worker has its own server and database (playwright.config.ts): point each test at its worker's server.
+  baseURL: async ({}, use, testInfo) => use(workerBaseUrl(testInfo.parallelIndex)),
+  // The project's session file is a placeholder for worker 0; swap in the worker's own. A `test.use({ storageState })`
+  // with an object (the signed-out specs) passes through untouched.
+  storageState: async ({ storageState }, use, testInfo) => use(typeof storageState === "string" ? authStatePath(testInfo.parallelIndex) : storageState),
   // Any page error, console error or failed API call fails the test that caused it. Warnings do not.
   issues: [
     async ({ page, expectedIssues }, use) => {

@@ -29,6 +29,13 @@ Plan, reference, screenshots and the delivery summary are in `specs/alt-dashboar
 - [ ] **Restart Claude Code** so the new speed rules load. These are scout and size triage before grilling, sub-batches of about 300 lines, running only the affected tests while iterating plus one full run per batch, tests shown failing on purpose, and minor findings folded into the next batch. They live in `.claude/agents/*.md` and `docs/agent-workflow.md`, both versioned since 2026-11-18.
 - [ ] **Decide on uncommitted local changes** that have been kept out of every commit so far: the deletion of `src/server.js` and `package.json` dropping the `legacy:dev` script (both inside `stash@{0}`).
 
+## E2E infrastructure (follow-ups from `refactor/e2e-db-per-worker`)
+
+- [ ] **Cross-worktree collision (MEDIUM, destructive).** The run lock lives per checkout, but ports 3200-3202 and the `<name>-e2e*` databases are shared by every checkout and worktree. A second checkout's setup or teardown (`DROP … WITH (FORCE)`) can kill a live run elsewhere. Fix: a lock in the OS temp dir keyed by the database name, or a per-checkout port and database suffix. Until then, run e2e from one session at a time.
+- [ ] **`tsconfig.json` dirtied by every run:** `next dev` adds `.next-e2e-<i>/types/**/*.ts`. Commit those includes once, or keep restoring the file after runs.
+- [ ] **Flaky `upload-wizard-checks.spec.ts:145`** ("DELETE fails", focus on the X button): `toBeFocused` sometimes gets "inactive".
+- [ ] **Deterministic seed data** instead of cloning the real database, so data- and time-dependent failures go away.
+
 ## Assistant chat (follow-ups)
 
 - [ ] **Optional spec-change:** combined questions on a recipe page ("¿Qué lleva y cómo se hace?") currently show only Preparación (today's narrowing rule, kept by spec v1.4). Decide whether they should show both sections.
@@ -55,6 +62,7 @@ Findings, with file:line references: `specs/bugs/shopping-list-findings.md`.
 
 ## Done
 
+- 2026-11-18: **E2E database and server per worker** (`refactor/e2e-db-per-worker`): 3 workers by default (`E2E_WORKERS`), full suite 32.9 → about 18 min with the same results. Note: `specs/refactors/e2e-db-per-worker.md`.
 - 2026-11-18: **Upload wizard stepper** merged as PR #12 (spec v1.3.4 `implemented`; T016 e2e gate passed). **Dashboard redesign, Modo Cocina and metric dials (US1)** merged as PR #13 (`alt-dashboard`).
 - 2026-11-18: **`specs/`, `docs/` and `.claude/` versioned** (`refactor/version-specs-docs-agents`): they were gitignored since `c006995`, so specs for cooking-mode, metric-dials and upload-wizard-stepper, the PRD and the agent definitions existed only on this machine. Note: `specs/refactors/version-specs-docs-agents.md`.
 

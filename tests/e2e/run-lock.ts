@@ -2,7 +2,7 @@ import { linkSync, readFileSync, statSync, unlinkSync, writeFileSync } from "nod
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-// One e2e run at a time: the suite owns port 3200, test-results/ and the "<name>-e2e" database (cloned in setup,
+// One e2e run at a time: the suite owns ports 3200+, test-results/ and the "<name>-e2e*" databases (cloned in setup,
 // dropped in teardown), so a second run would corrupt the first. The lock file holds "<pid> <ISO start time>".
 // Resolved from this file, not the cwd. E2E_RUN_LOCK_PATH overrides it so unit tests never touch the real lock.
 const defaultLockPath = path.resolve(path.dirname(fileURLToPath(import.meta.url)), ".e2e-run.lock");
@@ -119,7 +119,7 @@ export function acquireRunLock() {
     if (state.kind === "missing") continue; // released between our create and our read: just try again
     if (state.kind === "held" && isAlive(state.pid)) {
       throw new Error(
-        `Another e2e run (PID ${state.pid}, started ${state.startedAt}) is using port 3200, test-results/ and the e2e database; wait for it or stop it. ` +
+        `Another e2e run (PID ${state.pid}, started ${state.startedAt}) is using ports 3200+, test-results/ and the e2e databases; wait for it or stop it. ` +
           `Delete ${lockPath()} if no Playwright run is active.`
       );
     }
