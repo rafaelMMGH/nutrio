@@ -1,10 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
-import { e2eDatabaseUrl } from "./tests/e2e/database";
+import { authStatePath, BASE_PORT, serverLogName, workerCount, workerDatabaseUrl, workerPort } from "./tests/e2e/database";
 import { acquireRunLock } from "./tests/e2e/run-lock";
 
-// End-to-end tests run against their own `next dev` on PORT, backed by a throwaway copy of the database
-// (created in global setup, dropped in global teardown). The dev server on :3000 and its data are never touched.
-const PORT = 3200;
+// End-to-end tests run against their own `next dev` per worker (port BASE_PORT + parallelIndex), each backed by its own
+// throwaway copy of the database (created in global setup, dropped in global teardown), so spec files run in parallel
+// without sharing data. The dev server on :3000 and its data are never touched.
+const WORKERS = workerCount();
 
 // Refuse a second concurrent run here: Playwright clears test-results/ right after loading the config, before the
 // web server and global setup, so any later check would already have broken the first run's traces.
@@ -15,16 +16,17 @@ const viewport = { width: 1440, height: 900 };
 
 export default defineConfig({
   testDir: "./tests/e2e",
-  // One shared database: run tests one after another, in file order.
+  // Files spread across the workers; the tests inside a file keep running in order (describe.serial included).
   fullyParallel: false,
-  workers: 1,
+  workers: WORKERS,
   timeout: 60_000,
   expect: { timeout: 10_000 },
   reporter: [["list"], ["html", { open: "never" }]],
   globalSetup: "./tests/e2e/global-setup.ts",
   globalTeardown: "./tests/e2e/global-teardown.ts",
   use: {
-    baseURL: `http://localhost:${PORT}`,
+    // Placeholder: tests/e2e/fixtures.ts points every test at its own worker's server.
+    baseURL: `http://localhost:${BASE_PORT}`,
     locale: "es-MX",
     trace: "retain-on-failure",
     screenshot: "only-on-failure"
@@ -34,14 +36,16 @@ export default defineConfig({
     {
       name: "dashboard",
       dependencies: ["setup"],
-      use: { ...devices["Desktop Chrome"], viewport, storageState: "tests/e2e/.auth/user.json" }
+      use: { ...devices["Desktop Chrome"], viewport, storageState: authStatePath(0) }
     }
   ],
-  webServer: {
-    command: `sh -c "npx next dev -p ${PORT} 2>&1 | tee tests/e2e/.server.log"`,
-    url: `http://localhost:${PORT}/login`,
+  // One server per worker, each on its own database. None serves the template, so cloning it never meets open connections.
+  webServer: Array.from({ length: WORKERS }, (_, index) => ({
+    command: `sh -c "npx next dev -p ${workerPort(index)} 2>&1 | tee tests/e2e/${serverLogName(index)}"`,
+    url: `http://localhost:${workerPort(index)}/login`,
     reuseExistingServer: false,
-    timeout: 120_000,
-    env: { DATABASE_URL: e2eDatabaseUrl(), NEXT_DIST_DIR: ".next-e2e", E2E_HOOKS: "1" }
-  }
+    // Three cold compiles run at once, so the first /login takes longer than with a single server.
+    timeout: 240_000,
+    env: { DATABASE_URL: workerDatabaseUrl(index), NEXT_DIST_DIR: `.next-e2e-${index}`, E2E_HOOKS: "1" }
+  }))
 });

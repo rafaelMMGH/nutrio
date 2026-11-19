@@ -22,7 +22,7 @@ npm run db:import -- --replace # reload the legacy data/db.json into Postgres
 ## Working without disturbing the user's environment
 
 - The user keeps `next dev` running on :3000 against their real data. Do not run `next build` in place: it rewrites the shared `.next`. To check a production build, copy the project to a scratch dir (symlink `node_modules`) and build there.
-- The e2e suite is safe: global setup clones the DB into `<name>-e2e` (needs `psql`/`pg_dump`), runs `next dev -p 3200` with `NEXT_DIST_DIR=.next-e2e`, signs in through the login form, and drops the clone in teardown. Tests run serially (one shared DB) and any console error or failed API call fails the test.
+- The e2e suite is safe: global setup clones the DB into the template `<name>-e2e` (needs `psql`/`pg_dump`) and creates `<name>-e2e-<i>` from it for each of 3 workers (`E2E_WORKERS=1` runs serially); each worker `i` has its own `next dev -p 3200+i` with `NEXT_DIST_DIR=.next-e2e-<i>` and signs in through the login form, and teardown drops all the databases. Files run in parallel, tests inside a file in order, `sql()` and `baseURL` follow the worker's `parallelIndex`, and any console error or failed API call fails the test.
 - `@playwright/test` is pinned to 1.63.0 and `unpdf` to exactly 1.7.0 (newer versions require Node 22; this machine runs Node 20). Prisma is pinned to 7.x for the same reason.
 
 ## Architecture

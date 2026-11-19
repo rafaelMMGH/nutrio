@@ -6,7 +6,7 @@ import type { APIRequestContext, BrowserContext, Page } from "@playwright/test";
 import type { Button, ChatAnswer, Rich, Section } from "../../src/lib/assistant";
 import { addOnSpecs, DEFAULT_MEALS, PLAN_NAME, planFixture, slug, TIME_WINDOWS, type SeedLog, type SeedRecipe } from "../shared/assistant-fixture";
 import { BUTTON_TOPICS } from "../shared/assistant-buttons";
-import { sql } from "./database";
+import { currentWorkerIndex, serverLogName, sql, workerBaseUrl } from "./database";
 import { expect, test as base, watch } from "./fixtures";
 import { installToolkit } from "./theme-audit";
 import { contrast, effectiveBackground, toRgb, type Theme } from "./theme-helpers";
@@ -346,17 +346,18 @@ export async function pinToday(context: BrowserContext, date: string) {
   await context.route(/\/api\/rag\/chat$/, (route) => route.continue({ headers: { ...route.request().headers(), "x-e2e-today": date } }));
 }
 
-// From this file, not the cwd, so the log is found wherever Playwright is started.
-const SERVER_LOG = path.join(path.dirname(fileURLToPath(import.meta.url)), ".server.log");
+// From this file, not the cwd, so the log is found wherever Playwright is started. One log per worker's server.
+const serverLogPath = () => path.join(path.dirname(fileURLToPath(import.meta.url)), serverLogName(currentWorkerIndex()));
 
 // Next's dev server colours the log (also when piped to a file), which splits "messageLength: 23" with escapes.
 const ANSI = /\x1b\[[0-9;]*m/g;
 
 /** Marks the end of the e2e server's log now: `since()` returns the text appended after that point without colour escapes (a missing file counts as empty). */
 export function serverLog() {
+  const file = serverLogPath(); // outside the try below: a missing worker index must throw, not read as an empty log
   const read = () => {
     try {
-      return readFileSync(SERVER_LOG);
+      return readFileSync(file);
     } catch {
       return Buffer.alloc(0);
     }
@@ -421,7 +422,7 @@ export const test = base.extend<{ chat: Page; chatContext: BrowserContext }>({
     const context = await browser.newContext({ baseURL, viewport, colorScheme, reducedMotion, hasTouch, isMobile, forcedColors, timezoneId, locale: "es-MX" });
     // Registered before the first page exists, so every page of the context reports into `issues`.
     context.on("page", (page) => watch(page, issues));
-    await context.addCookies([{ name: "nm_session", value: user.token, url: baseURL ?? "http://localhost:3200", httpOnly: true, sameSite: "Lax" }]);
+    await context.addCookies([{ name: "nm_session", value: user.token, url: baseURL ?? workerBaseUrl(currentWorkerIndex()), httpOnly: true, sameSite: "Lax" }]);
     await use(context);
     await context.close();
   },
