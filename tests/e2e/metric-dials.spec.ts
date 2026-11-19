@@ -284,8 +284,8 @@ test("REQ-3: marking one more meal done moves Adherencia, Calorías and Proteín
   await open(page);
   await tab(page, "all").click();
   await expectDial(page, "Adherencia", { readout: "78%", line: "25 de 32 comidas", valueText: "78%, 25 de 32 comidas" });
-  // A bare click confirms at once (the way a screen reader presses the button), so no real hold is needed.
-  await Promise.all([saved(page), page.locator(".nt-done").dispatchEvent("click")]);
+  // One tap marks the meal (specs/dashboard-polish REQ-1).
+  await Promise.all([saved(page), page.getByRole("button", { name: "Marcar cumplida", exact: true }).click()]);
   await expectDial(page, "Adherencia", { readout: "81%", line: "26 de 32 comidas", valueText: "81%, 26 de 32 comidas" });
   const expected = readouts(26, 32, KCAL);
   await expectDial(page, "Calorías", expected.Calorías);

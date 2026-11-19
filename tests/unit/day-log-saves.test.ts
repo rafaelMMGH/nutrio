@@ -150,7 +150,7 @@ test("different dates do not wait for each other", async () => {
   assert.equal(calls.length, 2);
 });
 
-test("F1: unmark fails late (stale), then mark fails: rolls back to what the server has (done)", async () => {
+test("F1: unmark fails late (stale), then mark fails: the server already has done, so it counts as saved", async () => {
   const { logs, calls, saves, tick } = setup({ [DAY]: { meals_done: ["a"], water_glasses: 0 } });
   const unmark = saves.setMeal(DAY, "a", false);
   await tick();
@@ -159,11 +159,11 @@ test("F1: unmark fails late (stale), then mark fails: rolls back to what the ser
   assert.equal(await unmark, "stale");
   await tick();
   calls[1].reject();
-  assert.equal(await mark, "failed");
+  assert.equal(await mark, "saved");
   assert.deepEqual(logs[DAY].meals_done, ["a"]);
 });
 
-test("F1: mark fails late (stale), then unmark fails: rolls back to what the server has (pending)", async () => {
+test("F1: mark fails late (stale), then unmark fails: the server already has pending, so it counts as saved", async () => {
   const { logs, calls, saves, tick } = setup();
   const mark = saves.setMeal(DAY, "a", true);
   await tick();
@@ -172,7 +172,7 @@ test("F1: mark fails late (stale), then unmark fails: rolls back to what the ser
   assert.equal(await mark, "stale");
   await tick();
   calls[1].reject();
-  assert.equal(await unmark, "failed");
+  assert.equal(await unmark, "saved");
   assert.deepEqual(logs[DAY].meals_done, []);
 });
 
@@ -225,4 +225,25 @@ test("a throwing task does not break the queue", async () => {
   });
   await assert.rejects(saves.save(DAY, { water_glasses: 1 }));
   assert.equal(await saves.save(DAY, { water_glasses: 2 }), true);
+});
+
+test("REQ-25c: a request that carried another meal's optimistic mark confirms it, so that meal's own later failure counts as saved (no toast, no rollback)", async () => {
+  const { logs, calls, errors, saves, tick } = setup({ [DAY]: { meals_done: [], water_glasses: 0 } });
+  // c hangs; a and b queue behind it, so a's body is built when c settles and already carries b.
+  const first = saves.setMeal(DAY, "c", true);
+  const a = saves.setMeal(DAY, "a", true);
+  const b = saves.setMeal(DAY, "b", true);
+  await tick();
+  calls[0].resolve();
+  assert.equal(await first, "saved");
+  await tick();
+  assert.deepEqual(calls[1].body.meals_done?.toSorted(), ["a", "b", "c"]);
+  calls[1].resolve();
+  assert.equal(await a, "saved");
+  await tick();
+  // b's own request fails, but the server already has b through a's request.
+  calls[2].reject();
+  assert.equal(await b, "saved");
+  assert.ok(logs[DAY].meals_done.includes("b"));
+  assert.equal(errors.length, 0);
 });

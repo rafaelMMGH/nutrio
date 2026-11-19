@@ -24,7 +24,13 @@ type Props = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "type" | "children" |
 };
 
 const WIDTH_SPRING = { type: "spring", stiffness: 420, damping: 38 } as const;
-const RISE = { type: "spring", stiffness: 380, damping: 30 } as const;
+// Blur and opacity tween: a spring overshoots, and blur() must never go negative.
+const RISE = { default: { type: "spring", stiffness: 380, damping: 30 }, filter: { duration: 0.28, ease: "easeOut" }, opacity: { duration: 0.2, ease: "easeOut" } } as const;
+
+type IconMotion = { reduced: boolean; instant: boolean };
+// A function-valued exit reads the current flags from AnimatePresence's `custom`: an exiting child keeps the
+// props it last rendered with, so a swap caused by instantKey would otherwise exit with the previous flags.
+const iconExit = { exit: ({ reduced, instant }: IconMotion) => ({ opacity: 0, scale: reduced || instant ? 1 : 0.6, transition: { duration: instant ? 0 : 0.12 } }) };
 
 export function ActionButton({ label, pendingLabel, successLabel, state, onPress, instantKey, className, ...rest }: Props) {
   const reduced = useReducedMotion() ?? false;
@@ -95,13 +101,15 @@ export function ActionButton({ label, pendingLabel, successLabel, state, onPress
         </span>
       </motion.span>
       <span className="arc-ab-icon" aria-hidden>
-        <AnimatePresence initial={false}>
+        <AnimatePresence initial={false} custom={{ reduced, instant: shown.instant }}>
           <motion.span
             key={state}
+            custom={{ reduced, instant: shown.instant }}
+            variants={iconExit}
             className={pending ? "arc-ab-spinner" : undefined}
             initial={shown.instant ? false : { opacity: 0, scale: reduced ? 1 : 0.6 }}
             animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: reduced || shown.instant ? 1 : 0.6, transition: { duration: shown.instant ? 0 : 0.12 } }}
+            exit="exit"
             transition={{ duration: reduced ? 0.12 : 0.2 }}
           >
             {state === "idle" && <ArrowRight size={16} />}

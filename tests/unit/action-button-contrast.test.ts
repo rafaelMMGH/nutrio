@@ -40,3 +40,10 @@ for (const [theme, base] of [["light", light], ["dark", dark]] as const) {
     assert.ok(ring("--arc-ab-ring-inner", "--arc-ab-bg", done) >= 3, "inner vs done fill");
   });
 }
+
+// The pairs above are measured on the aliases, so the CSS must really use them.
+test("the focus ring and the icon and spinner colours are drawn from the measured aliases", () => {
+  assert.match(buttonCss, /\.arc-ab:focus-visible \{[^}]*box-shadow:\s*0 0 0 2px var\(--arc-ab-ring-inner\),\s*0 0 0 4px var\(--arc-ab-ring-outer\)/);
+  assert.match(buttonCss, /\.arc-ab-icon \{[^}]*color:\s*var\(--arc-ab-icon\)/);
+  assert.match(buttonCss, /\.arc-ab-spinner \{[^}]*color:\s*var\(--arc-ab-spinner\)/);
+});

@@ -23,7 +23,7 @@ export function createDaySaves({ send, read, write, onError }: Deps) {
   const tails = new Map<string, Promise<void>>();
   const mealSeq = new Map<string, number>();
   // What the server is known to hold per (date, meal): seeded from the optimistic log on the first action,
-  // then set by every request that succeeds, stale or not. A failed action rolls back to this, not to the
+  // then set for every meal of the date by each request that succeeds, stale or not. A failed action rolls back to this, not to the
   // optimistic state at tap time (which may be an accepted action that never reached the server).
   const confirmed = new Map<string, boolean>();
 
@@ -37,12 +37,23 @@ export function createDaySaves({ send, read, write, onError }: Deps) {
 
   async function request(date: string, body: () => Partial<DayLog>): Promise<boolean> {
     try {
-      await send(date, body());
+      const sent = body();
+      await send(date, sent);
+      if (sent.meals_done) confirmMeals(date, sent.meals_done);
       return true;
     } catch {
       // Not logged: e2e fails on console errors, and the toast (onError) is the user-facing report.
       return false;
     }
+  }
+
+  // A request carries the whole meals_done list, so once it succeeds the server holds every meal in it,
+  // including marks of meals whose own request is still queued; those must not roll back past it.
+  function confirmMeals(date: string, mealsDone: string[]) {
+    for (const key of confirmed.keys()) {
+      if (key.startsWith(`${date}/`)) confirmed.set(key, false);
+    }
+    for (const id of mealsDone) confirmed.set(`${date}/${id}`, true);
   }
 
   function save(date: string, patch: Partial<DayLog>): Promise<boolean> {
@@ -74,9 +85,10 @@ export function createDaySaves({ send, read, write, onError }: Deps) {
     write(date, withMeal(read(date), done));
     return enqueue(date, async () => {
       const ok = await request(date, () => ({ meals_done: read(date).meals_done }));
-      if (ok) confirmed.set(key, done);
       if (mealSeq.get(key) !== seq) return "stale";
       if (ok) return "saved";
+      // The server already holds the intended value through an earlier request's body: nothing failed for the user.
+      if (confirmed.get(key) === done) return "saved";
       write(date, withMeal(read(date), confirmed.get(key) ?? false));
       onError();
       return "failed";

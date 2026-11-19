@@ -39,16 +39,16 @@ None. Each story's groundwork is inside its own batch.
 
 ### Batch US1c: e2e rewrites, red against the hold UI (≈250 lines)
 
-- [ ] T013 [US1] Rewrite the helpers and the three titles: a `mark()` click helper replaces `holdToConfirm`; "saves the meal…" asserts "Guardando" with `aria-busy` and `aria-pressed` false behind a held route, then "Cumplida" and `aria-pressed` true, no move at 600 ms, moved by 1300 ms, focus still on the button; "last pending" stays on its slide; the Comidas title only swaps the helper here (US2 rewrites it) (REQ-1, 3, 6, 8, 9) (tests/e2e/dashboard.spec.ts)
-- [ ] T014 [US1] New title '"Marcar cumplida": failed save, double tap and reduced motion': 500 route under `expectIssues` (never "Cumplida", toast once inside `section[aria-live]`, dials roll back); failed unmark returns to "Cumplida"; `dblclick` gives one PUT; unmark within one frame; status-region texts; reduced motion with no transform, width animation or stroke animation; forced colours with a visible edge (REQ-4, 5, 7, 24, 25, 27) (tests/e2e/dashboard.spec.ts)
-- [ ] T015 [P] [US1] Rewrite "REQ-3: marking one more meal done moves Adherencia, Calorías and Proteína without a reload" to a single click (tests/e2e/metric-dials.spec.ts)
+- [x] T013 [US1] Rewrite the helpers and the three titles: a `mark()` click helper replaces `holdToConfirm`; "saves the meal…" asserts "Guardando" with `aria-busy` and `aria-pressed` false behind a held route, then "Cumplida" and `aria-pressed` true, no move at 600 ms, moved by 1300 ms, focus still on the button; "last pending" stays on its slide; the Comidas title only swaps the helper here (US2 rewrites it) (REQ-1, 3, 6, 8, 9) (tests/e2e/dashboard.spec.ts)
+- [x] T014 [US1] New title '"Marcar cumplida": failed save, double tap and reduced motion': 500 route under `expectIssues` (never "Cumplida", toast once inside `section[aria-live]`, dials roll back); failed unmark returns to "Cumplida"; `dblclick` gives one PUT; unmark within one frame; status-region texts; reduced motion with no transform, width animation or stroke animation; forced colours with a visible edge (REQ-4, 5, 7, 24, 25, 27) (tests/e2e/dashboard.spec.ts)
+- [x] T015 [P] [US1] Rewrite "REQ-3: marking one more meal done moves Adherencia, Calorías and Proteína without a reload" to a single click (tests/e2e/metric-dials.spec.ts)
 
 **Checkpoint:** US1c reviewed; titles shown red against the current hold UI. Commit with US1d (green together).
 
 ### Batch US1d: hero integration (≈200 lines)
 
-- [ ] T016 [US1] Hero uses `ActionButton` (no `key` per meal; `instantKey={meal.id}`), per-meal `saving` and lockout via `acceptTap`, `createAdvance` started on "saved" and cancelled on switch, unmark or rollback, status region outside `.nt-hero-copy` (REQ-1 to REQ-9, REQ-24, REQ-25) (src/components/nutrio/Hero.tsx)
-- [ ] T017 [US1] Delete HoldToConfirm, its logic, CSS and unit test; drop the `.nt-done` hold rules (D19, REQ-1) (src/components/nutrio/HoldToConfirm.tsx, hold-to-confirm-logic.ts, hold-to-confirm.css, tests/unit/hold-to-confirm.test.ts, src/components/nutrio/dashboard.css)
+- [x] T016 [US1] Hero uses `ActionButton` (no `key` per meal; `instantKey={meal.id}`), per-meal `saving` and lockout via `acceptTap`, `createAdvance` started on "saved" and cancelled on switch, unmark or rollback, status region outside `.nt-hero-copy` (REQ-1 to REQ-9, REQ-24, REQ-25) (src/components/nutrio/Hero.tsx)
+- [x] T017 [US1] Delete HoldToConfirm, its logic, CSS and unit test; drop the `.nt-done` hold rules (D19, REQ-1) (src/components/nutrio/HoldToConfirm.tsx, hold-to-confirm-logic.ts, hold-to-confirm.css, tests/unit/hold-to-confirm.test.ts, src/components/nutrio/dashboard.css)
 - [ ] T018 [US1] Run tsc, unit tests and the US1 e2e titles (T013 to T015); `grep -r "Mantén presionado\|HoldToConfirm" src` is empty (REQ-1)
 
 **Checkpoint:** US1 complete. Review, commit US1c+US1d, then continue.

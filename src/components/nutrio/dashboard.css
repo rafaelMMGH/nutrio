@@ -34,22 +34,6 @@
 .nt-cook:active { transform: scale(0.97); }
 .nt-cook:focus-visible { outline: none; box-shadow: var(--nt-focus); }
 .nt-rating { height: 40px; font-size: 15px; }
-.nt-done {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 40px;
-  padding: 0 16px;
-  border: 1px solid var(--nt-border);
-  border-radius: var(--nt-radius-pill);
-  background: var(--nt-surface);
-  color: var(--nt-ink);
-  font: inherit;
-  font-size: 14px;
-  cursor: pointer;
-}
-/* The ink inside comes from the hold fill (hold-to-confirm.css); only the border is left to colour. */
-.nt-done.is-done { border-color: var(--nt-ink); }
 .nt-hero-empty { margin-top: 20px; font-size: 28px; font-weight: 300; max-width: 320px; position: relative; z-index: 2; }
 .nt-hero.is-empty > .nt-pill { margin-top: 40px; align-self: flex-start; position: relative; z-index: 2; }
 .nt-link { display: inline-flex; align-items: center; gap: 6px; margin-top: 16px; align-self: flex-start; color: var(--nt-ink); font-size: 14px; position: relative; z-index: 2; border-radius: 6px; }
