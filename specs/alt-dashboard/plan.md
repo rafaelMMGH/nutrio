@@ -165,6 +165,8 @@ Cuatro tarjetas blancas de igual ancho, como en la imagen: icono en círculo con
 | 3 | Avg prep time | Recetas disponibles | Total del recetario | `concierge-bell` (la campana de servicio de la imagen) |
 | 4 | Low stock items | Compras pendientes | Artículos sin marcar en la lista de compras activa | `package` (la caja de la imagen) |
 
+> **Nota (2026-11-18):** la posición 1 «Comidas de hoy» queda reemplazada por «Racha» (días seguidos con todas las comidas planeadas cumplidas, icono `flame`) según `specs/dashboard-polish/spec.md` (US2). Las posiciones 2 a 4 no cambian.
+
 La cuarta métrica es mi propuesta: equivale directamente a «Low stock items», cierra el ciclo del día (qué como → con qué plan → qué recetas → qué me falta) y conecta con la sección Compras del sidebar.
 
 ### 5.5 Tarjeta negra — Métricas (fila 2)

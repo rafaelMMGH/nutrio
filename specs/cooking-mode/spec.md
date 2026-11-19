@@ -1,7 +1,7 @@
 # Spec: Cooking mode
 
 **Status:** partial (implemented on `feature/cooking-mode`; the e2e test is written and waits for the user to lift the e2e freeze, D10). Gate 1 approved 2026-11-17; Gate 2 (plan) approved 2026-11-17.
-**Version:** 1.0.3 · **Branch:** feature/cooking-mode, from `alt-dashboard` · **Owner:** Rafael Martinez · **Date:** 2026-11-17
+**Version:** 1.1.0 · **Branch:** feature/cooking-mode, from `alt-dashboard` · **Owner:** Rafael Martinez · **Date:** 2026-11-17
 
 > The *what* and *why* only. UI copy is quoted in Spanish (Mexico). URLs are in English (project rule, 2026-11-17).
 
@@ -26,7 +26,7 @@ The data shapes the design. In the current data, 8 of 13 recipes have preparatio
 
 Q1 to Q7 answered by the user on 2026-11-17.
 
-- D1 (Q1) Entry points: a "Modo Cocina" button on the recipe page and a "Modo Cocina" link on the dashboard hero's current meal.
+- D1 (Q1) *(Dashboard part superseded by `specs/dashboard-polish`: the hero text link is removed and the plate dot becomes a glass pill.)* Entry points: a "Modo Cocina" button on the recipe page and a "Modo Cocina" link on the dashboard hero's current meal.
 - D2 (Q2) The first screen is a "before you start" page: what to gather, in a friendlier form than a checklist (welcoming title, the dish, illustrated rows, encouraging copy), still tappable to mark what is ready.
 - D3 (Q3) A recipe without steps still opens Modo Cocina; the end screen offers "Marcar como hecha".
 - D4 (Q4) Timers appear only on a step whose text names a duration; no timer otherwise.
@@ -46,7 +46,7 @@ As a user cooking from my phone, I want a full-screen view that keeps the screen
 - **REQ-1:** The recipe page's summary shows a "Modo Cocina" button (chef hat icon) above "Agregar … al carrito". It opens `/recipes/<id>/cook` on the first screen, or on the saved screen (REQ-20).
 - **REQ-2:** Modo Cocina shows no top bar, sidebar or assistant button. "Salir" (X, `aria-label="Salir del Modo Cocina"`), Escape and the browser's back button return to the recipe page.
 - **REQ-3:** While Modo Cocina is visible the screen stays awake where the browser allows it; the lock is taken again when the tab becomes visible and released on exit. When the browser refuses or lacks it, a one-line note reads "Tu pantalla podría apagarse mientras cocinas." and nothing else changes.
-- **REQ-4:** On the dashboard hero, the plate's middle dot (the white ring with a centre dot) is the "Modo Cocina" link for the meal on screen. Hovering or focusing it shows a "Modo Cocina" tooltip that rises and fades in; on touch screens the tooltip stays visible. The plate has no other dots: the decorative dots are removed. A meal with no recipe shows no dot. (User, 2026-11-17, v1.0.2; v1.0.3.)
+- **REQ-4:** *(Superseded by `specs/dashboard-polish` REQ-16 to REQ-23, 2026-11-18: no text button and no dot; the plate centre holds a glass pill.)* On the dashboard hero, the plate's middle dot (the white ring with a centre dot) is the "Modo Cocina" link for the meal on screen. Hovering or focusing it shows a "Modo Cocina" tooltip that rises and fades in; on touch screens the tooltip stays visible. The plate has no other dots: the decorative dots are removed. A meal with no recipe shows no dot. (User, 2026-11-17, v1.0.2; v1.0.3.)
 - **REQ-5:** An unknown or deleted recipe id shows the app's 404, as the recipe page does.
 
 ### US2 (P1): Before you start
@@ -118,6 +118,7 @@ As a user, I want one step per screen in large type so that I can read it from a
 | Version | Date | Change |
 |---|---|---|
 | 0.1 | 2026-11-17 | Draft with defaults |
+| 1.1.0 | 2026-11-18 | REQ-4 and D1 (the dashboard hero's "Modo Cocina" text link and the plate's centre dot with its tooltip) are superseded by `specs/dashboard-polish` (US3, REQ-16 to REQ-23): the text button is removed and the dot becomes a frosted-glass pill with the beef icon, the title "Modo Cocina" and the dish name, linking to the same `/recipes/<id>/cook`. The recipe page's button (REQ-1) is unchanged. Requirement text below is kept for history. |
 | 1.0.3 | 2026-11-17 | User's request: the plate keeps only the Modo Cocina dot; the decorative dots are removed and a meal with no recipe shows no dot (REQ-4). |
 | 1.0.2 | 2026-11-17 | User's request: the dashboard entry becomes the plate's middle dot with an animated tooltip (REQ-4); the Modo Cocina icon is a ring with a centre dot. |
 | 1.0.1 | 2026-11-17 | Clarifications found while building, no behaviour the user approved changes: durations under 10 s get no timer; a non-permission recognition failure turns voice off with a message. |

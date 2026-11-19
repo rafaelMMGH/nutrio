@@ -22,6 +22,6 @@ Open any recipe → **Modo Cocina**. Tick each item, or note what happened.
 
 ## Both
 
-- [ ] From the dashboard, "Modo Cocina" next to "Marcar cumplida" opens the meal on screen.
+- [ ] From the dashboard, the glass "Modo Cocina" pill at the plate's centre (title "Modo Cocina", subtitle the dish name) opens the meal on screen. *(Updated 2026-11-18 per `specs/dashboard-polish`: the text button next to "Marcar cumplida" and the centre dot no longer exist; on ≤937px the pill shows the title only.)*
 - [ ] On "¡Listo!", "Marcar como hecha (…)" marks today's meal; the dashboard shows it as done; "Deshacer" in the toast undoes it.
 - [ ] Reload in the middle of a recipe: "Retomamos donde te quedaste." and "Empezar de nuevo" work.
