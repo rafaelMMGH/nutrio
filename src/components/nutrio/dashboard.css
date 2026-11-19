@@ -21,7 +21,11 @@
 .nt-hero-copy h2 {
   font-size: 36px;
   font-weight: 300;
-  line-height: 1.2;
+  /* One value drives both, so the reserved height can never drift from the line-height. */
+  --nt-hero-title-lh: 1.2;
+  line-height: var(--nt-hero-title-lh);
+  /* Always reserve two lines (em follows the compact font-size overrides) so one-line titles do not shift what is below. */
+  min-height: calc(2em * var(--nt-hero-title-lh));
   display: -webkit-box;
   -webkit-line-clamp: 2;
   line-clamp: 2;
