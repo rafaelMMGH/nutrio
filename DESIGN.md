@@ -68,6 +68,11 @@ Los pasos 200 y 300 de `butter` y `sky` se midieron sobre la referencia; confirm
 | `status.live` | green-500 | Punto del pill «Live» |
 | `status.danger` | texto red-700 sobre red-100 | Errores |
 | `rating.star` | butter-300 | Estrella de la puntuación |
+| `on-accent` (`--nt-on-accent`) | neutral-900 | Texto, iconos, anillo de foco y marcador de selección sobre amarillo y celeste; no cambia en oscuro, porque esas tarjetas conservan su color claro |
+| `on-accent-sub` (`--nt-on-accent-sub`) | neutral-600 | Horas, «Pendiente» y etiquetas sobre amarillo y celeste |
+| `on-accent-line` (`--nt-on-accent-line`) | = `on-accent-sub` | Línea de 1 px que sustituye al desvanecido de la lista cuando se reduce la transparencia o se pide más contraste |
+| `yellow-hover` (`--nt-yellow-hover`) | butter-100 | Fondo de una fila de «Comidas de hoy» al pasar el cursor |
+| `yellow-press` (`--nt-yellow-press`) | butter-300 | Fondo de una fila de «Comidas de hoy» al pulsarla |
 
 ### 3.3 Métricas (tarjeta «Métricas»)
 
@@ -105,6 +110,12 @@ Orden y color fijos en todas las pestañas: Adherencia → Calorías → Proteí
 | `text.on-accent-secondary` / `bg.accent-cool` | 5.8:1 | AA |
 | `text.primary` / `bg.accent-warm` | 15.5:1 | AA |
 | `text.primary` / `bg.accent-cool` | 13.4:1 | AA |
+| `on-accent` / `yellow-hover` | 17.0:1 | AA |
+| `on-accent` / `yellow-press` | 13.5:1 | AA |
+| `on-accent-sub` / `yellow-hover` | 7.4:1 | AA |
+| `on-accent-sub` / `yellow-press` | 5.8:1 | AA |
+| `on-accent-line` / `bg.accent-warm` (divisor de 1 px) | 6.7:1 | ≥ 3:1 no textual |
+| Arco `--nt-sky-deep` / `bg.accent-cool` | 5.7:1 | ≥ 3:1 no textual |
 | `text.inverse-secondary` / `bg.inverse-raised` | 7.4:1 | AA |
 | `text.inverse` / `action.primary` hover | 13.2:1 | AA |
 | `status.success` green-700 / green-100 | 5.6:1 | AA |
@@ -112,6 +123,8 @@ Orden y color fijos en todas las pestañas: Adherencia → Calorías → Proteí
 | `focus.ring` sky-500 / `bg.page` | 5.3:1 | ≥ 3:1 no textual |
 | `focus.ring` sky-300 / `bg.inverse` | 9.8:1 | ≥ 3:1 no textual |
 | Punto inactivo del carrusel neutral-500 / `bg.page` | 4.7:1 | ≥ 3:1 no textual |
+
+Los pares de `on-accent` se miden con `tests/unit/real-data-contrast.test.ts` en tema claro y oscuro (texto ≥ 4.5:1, gráficos ≥ 3:1).
 
 **Combinaciones prohibidas** (no pasan): neutral-500 sobre amarillo (4.1:1) o celeste (3.6:1); green-500 como texto sobre green-100 (2.7:1); neutral-300 para controles sobre `bg.page` (1.4:1).
 
@@ -196,9 +209,9 @@ Librería **Lucide**, trazo 1.5, tamaño 20 px en botones de 44 px y 18 px en en
 | Barra superior | `sparkle`, `chef-hat`, `plus`, `bell`, `notebook-pen`, `inbox`, `chevron-down` |
 | Sidebar | `layout-grid` (Inicio), `calendar-days` (Planes), `cooking-pot` (Recetario), `shopping-basket` (Compras), `chart-column` (Análisis), `settings` (Configuración) |
 | KPIs | `hand-platter` (Comidas de hoy), `clipboard-list` (Planes disponibles), `concierge-bell` (Recetas disponibles), `package` (Compras pendientes) |
-| Tarjetas | `gauge` (Métricas), `cooking-pot` + `clock` (Current preparation), `arrow-up-right`, `star`, `arrow-up` |
+| Tarjetas | `gauge` (Métricas), `cooking-pot` + `clock` (Current preparation), `hand-platter` (Comidas de hoy), `utensils` (Cumplimiento del plan), `check` (fila «Cumplida»), `arrow-up-right`, `star`, `arrow-up` |
 
-Todo botón de solo icono lleva `aria-label` y tooltip.
+Todo botón de solo icono lleva `aria-label` y tooltip. La paginación vertical del hero se llama «Elegir comida» para tecnologías de apoyo, y no «Comidas de hoy», que es el nombre de la lista.
 
 ---
 
@@ -239,9 +252,10 @@ Foto de la receta activa como fondo con `overlay.hero-fade`; puntos decorativos 
 
 Reglas: > 100 % → dial lleno y número real; sin datos → «—», dial sin cuña.
 
-### 8.12 Tarjetas amarilla y celeste (solo visuales)
-- **Amarilla** (`bg.accent-warm`): «Resumen calórico», selector «Hoy» inactivo, cifra `number-xl`, insignia `status.success` con `arrow-up`, dos métricas secundarias con separador vertical, 9 barras neutral-900 con `pattern.hatch`, eje horario `caption` `text.on-accent-secondary`.
-- **Celeste** (`bg.accent-cool`): «Cumplimiento del plan», botón `arrow-up-right` inactivo, pill «Live» con punto `status.live`, semicírculo `gradient.plan-arc`, total al centro, tres cifras abajo con punto de color.
+### 8.12 Tarjetas amarilla y celeste («Comidas de hoy» y «Cumplimiento del plan»)
+Ambas conservan sus colores claros en los dos temas y usan los tokens `on-accent` (§3.2).
+- **Amarilla** (`bg.accent-warm`): «Comidas de hoy», con icono `hand-platter` en círculo. Lista con las comidas de hoy en el orden del plan; cada fila es un botón de 56 px (mínimo 44 px: las filas se comprimen por igual y después la lista se desplaza) con hora (si el plan la trae), nombre con elipsis y estado: `check` + «Cumplida», pill «Siguiente» (la primera sin marcar) o «Pendiente». La comida que muestra el hero lleva un marcador de 4 px a la izquierda y el nombre en 600. Pulsar una fila la elige en el hero (sin mover el foco; en móvil lleva el hero a la vista) y cancela el avance automático. Desde 360 px hasta 1279 px la lista tiene su propia altura (máximo 336 px, seis filas); desde 1280 px llena la tarjeta. Los bordes con contenido oculto se desvanecen 16 px con una máscara; con transparencia reducida, más contraste o colores forzados la máscara se sustituye por una línea de 1 px (`on-accent-line`). Hover `yellow-hover`, pulsado `yellow-press` (sin transición ni escala con movimiento reducido), foco visible con anillo de 2 px `on-accent`. Cada fila se lee como «hora, nombre, estado». Vacíos: «Tu plan no tiene comidas» y, sin plan, «Sin plan activo» con el botón «Subir plan», que abre el asistente de carga.
+- **Celeste** (`bg.accent-cool`): «Cumplimiento del plan», con icono `utensils` en círculo y a la derecha la etiqueta «Desde 12 nov» (con el año si no es el actual) con la fecha en que empezó la versión activa del plan. Semicírculo con relleno `--nt-sky-deep` sobre una pista (`role="img"`, «N de M comidas cumplidas»), cuyo avance es Cumplidas ÷ Planificadas, y el total «Planificadas» al centro. Debajo, tres cifras con punto de color: «Cumplidas», «Sin marcar» (comidas de días pasados sin marcar; no se llaman «Omitidas», porque la app no distingue un olvido de una omisión) y «Pendientes» (las de hoy aún sin marcar). Se recalcula al marcar o desmarcar, sin petición. Sin plan activo: «Sin plan activo» y el botón «Subir plan».
 
 ### 8.13 Chatbot flotante
 Se conserva del dashboard anterior: funcionamiento y diseño intactos. Fijo abajo a la derecha, `shadow.floating-strong`, por encima de todas las capas, sin tapar la tarjeta celeste.
