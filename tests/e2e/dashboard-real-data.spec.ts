@@ -68,6 +68,38 @@ const FOUR: Slot[] = [
 ];
 const mealsDone = () => sql(`select coalesce(array_to_string(meals_done, ','), '') from daily_logs where date = '${TODAY}'`);
 
+/** Local calendar day `count` days before today, at noon so no timezone shifts it to a neighbouring date. */
+const dayAt = (count: number) => {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() - count, 12);
+};
+const MONTHS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+/** The counts card's header as the spec words it ("Desde 12 nov", with the year when it is not this one), written out here, not taken from src. */
+const sinceText = (count: number) => {
+  const day = dayAt(count);
+  return `Desde ${day.getDate()} ${MONTHS[day.getMonth()]}${day.getFullYear() === new Date().getFullYear() ? "" : ` ${day.getFullYear()}`}`;
+};
+
+/** Past days' check-offs for `withMeals` scenarios: `[daysAgo, indexes into the slots]`, each replacing that day's log. Foreign ids are kept as given. */
+function withLogs(entries: [number, (number | string)[]][]) {
+  for (const [count, done] of entries) {
+    const date = dayKey(dayAt(count));
+    const ids = done.map((item) => (typeof item === "number" ? `e2e-tl-${item}` : item)).join(",");
+    sql(
+      `delete from daily_logs where date = '${date}'; insert into daily_logs (id, user_id, date, meals_done, water_glasses, created_at, updated_at) values ('e2e-tl-log-${count}', ${FIRST_USER}, '${date}', '{${ids}}', 0, now(), now())`
+    );
+  }
+}
+
+/**
+ * Four meals, plan created 2 days ago (3 days from the start through today): today 2 done, yesterday 4, two days ago 3,
+ * plus logs that must be ignored (a foreign id, a full day before the plan began, and a full day after today). So 12 planned, 9 done, 1 unmarked, 2 pending.
+ */
+function nineOfTwelve() {
+  withMeals(FOUR, { done: [0, 1], createdAt: dayAt(2).toISOString() });
+  withLogs([[1, [0, 1, 2, 3, "e2e-tl-foreign"]], [2, [0, 1, 2]], [3, [0, 1, 2, 3]], [-1, [0, 1, 2, 3]]]);
+}
+
 /* ---------- Page helpers ---------- */
 
 async function open(page: Page, size?: { width: number; height: number }) {
@@ -86,6 +118,61 @@ const markButton = (page: Page) => page.getByRole("button", { name: "Marcar cump
 const label = (button: Locator) => button.locator(".arc-ab-text");
 const region = (page: Page) => page.locator(".nt-hero [role=status]");
 const saved = (page: Page) => page.waitForResponse((r) => r.url().includes("/api/daily-logs/") && r.request().method() === "PUT" && r.status() < 400);
+
+/* ---------- Cumplimiento del plan (the counts card) ---------- */
+
+const comp = (page: Page) => page.locator(".nt-comp");
+const COUNT_LABELS = ["Planificadas", "Cumplidas", "Sin marcar", "Pendientes"] as const;
+/**
+ * The number printed next to a label, with its box: climbs from the label's text to the nearest ancestor that holds digits and no other label.
+ * Text starting "Desde " (the header) is not a figure.
+ */
+const figureOf = async (page: Page, name: (typeof COUNT_LABELS)[number]) => {
+  const target = comp(page).getByText(name, { exact: true });
+  if ((await target.count()) !== 1) return null;
+  return target.evaluate((node, others) => {
+      for (let up: HTMLElement | null = node as HTMLElement; up && !up.matches(".nt-comp"); up = up.parentElement) {
+        if (others.some((other) => (up!.textContent ?? "").includes(other))) return null;
+        const walker = document.createTreeWalker(up, NodeFilter.SHOW_TEXT);
+        for (let text = walker.nextNode(); text; text = walker.nextNode()) {
+          const value = text.textContent ?? "";
+          const digits = value.trim().startsWith("Desde ") ? null : value.match(/\d[\d.,]*/);
+          if (!digits) continue;
+          const range = document.createRange();
+          range.setStart(text, digits.index!);
+          range.setEnd(text, digits.index! + digits[0].length);
+          const { left, right, top, bottom } = range.getBoundingClientRect();
+          return { text: digits[0], left, right, top, bottom };
+        }
+      }
+      return null;
+    }, COUNT_LABELS.filter((other) => other !== name));
+};
+const figure = async (page: Page, name: (typeof COUNT_LABELS)[number]) => (await figureOf(page, name))?.text ?? null;
+const figures = async (page: Page) => ({
+  Planificadas: await figure(page, "Planificadas"),
+  Cumplidas: await figure(page, "Cumplidas"),
+  "Sin marcar": await figure(page, "Sin marcar"),
+  Pendientes: await figure(page, "Pendientes")
+});
+const countsOf = (planned: number, done: number, unmarked: number, pending: number) => ({ Planificadas: String(planned), Cumplidas: String(done), "Sin marcar": String(unmarked), Pendientes: String(pending) });
+const arc = (page: Page, name: string) => comp(page).getByRole("img", { name, exact: true });
+/** How much of the arc is filled, in percent of its pathLength, read from the stroke-dasharray (and the dashoffset when one full-length dash is used); 0 when no stroke is dashed. */
+const arcFill = async (page: Page, name: string) => {
+  const target = arc(page, name);
+  if ((await target.count()) !== 1) return null;
+  return target.evaluate((svg) => {
+      const dashed = [...svg.querySelectorAll("path, circle")].filter((shape) => shape.hasAttribute("pathLength") && getComputedStyle(shape).strokeDasharray !== "none");
+      const fill = dashed.at(-1);
+      if (!fill) return 0;
+      const style = getComputedStyle(fill);
+      const [dash] = style.strokeDasharray.split(/[\s,]+/).map(parseFloat);
+      const length = Number(fill.getAttribute("pathLength"));
+      // One full-length dash is drawn shorter by the dash offset; otherwise the dash itself is the fill.
+      const filled = dash >= length ? length - (parseFloat(style.strokeDashoffset) || 0) : dash;
+      return (filled / length) * 100;
+    });
+};
 
 /** Every text the hero's status region took, with its time, from now on. Empty texts are kept: `go` says "" when it lands on a pending meal. */
 const watchRegion = (page: Page) =>
@@ -358,6 +445,12 @@ test("Empty states: no active plan and a plan with no meals", async ({ page }) =
   await expect(card).toContainText("Tu plan no tiene comidas");
   await expect(rows(page)).toHaveCount(0);
 
+  // REQ-10, REQ-15: the counts card shows all four figures at 0 and an empty arc that still says so in text.
+  await expect.soft.poll(() => figures(page), SOFT).toEqual(countsOf(0, 0, 0, 0));
+  await expect.soft(arc(page, "0 de 0 comidas cumplidas"), "arc text").toHaveCount(1, SOFT);
+  expect.soft(await arcFill(page, "0 de 0 comidas cumplidas"), "arc fill").toBe(0);
+  await expect.soft(comp(page), "no invented figures").not.toContainText(/En vivo|Omitidas/);
+
   // No active plan: "Sin plan activo" and a button (not a link) that opens the upload wizard, no rows, no times.
   const active = sql("select id from plans where status = 'active' and deleted_at is null");
   test.skip(!active, "no active plan to archive");
@@ -372,6 +465,20 @@ test("Empty states: no active plan and a plan with no meals", async ({ page }) =
     await card.getByRole("button", { name: "Subir plan", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Creación de Plan Nutricional" })).toBeVisible();
     await page.getByRole("button", { name: "Cerrar" }).click();
+
+    // REQ-10, REQ-15: the counts card says the same, with its own button (not a link) to the upload wizard and no figures at all.
+    const counts = comp(page);
+    await expect.soft(counts, "counts card: no plan").toContainText("Sin plan activo", SOFT);
+    await expect.soft(counts.getByRole("link"), "counts card: no link").toHaveCount(0, SOFT);
+    await expect.soft(counts, "counts card: no digits, no old copy").not.toContainText(/\d|En vivo|Omitidas|Planificadas/, SOFT);
+    await expect.soft(counts.getByRole("img"), "counts card: no arc").toHaveCount(0, SOFT);
+    const upload = counts.getByRole("button", { name: "Subir plan", exact: true });
+    await expect.soft(upload, "counts card: Subir plan").toHaveCount(1, SOFT);
+    if ((await upload.count()) === 1) {
+      await upload.click();
+      await expect(page.getByRole("heading", { name: "Creación de Plan Nutricional" })).toBeVisible();
+      await page.getByRole("button", { name: "Cerrar" }).click();
+    }
   } finally {
     sql(`update plans set status = 'active' where id in (${ids})`);
   }
@@ -420,6 +527,57 @@ test.describe("failed saves", () => {
     expect(requests).toHaveLength(1);
     await expect(rows(page)).toHaveCount(3);
     await expect(list(page).locator("[aria-pressed], input, [role=checkbox], [role=switch]")).toHaveCount(0);
+  });
+
+  test("Cumplimiento del plan: counts move at once and roll back", async ({ page }) => {
+    nineOfTwelve();
+    await open(page);
+    await expect(list(page)).toBeVisible();
+    const requests: string[] = [];
+    page.on("request", (request) => new URL(request.url()).pathname.startsWith("/api/") && requests.push(`${request.method()} ${new URL(request.url()).pathname}`));
+    const before = countsOf(12, 9, 1, 2);
+    await expect.soft.poll(() => figures(page), { message: "counts before" }).toEqual(before);
+
+    // REQ-16: behind a held request Cumplidas has gone up and Pendientes down by one; Sin marcar and Planificadas stay.
+    const release = await holdSaves(page, "fail");
+    await markButton(page).click();
+    await expect(row(page, "14:00, Comida, Cumplida")).toBeVisible();
+    await expect.soft.poll(() => figures(page), { message: "counts while the save is held", ...SOFT }).toEqual(countsOf(12, 10, 1, 1));
+    await expect.soft(arc(page, "10 de 12 comidas cumplidas"), "arc follows").toHaveCount(1, SOFT);
+
+    // On the 500 everything is back, with the toast shown once.
+    release();
+    await expect(page.locator("section[aria-live]").getByText(TOAST)).toHaveCount(1);
+    await expect(row(page, "14:00, Comida, Siguiente")).toBeVisible();
+    await expect.soft.poll(() => figures(page), { message: "counts after the rollback", ...SOFT }).toEqual(before);
+    await expect.soft(arc(page, "9 de 12 comidas cumplidas"), "arc rolled back").toHaveCount(1, SOFT);
+
+    // The counts add no request: the one check-off is the one daily-log save.
+    expect(requests).toEqual([expect.stringMatching(/^PUT \/api\/daily-logs\//)]);
+  });
+
+  test("Cumplimiento del plan: unchecking moves the counts at once and rolls back", async ({ page }) => {
+    nineOfTwelve();
+    await open(page);
+    await expect(list(page)).toBeVisible();
+    const before = countsOf(12, 9, 1, 2);
+    await expect.soft.poll(() => figures(page), { message: "counts before unchecking" }).toEqual(before);
+
+    // REQ-16: behind a held request, unchecking today's Desayuno has taken one off Cumplidas and put it on Pendientes.
+    const release = await holdSaves(page, "fail");
+    await row(page, "07:00, Desayuno, Cumplida").click();
+    await expect(hero(page)).toHaveText("Desayuno");
+    await markButton(page).click();
+    await expect(row(page, /07:00, Desayuno, (Siguiente|Pendiente)/)).toBeVisible();
+    await expect.soft.poll(() => figures(page), { message: "counts while the uncheck is held", ...SOFT }).toEqual(countsOf(12, 8, 1, 3));
+    await expect.soft(arc(page, "8 de 12 comidas cumplidas"), "arc follows").toHaveCount(1, SOFT);
+
+    // On the 500 everything is back.
+    release();
+    await expect(page.locator("section[aria-live]").getByText(TOAST)).toHaveCount(1);
+    await expect(row(page, "07:00, Desayuno, Cumplida")).toBeVisible();
+    await expect.soft.poll(() => figures(page), { message: "counts after the rollback", ...SOFT }).toEqual(before);
+    await expect.soft(arc(page, "9 de 12 comidas cumplidas"), "arc rolled back").toHaveCount(1, SOFT);
   });
 });
 
@@ -993,7 +1151,8 @@ test.describe("midnight", () => {
     };
 
     // The rows follow the new day: every Cumplida becomes Pendiente, the first is Siguiente and the selected row stays.
-    withMeals(FOUR, { done: [0, 1] });
+    // The plan began today (day 1), so every count is easy to follow across the date change.
+    withMeals(FOUR, { done: [0, 1], createdAt: dayAt(0).toISOString() });
     await open(page);
     // The page loaded before the clock is installed, so server and client agree on the date during hydration.
     await page.clock.install({ time: new Date() });
@@ -1002,7 +1161,10 @@ test.describe("midnight", () => {
     await expect(row(page, "07:00, Desayuno, Cumplida")).toBeVisible();
     await expect(row(page, "10:30, Colación, Cumplida")).toBeVisible();
     await expect(row(page, "14:00, Comida, Siguiente")).toBeVisible();
+    await expect.soft.poll(() => figures(page), { message: "counts on day 1", ...SOFT }).toEqual(countsOf(4, 2, 0, 2));
     await midnight(1);
+    // REQ-11, REQ-13: yesterday's two checked meals stay Cumplidas, its two unchecked ones are now Sin marcar, and today's four are Pendientes.
+    await expect.soft.poll(() => figures(page), { message: "counts after midnight", ...SOFT }).toEqual(countsOf(8, 2, 2, 4));
     await expect(row(page, "07:00, Desayuno, Siguiente")).toBeVisible();
     await expect(row(page, "10:30, Colación, Pendiente")).toBeVisible();
     await expect(row(page, "14:00, Comida, Pendiente")).toBeVisible();
@@ -1012,21 +1174,26 @@ test.describe("midnight", () => {
     await expect(hero(page)).toHaveText("Cena");
     await midnight(0);
     await expect(row(page, "07:00, Desayuno, Cumplida")).toBeVisible();
+    await expect.soft.poll(() => figures(page), { message: "counts back on day 1", ...SOFT }).toEqual(countsOf(4, 2, 0, 2));
 
     // A check-off held across midnight and then refused: yesterday's meal comes back unchecked, today's rows are not touched.
-    withMeals(FOUR, { done: [] });
+    withMeals(FOUR, { done: [], createdAt: dayAt(0).toISOString() });
     await open(page);
     await page.clock.install({ time: new Date() });
     const release = await holdSaves(page, "fail");
     await markButton(page).click();
     await expect(row(page, "07:00, Desayuno, Cumplida")).toBeVisible();
     await midnight(1);
+    // REQ-11: the held mark counts for yesterday (Cumplidas 1, so Sin marcar 3), not for the new day's four Pendientes.
+    await expect.soft.poll(() => figures(page), { message: "counts with the save held across midnight", ...SOFT }).toEqual(countsOf(8, 1, 3, 4));
     // The held mark belongs to yesterday: the new day starts with nothing done.
     await expect(row(page, "07:00, Desayuno, Siguiente")).toBeVisible();
     await expect(list(page).getByText("Cumplida")).toHaveCount(0);
     release();
     await expect(page.locator("section[aria-live]").getByText(TOAST)).toHaveCount(1);
     await expect(row(page, "07:00, Desayuno, Siguiente")).toBeVisible();
+    // The refused save rolls back against yesterday: nothing was done, so all four of its meals are Sin marcar.
+    await expect.soft.poll(() => figures(page), { message: "counts after the rollback across midnight", ...SOFT }).toEqual(countsOf(8, 0, 4, 4));
     for (const [index, name] of ["07:00, Desayuno, Siguiente", "10:30, Colación, Pendiente", "14:00, Comida, Pendiente", "20:00, Cena, Pendiente"].entries()) await expect(rows(page).nth(index)).toHaveAccessibleName(name);
     // Back on yesterday, the rollback is there: the meal is unchecked again.
     await midnight(0);
@@ -1034,4 +1201,120 @@ test.describe("midnight", () => {
     await expect(list(page).getByText("Cumplida")).toHaveCount(0);
     expect(mealsDone()).toBe("");
   });
+});
+
+/* ---------- US2b: the counts card ---------- */
+
+test("Cumplimiento del plan: real counts since the plan began", async ({ page }) => {
+  // REQ-12 to REQ-15: 4 meals, plan created 2 days ago, so 3 days: 12 planned, 9 done (the foreign id, the day before the start and the day after today are ignored), 1 unmarked, 2 pending.
+  nineOfTwelve();
+  await open(page);
+  const card = comp(page);
+  await expect(card.getByRole("heading", { name: "Cumplimiento del plan", level: 2 })).toBeVisible();
+  await expect.soft.poll(() => figures(page), { message: "figures with their labels" }).toEqual(countsOf(12, 9, 1, 2));
+
+  // REQ-15: Planificadas sits at the centre of the arc, inside its box.
+  const centre = await figureOf(page, "Planificadas");
+  const arcBox = await arc(page, "9 de 12 comidas cumplidas").boundingBox(SOFT).catch(() => null);
+  expect.soft(centre !== null && arcBox !== null, "Planificadas and the arc are both on the card").toBe(true);
+  if (centre && arcBox) {
+    expect.soft(Math.abs((centre.left + centre.right) / 2 - (arcBox.x + arcBox.width / 2)), "Planificadas horizontally at the arc centre").toBeLessThanOrEqual(4);
+    expect.soft(centre.left >= arcBox.x - 1 && centre.right <= arcBox.x + arcBox.width + 1 && centre.top >= arcBox.y - 1 && centre.bottom <= arcBox.y + arcBox.height + 1, "Planificadas inside the arc's box").toBe(true);
+  }
+
+  // REQ-15: the arc is an image named in text, filled 9/12 = 75%, and the header says since when.
+  await expect.soft(arc(page, "9 de 12 comidas cumplidas"), "arc text").toHaveCount(1, SOFT);
+  const fill = await arcFill(page, "9 de 12 comidas cumplidas");
+  expect.soft(fill, "arc fill percent").not.toBeNull();
+  expect.soft(fill ?? -1, "arc fill percent").toBeCloseTo(75, 0);
+  await expect.soft(card.getByText(sinceText(2), { exact: true }), `header ${sinceText(2)}`).toHaveCount(1, SOFT);
+
+  // REQ-14, REQ-15: no percentage, no "Omitidas", no "En vivo" and no arrow (its black badge or its icon) anywhere on the card.
+  await expect.soft(card, "no %").not.toContainText("%", SOFT);
+  await expect.soft(card.locator("[aria-label*='%'], [title*='%']"), "no % in names").toHaveCount(0, SOFT);
+  await expect.soft(card, "no Omitidas").not.toContainText("Omitidas", SOFT);
+  await expect.soft(card, "no En vivo").not.toContainText("En vivo", SOFT);
+  await expect.soft(card.locator(".nt-arrow, .nt-live, .lucide-arrow-up-right"), "no arrow, no live pill").toHaveCount(0, SOFT);
+  await expect.soft(card.getByRole("link"), "no link").toHaveCount(0, SOFT);
+
+  // REQ-12: a start in another year carries the year.
+  withMeals(FOUR, { done: [0, 1], createdAt: dayAt(400).toISOString() });
+  await open(page);
+  await expect.soft(card.getByText(sinceText(400), { exact: true }), `header ${sinceText(400)}`).toHaveCount(1, SOFT);
+
+  // REQ-17: a plan that began today shows Sin marcar 0: 4 planned, 1 done, 3 pending.
+  withMeals(FOUR, { done: [0], createdAt: dayAt(0).toISOString() });
+  await open(page);
+  await expect.soft.poll(() => figures(page), { message: "day 1", ...SOFT }).toEqual(countsOf(4, 1, 0, 3));
+  await expect.soft(arc(page, "1 de 4 comidas cumplidas"), "day 1 arc text").toHaveCount(1, SOFT);
+  expect.soft((await arcFill(page, "1 de 4 comidas cumplidas")) ?? -1, "day 1 arc fill").toBeCloseTo(25, 0);
+  await expect.soft(card.getByText(sinceText(0), { exact: true }), `header ${sinceText(0)}`).toHaveCount(1, SOFT);
+});
+
+/** Text leaves of the card that are cut off, outside the card or the viewport, hidden by a clipping ancestor, or drawn over each other. */
+const layoutFaults = (page: Page) =>
+  comp(page).evaluate((card) => {
+    const cardBox = card.getBoundingClientRect();
+    const leaves = [...card.querySelectorAll<HTMLElement>("*")].filter((node) => {
+      if (![...node.childNodes].some((child) => child.nodeType === Node.TEXT_NODE && child.textContent!.trim())) return false;
+      // Visually-hidden text (sr-only: 1px box, clipped) is not drawn, so it cannot be cut off or overlap.
+      const style = getComputedStyle(node);
+      return node.getBoundingClientRect().width > 1 && style.clip === "auto" && style.clipPath === "none";
+    });
+    const name = (node: HTMLElement) => `${node.tagName.toLowerCase()}.${node.className || "-"}"${node.textContent!.trim().slice(0, 24)}"`;
+    const faults: string[] = [];
+    const rects = leaves.map((node) => node.getBoundingClientRect());
+    leaves.forEach((node, index) => {
+      const box = rects[index];
+      if (node.scrollWidth > node.clientWidth + 1 && node.clientWidth > 0) faults.push(`cut off: ${name(node)}`);
+      if (box.left < cardBox.left - 1 || box.right > cardBox.right + 1 || box.top < cardBox.top - 1 || box.bottom > cardBox.bottom + 1) faults.push(`outside the card: ${name(node)}`);
+      if (box.left < -1 || box.right > innerWidth + 1) faults.push(`outside the viewport: ${name(node)}`);
+      for (let up = node.parentElement; up && up !== card; up = up.parentElement) {
+        const { overflowX, overflowY } = getComputedStyle(up);
+        if (overflowX === "visible" && overflowY === "visible") continue;
+        const clip = up.getBoundingClientRect();
+        if (box.left < clip.left - 1 || box.right > clip.right + 1 || box.top < clip.top - 1 || box.bottom > clip.bottom + 1) faults.push(`clipped by ${up.tagName.toLowerCase()}.${up.className}: ${name(node)}`);
+      }
+      leaves.forEach((other, next) => {
+        if (next <= index || node.contains(other) || other.contains(node)) return;
+        const o = rects[next];
+        if (Math.min(box.right, o.right) - Math.max(box.left, o.left) > 1 && Math.min(box.bottom, o.bottom) - Math.max(box.top, o.top) > 1) faults.push(`overlap: ${name(node)} with ${name(other)}`);
+      });
+    });
+    return { faults, cardOverflow: card.scrollWidth - card.clientWidth, pageOverflow: document.documentElement.scrollWidth - innerWidth, leaves: leaves.length };
+  });
+
+test("Cumplimiento del plan: four-digit figures fit at 360px and at 200% zoom, light and dark", async ({ page }) => {
+  // 8 meals for 365 days (the spec's bound): 2920 planned; the 180 days before today fully done is 1440; so 1472 unmarked and 8 pending.
+  withMeals(EIGHT, { done: [], createdAt: dayAt(364).toISOString() });
+  const all = EIGHT.map((_, index) => `'e2e-tl-${index}'`).join(",");
+  sql(
+    `delete from daily_logs; insert into daily_logs (id, user_id, date, meals_done, water_glasses, created_at, updated_at) select 'e2e-tl-big-' || n, ${FIRST_USER}, '${TODAY}'::date - n, array[${all}], 0, now(), now() from generate_series(1, 180) n`
+  );
+
+  // 200% browser zoom is half the viewport in CSS px (as the dashboard Racha test does): 1280x900 becomes 640x450.
+  for (const size of [{ width: 360, height: 740 }, { width: 640, height: 450 }]) {
+    for (const scheme of ["light", "dark"] as const) {
+      const where = `${size.width}px ${scheme}`;
+      await page.emulateMedia({ colorScheme: scheme });
+      await open(page, size);
+      // The app follows the system scheme: make sure the emulated one is the one on screen before measuring.
+      if (scheme === "dark") await expect(page.locator("html")).toHaveClass(/\bdark\b/);
+      else await expect(page.locator("html")).not.toHaveClass(/\bdark\b/);
+      await expect.soft.poll(() => figures(page), { message: `${where}: four-digit figures` }).toEqual(countsOf(2920, 1440, 1472, 8));
+      // The page pops its cards in: measure at rest.
+      let last = "";
+      await expect.poll(async () => {
+        const now = JSON.stringify(await comp(page).evaluate((node) => node.getBoundingClientRect().toJSON()));
+        const same = now === last;
+        last = now;
+        return same;
+      }).toBe(true);
+      const seen = await layoutFaults(page);
+      expect.soft(seen.leaves, `${where}: the card has text to measure`).toBeGreaterThanOrEqual(5);
+      expect.soft(seen.faults, `${where}: figures and labels fit`).toEqual([]);
+      expect.soft(seen.cardOverflow, `${where}: card scroll width`).toBeLessThanOrEqual(1);
+      expect.soft(seen.pageOverflow, `${where}: page scroll width`).toBeLessThanOrEqual(0);
+    }
+  }
 });

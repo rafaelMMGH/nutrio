@@ -175,13 +175,13 @@ Per batch:
 
 ### Batch US2b: e2e for the counts card, red (≈220 lines)
 
-- [ ] T032 [US2] Title "Cumplimiento del plan: real counts since the plan began" (REQ-12 to REQ-15) (tests/e2e/dashboard-real-data.spec.ts):
+- [x] T032 [US2] Title "Cumplimiento del plan: real counts since the plan began" (REQ-12 to REQ-15) (tests/e2e/dashboard-real-data.spec.ts):
   - Seeded 9 of 12 shows "Planificadas" 12 at the centre, and Cumplidas 9, Sin marcar 1, Pendientes 2 with labels.
   - The arc `role="img"` is named "9 de 12 comidas cumplidas" and is 75% filled; "Desde 12 nov", or with the year.
   - No "%", no "Omitidas", no "En vivo" and no arrow.
   - Day-1 plan gives Sin marcar 0.
-- [ ] T033 [US2] In `failed saves`, title "Cumplimiento del plan: counts move at once and roll back" (REQ-16): Cumplidas +1 and Pendientes −1 before the response with Sin marcar unchanged; back on a 500; the check-off sends exactly one request to `/api/` (the daily-log save), so the counts add none (tests/e2e/dashboard-real-data.spec.ts)
-- [ ] T034 [US2] Extend the T012 and T022 titles and add one: no plan shows "Sin plan activo" plus "Subir plan" on the counts card; no meals shows 0, 0, 0, 0 with an empty arc and "0 de 0 comidas cumplidas"; midnight moves yesterday's unchecked meals to Sin marcar; four-digit figures fit at 360px and at 200% zoom, light and dark (REQ-10, REQ-11, REQ-15, NFR) (tests/e2e/dashboard-real-data.spec.ts)
+- [x] T033 [US2] In `failed saves`, title "Cumplimiento del plan: counts move at once and roll back" (REQ-16): Cumplidas +1 and Pendientes −1 before the response with Sin marcar unchanged; back on a 500; the check-off sends exactly one request to `/api/` (the daily-log save), so the counts add none (tests/e2e/dashboard-real-data.spec.ts)
+- [x] T034 [US2] Extend the T012 and T022 titles and add one: no plan shows "Sin plan activo" plus "Subir plan" on the counts card, with no figures and no arc (the empty state shared with the timeline, plan.md); no meals shows 0, 0, 0, 0 with an empty arc and "0 de 0 comidas cumplidas"; midnight moves yesterday's unchecked meals to Sin marcar; four-digit figures fit at 360px and at 200% zoom, light and dark (REQ-10, REQ-11, REQ-15, NFR) (tests/e2e/dashboard-real-data.spec.ts)
 
 **Checkpoint:** US2b reviewed; titles shown red. Commit them alone as the red commit.
 
