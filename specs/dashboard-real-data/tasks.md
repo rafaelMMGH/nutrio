@@ -137,20 +137,20 @@ Per batch:
 
 ### Batch US1f: overflow and interaction (≈250 lines)
 
-- [ ] T025 [US1] Overflow and state CSS (src/components/nutrio/meal-timeline.css):
+- [x] T025 [US1] Overflow and state CSS (src/components/nutrio/meal-timeline.css):
   - REQ-7: flex list with rows `flex: 1 1 0; min-height: 44px; max-height: <row>`; the `<cap>` rule with `--nt-tl-rows` under `max-width: 1279px` (spec v1.2); the `mask-image` fade driven by `--nt-tl-fade-top` and `--nt-tl-fade-bottom`; `scroll-padding-block`; 1px `--nt-on-accent-line` dividers under reduced transparency, more contrast and forced colours; short-screen rules from 1280px.
   - REQ-18: hover in 150 ms only under no-preference; pressed `transition: none`; inset 2px focus ring. The shell rule `.nt :is(a, button, [tabindex]):focus-visible` (primitives.css:99, specificity 0,3,0) replaces outlines with a box-shadow and beats `.nt-today-row:focus-visible`; use `.nt .nt-today-row:focus-visible { outline: 2px solid var(--nt-on-accent); outline-offset: -2px; box-shadow: none; }` (precedent dashboard.css:122, :134) so the ring is inset and survives forced colours.
   - REQ-5: forced-colours marker in `CanvasText`.
   - REQ-1: no horizontal scroll at 360px.
   - Also check one width in 938–1279 (e.g. 1100×900).
-- [ ] T026 [US1] `MealTimeline` behaviour (src/components/nutrio/MealTimeline.tsx):
+- [x] T026 [US1] `MealTimeline` behaviour (src/components/nutrio/MealTimeline.tsx):
   - REQ-7: edge fades from `scroll` and `ResizeObserver`.
   - REQ-5: an effect on `shownId` calls `list.scrollTo(listScrollTop(...))`, instant under reduced motion.
   - REQ-19: `onFocus` brings the row clear of the fade.
   - REQ-9: on activation at `max-width: 937px`, `window.scrollTo` puts the hero top at the top bar's bottom edge, instant under reduced motion; focus is never moved.
-- [ ] T026a [US1] (conditional, only if T022's in-flight case fails after T026) Unit test that reproduces it: a save started for day D and settled after midnight changes only D's log, including on rollback. Show it red (tests/unit/day-log-saves.test.ts)
-- [ ] T026b [US1] (conditional, after T026a is red) Fix the date capture in `toggleMeal`/`press` or the per-date queue so T026a and T022 pass (src/components/nutrio/Dashboard.tsx, src/components/nutrio/day-log-saves.ts)
-- [ ] T027 [US1] Run tsc, unit tests and T019 to T024. Then run `dashboard-real-data.spec.ts`, `dashboard.spec.ts --grep-invert "screenshot"` and `metric-dials.spec.ts` in full, once each, and restore the screenshots folder. Save screenshots to the session scratchpad: 1440×900, 1280×768 with 8 meals, 390×844, and dark. Report the T002 numbers.
+- [x] T026a [US1] (not needed: T022 stayed green after T026) (conditional, only if T022's in-flight case fails after T026) Unit test that reproduces it: a save started for day D and settled after midnight changes only D's log, including on rollback. Show it red (tests/unit/day-log-saves.test.ts)
+- [x] T026b [US1] (not needed) (conditional, after T026a is red) Fix the date capture in `toggleMeal`/`press` or the per-date queue so T026a and T022 pass (src/components/nutrio/Dashboard.tsx, src/components/nutrio/day-log-saves.ts)
+- [x] T027 [US1] Run tsc, unit tests and T019 to T024. Then run `dashboard-real-data.spec.ts`, `dashboard.spec.ts --grep-invert "screenshot"` and `metric-dials.spec.ts` in full, once each, and restore the screenshots folder. Save screenshots to the session scratchpad: 1440×900, 1280×768 with 8 meals, 390×844, and dark. Report the T002 numbers.
 
 **Checkpoint:** US1 complete. Review, commit, show the screenshots, then continue.
 
