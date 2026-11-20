@@ -40,19 +40,22 @@ export function MealTimeline({ meals, doneIds, hasPlan, shownId, onSelect }: Pro
   }, [rows.length]);
 
   // Scrolls only the list, never the page, so the row is whole and clear of the fades.
-  function reveal(row: HTMLElement) {
+  function reveal(row: HTMLElement, instant = reducedMotion()) {
     const list = listRef.current;
     if (!list) return;
     const box = row.getBoundingClientRect();
     const top = box.top - list.getBoundingClientRect().top - list.clientTop + list.scrollTop;
     const next = listScrollTop({ top, bottom: top + box.height, scrollTop: list.scrollTop, height: list.clientHeight, scrollHeight: list.scrollHeight, pad: FADE_PX });
-    if (next !== list.scrollTop) list.scrollTo({ top: next, behavior: reducedMotion() ? "instant" : "smooth" });
+    if (next !== list.scrollTop) list.scrollTo({ top: next, behavior: instant ? "instant" : "smooth" });
   }
 
   // The row on the hero follows the hero, also when it changes from the hero's own controls (REQ-5).
+  // The first run is the page loading: start at the row instead of animating the list on arrival.
+  const firstReveal = useRef(true);
   useEffect(() => {
     const current = listRef.current?.querySelector<HTMLElement>("[aria-current='true']");
-    if (current) reveal(current);
+    if (current) reveal(current, firstReveal.current || reducedMotion());
+    firstReveal.current = false;
   }, [shownId]);
 
   // On a phone the hero is far above the rows: bring it under the top bar. Focus stays on the row (REQ-9).
@@ -78,7 +81,7 @@ export function MealTimeline({ meals, doneIds, hasPlan, shownId, onSelect }: Pro
           {rows.map((row) => (
             <li key={row.id}>
               {/* The label carries time, name and state, so every visible part is hidden from readers. */}
-              <button type="button" className={`nt-today-row is-${row.state}`} aria-label={rowLabel(row)} aria-current={row.id === shownId ? "true" : undefined} onFocus={(event) => reveal(event.currentTarget)} onClick={() => select(row.id)}>
+              <button type="button" className={`nt-today-row is-${row.state}`} aria-label={rowLabel(row)} aria-current={row.id === shownId ? "true" : undefined} onFocus={(event) => event.currentTarget.matches(":focus-visible") && reveal(event.currentTarget)} onClick={() => select(row.id)}>
                 {hasTimes && (
                   <span className="nt-today-time" aria-hidden>
                     {row.time}

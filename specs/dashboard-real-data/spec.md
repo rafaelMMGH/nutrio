@@ -157,7 +157,7 @@ None. Resolved at Gate 1 (2026-11-19):
 
 ## Progress
 
-- [ ] US1 (P1): today's meal timeline (REQ-1 to REQ-11, REQ-18 to REQ-23)
+- [x] US1 (P1): today's meal timeline (REQ-1 to REQ-11, REQ-18 to REQ-23)
 - [ ] US2 (P2): real plan-compliance counts (REQ-12 to REQ-17)
 - [ ] Housekeeping: superseded notes (D14), affected e2e rewritten, made-up-hours fallback deleted
 

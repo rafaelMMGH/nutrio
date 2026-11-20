@@ -697,6 +697,51 @@ test("Comidas de hoy: 8 meals tighten, then scroll with edge fades", async ({ pa
   }
 });
 
+test("Comidas de hoy: mouse click in the fade band and initial position", async ({ page }) => {
+  // A mouse press focuses the row but must not start a reveal scroll: the row would slide under the pointer and the click be lost.
+  withMeals(EIGHT, { done: [] });
+  await open(page, SHORT_LAPTOP);
+  await expect(rows(page)).toHaveCount(8);
+  await scrollList(page, 0);
+  const target = await list(page).evaluate((node) => {
+    const box = node.getBoundingClientRect();
+    const buttons = [...node.querySelectorAll("button")];
+    const index = buttons.findIndex((button) => {
+      const rect = button.getBoundingClientRect();
+      return rect.top < box.bottom - 2 && rect.bottom > box.bottom - 12;
+    });
+    const rect = buttons[index].getBoundingClientRect();
+    return { index, x: rect.left + rect.width / 2, y: (rect.top + box.bottom) / 2 };
+  });
+  expect(target.index, "a row is partly under the bottom fade").toBeGreaterThan(0);
+  await page.mouse.move(target.x, target.y);
+  await page.mouse.down();
+  await page.waitForTimeout(150);
+  await page.mouse.up();
+  await expect(hero(page)).toHaveText(EIGHT[target.index].name);
+  await expect(rows(page).nth(target.index)).toHaveAttribute("aria-current", "true");
+
+  // The first position is set instantly on load: the list never passes through in-between offsets.
+  withMeals(EIGHT, { done: [0, 1, 2, 3, 4, 5] });
+  await page.addInitScript(() => {
+    const seen = new Set<number>();
+    (window as unknown as { __tops: Set<number> }).__tops = seen;
+    const tick = () => {
+      const node = document.querySelector("ul[aria-label='Comidas de hoy']");
+      if (node) seen.add(node.scrollTop);
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  await open(page, SHORT_LAPTOP);
+  await expect(hero(page)).toHaveText("Comida 7");
+  await page.waitForTimeout(800);
+  const final = (await listScroll(page)).top;
+  expect(final, "the selected row below the fold scrolled into view").toBeGreaterThan(0);
+  const tops = await page.evaluate(() => [...(window as unknown as { __tops: Set<number> }).__tops].filter((top) => top > 0));
+  expect(tops, "no intermediate offsets on load").toEqual([final]);
+});
+
 test("Comidas de hoy: phone row tap brings the hero below the top bar; desktop only scrolls the list", async ({ page }) => {
   withMeals(EIGHT, { done: [] });
 
