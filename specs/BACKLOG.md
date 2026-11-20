@@ -7,7 +7,7 @@ _Last updated: 2026-11-18 (PRs #12 and #13 merged: upload wizard, cooking mode, 
 ## In progress
 
 - [ ] **Dashboard polish follow-ups** (spec `implemented`, PR #16): T037 (US3 screenshots for the user) and T038 (regenerate the home visual snapshot and `specs/alt-dashboard/screenshots/` after the user approves the visuals) were never ticked.
-- [ ] **Real data on the dashboard cards** (`specs/dashboard-real-data/`, spec v1.2 `planned`, Feature route, size large): today's meal timeline replaces the fake Calorías card (US1), real plan-compliance counts in Cumplimiento (US2). Paused 2026-11-19 after US1b (red e2e committed): 13 of 46 tasks done. Next: batch US1c (T013, T014, T014a). Review note to carry into US1d/T017: the T010 marker test assumes unselected rows have no border; relax it if rows get a transparent border.
+- [ ] **Real data on the dashboard cards** (`specs/dashboard-real-data/`, spec v1.2 `planned`, Feature route, size large): today's meal timeline replaces the fake Calorías card (US1), real plan-compliance counts in Cumplimiento (US2). US1c lift committed 2026-11-19; next: pager rename "Elegir comida" (rest of T014), then US1d (T015–T018). Review note to carry into US1d/T017: the T010 marker test assumes unselected rows have no border; relax it if rows get a transparent border.
 - [ ] **Hero placeholders (later phases, by decision 2026-11-19):** star rating from shared recipes (multi-user phase); prep progress from Modo Cocina's stepper. They stay unmarked until then.
 - [ ] **Parser keeps the full time window** ("Entre 7 a 8 am" → 07:00–08:00); today only the start is stored (`pdf-plan.ts` parseTimeWindow).
 - [ ] **Possible bug (hero pager):** if the last meal is removed while it's shown, the index clamp leaves no pager dot selected. Kept as-is by Gate 2 decision (dashboard-real-data REQ-22); needs a bug-fix route if the user wants it fixed.
@@ -52,6 +52,9 @@ Findings, with file:line references: `specs/bugs/shopping-list-findings.md`.
 - [ ] **Pre-existing e2e failures on main** (found 2026-10-24 reviewing #2, fail without the fix too). Serial mode skips every later test when they fail:
   - `dashboard.spec.ts:213` "the newest shopping list can be checked off": the newest list in the cloned data has 0 items, so `.home-shop .home-count` never appears. The test depends on the data.
   - `dashboard.spec.ts:91` "intake rings count the equivalents of meals marked done": gets 7, expects > 7. Probably depends on the time of day. Not stash-checked.
+  - `dashboard.spec.ts:848` "Modo Cocina pill": expects the pill title "Modo Cocina", gets "Abrir Modo Cocina" (found 2026-11-19 in US1c, stash-checked).
+  - `cooking-mode.spec.ts:68` REQ-1/2/6/8/10: `getByText('Paso 1 de 2')` matches 2 elements (strict mode) (2026-11-19, stash-checked).
+  - `cooking-mode.spec.ts:171` REQ-21/22/23/25: expects `step-0`, gets `step-1` (2026-11-19, stash-checked).
 - [ ] **Spec-change:** the unit policy (#3, #4), and the meaning of "Entrenamiento", supplements and alternatives (#8, #9).
 - [ ] **Spec-change: deleted lists vs templates (#11).** Filtering deleted lists alone would make a template load empty after its backing list is deleted. Options: A) read `reference_snapshot.items` at read time (no migration); B) copy the snapshot into the cart at load; C) store the snapshot on the cart item (migration). Also decide whether a template in the Papelera still counts.
 - [ ] **Refactor:** make the "Ingredientes" catalog use the same totals as the cart (#6), and remove the dead `practical_*` code and the misleading template "snapshot" wording (#10, #11).

@@ -77,7 +77,7 @@ Per batch:
 
 ### Batch US1c: timeline markup, then selection and marking lifted into Dashboard (≈270 changed lines, ~70 of them moved; three commits: markup, lift, pager rename)
 
-- [ ] T013 [US1] `MealTimeline` markup (src/components/nutrio/MealTimeline.tsx):
+- [x] T013 [US1] `MealTimeline` markup (src/components/nutrio/MealTimeline.tsx):
   - `tone="yellow"` card `.nt-today` with the `HandPlatter` header "Comidas de hoy".
   - `<ul aria-label="Comidas de hoy">` with native row buttons: `aria-label={rowLabel}`, `aria-current`, `aria-hidden` visible parts; time column only when `hasTimes`; `Check` plus "Cumplida", "Siguiente" pill and "Pendiente" word.
   - Empty states: "Sin plan activo" with a "Subir plan" button that calls `openUpload` (spec v1.2), and "Tu plan no tiene comidas".
