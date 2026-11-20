@@ -107,39 +107,39 @@ Per batch:
 
 ### Batch US1e: e2e for overflow, phone, keyboard and midnight, red (≈300 lines)
 
-- [ ] T019 [US1] Title "Comidas de hoy: 8 meals tighten, then scroll with edge fades" (REQ-7) (tests/e2e/dashboard-real-data.spec.ts):
+- [x] T019 [US1] Title "Comidas de hoy: 8 meals tighten, then scroll with edge fades" (REQ-7) (tests/e2e/dashboard-real-data.spec.ts):
   - At 1280×768: rows ≥44px, every row reachable by scroll and by Tab, a bottom fade until the end and then a top fade, and no page scrollbar at all 5 desktop viewports.
   - 1 meal: rows at the T002 row height and the card box unchanged.
   - At 390×844: list capped at the T002 cap.
   - The fade does not intercept pointer input.
   - Reduced transparency (CDP), `prefers-contrast: more` and forced colours: a 1px divider ≥3:1 instead of the fade.
   - Reduced motion: no transition on the fade.
-- [ ] T020 [US1] Title "Comidas de hoy: phone row tap brings the hero below the top bar; desktop only scrolls the list" (tests/e2e/dashboard-real-data.spec.ts):
+- [x] T020 [US1] Title "Comidas de hoy: phone row tap brings the hero below the top bar; desktop only scrolls the list" (tests/e2e/dashboard-real-data.spec.ts):
   - REQ-9: at 390px the hero top is at or just below `.nt-topbar` and focus is still on the row; under reduced motion this is instant; at ≥938px a row activation leaves `scrollY` unchanged.
   - REQ-5: with 8 meals and the page not scrolled, selecting meal 8 changes only the list's `scrollTop`. Under `reducedMotion: "reduce"`, the list's `scrollTop` already equals its final value in the first animation frame after the selection (no smooth scroll).
-- [ ] T021 [US1] Title "Comidas de hoy: keyboard path, focus, hover, contrast, forced colours" (tests/e2e/dashboard-real-data.spec.ts):
+- [x] T021 [US1] Title "Comidas de hoy: keyboard path, focus, hover, contrast, forced colours" (tests/e2e/dashboard-real-data.spec.ts):
   - REQ-19:
     - Tab order: hero controls, then Métricas, then rows in plan order, then the counts card.
     - Focus stays on row 3 after marking meal 3 in the hero, and the list does not jump.
     - The row-6 focus ring is fully visible and clear of the fade.
   - REQ-18: hover change within 150 ms; instant under reduced motion with no transform; ring ≥3:1 also on the selected row, in both themes.
   - NFR: measured contrast of the time, "Pendiente", icons and the marker in both themes; forced colours show rows, icons, cue and ring.
-- [ ] T022 [US1] Title "Midnight: rows reset on focus; an in-flight save settles against its day" (REQ-11, timeline part):
+- [x] T022 [US1] Title "Midnight: rows reset on focus; an in-flight save settles against its day" (REQ-11, timeline part):
   - Use `page.clock` and a `focus` dispatch: all rows Cumplida become Pendiente, with the first one Siguiente.
   - A check-off is held across midnight, then fails: yesterday's meal returns to unchecked and today's rows are untouched.
   - The selected row is kept.
   - If the in-flight case still fails once T025 and T026 are in, the bug is in `toggleMeal`/`press` (Dashboard.tsx) or `day-log-saves.ts`, not in the timeline: run T026a/T026b.
   (tests/e2e/dashboard-real-data.spec.ts)
-- [ ] T023 [P] [US1] Change `.nt-cal` to `.nt-today` in the "fits W×H without scrolling" titles. The list scroller is not a clipped card (REQ-7) (tests/e2e/dashboard.spec.ts)
-- [ ] T024 [P] [US1] Change `.nt-cal` to `.nt-today` in the "REQ-9: … no card is clipped at the five window sizes" list (tests/e2e/metric-dials.spec.ts)
+- [x] T023 [P] [US1] Change `.nt-cal` to `.nt-today` in the "fits W×H without scrolling" titles. The list scroller is not a clipped card (REQ-7) (tests/e2e/dashboard.spec.ts)
+- [x] T024 [P] [US1] Change `.nt-cal` to `.nt-today` in the "REQ-9: … no card is clipped at the five window sizes" list (tests/e2e/metric-dials.spec.ts)
 
-**Checkpoint:** US1e reviewed; T019 to T022 shown red. Commit them alone as the red commit.
+**Checkpoint:** US1e reviewed; T019 to T021 and T023 shown red; T022 and T024 are green guards on arrival (2026-11-19: midnight already settles against its day; `.nt-cal` matched nothing since T015). Commit them alone as the red commit.
 
 ### Batch US1f: overflow and interaction (≈250 lines)
 
 - [ ] T025 [US1] Overflow and state CSS (src/components/nutrio/meal-timeline.css):
   - REQ-7: flex list with rows `flex: 1 1 0; min-height: 44px; max-height: <row>`; the `<cap>` rule with `--nt-tl-rows` under `max-width: 1279px` (spec v1.2); the `mask-image` fade driven by `--nt-tl-fade-top` and `--nt-tl-fade-bottom`; `scroll-padding-block`; 1px `--nt-on-accent-line` dividers under reduced transparency, more contrast and forced colours; short-screen rules from 1280px.
-  - REQ-18: hover in 150 ms only under no-preference; pressed `transition: none`; inset 2px focus ring.
+  - REQ-18: hover in 150 ms only under no-preference; pressed `transition: none`; inset 2px focus ring. The shell rule `.nt :is(a, button, [tabindex]):focus-visible` (primitives.css:99, specificity 0,3,0) replaces outlines with a box-shadow and beats `.nt-today-row:focus-visible`; use `.nt .nt-today-row:focus-visible { outline: 2px solid var(--nt-on-accent); outline-offset: -2px; box-shadow: none; }` (precedent dashboard.css:122, :134) so the ring is inset and survives forced colours.
   - REQ-5: forced-colours marker in `CanvasText`.
   - REQ-1: no horizontal scroll at 360px.
   - Also check one width in 938–1279 (e.g. 1100×900).

@@ -586,7 +586,7 @@ test("REQ-9: with data the page does not scroll and no card is clipped at the fi
     const scroll = await noScroll(page);
     expect(scroll.vertical, `vertical page scroll at ${at}`).toBeLessThanOrEqual(0);
     expect(scroll.horizontal, `horizontal page scroll at ${at}`).toBeLessThanOrEqual(0);
-    const clipped = await page.locator(".nt-kpi, .nt-metrics, .nt-gauges > *, .nt-cal, .nt-comp, .nt-prep").evaluateAll((nodes) =>
+    const clipped = await page.locator(".nt-kpi, .nt-metrics, .nt-gauges > *, .nt-today, .nt-comp, .nt-prep").evaluateAll((nodes) =>
       nodes.filter((node) => node.scrollHeight > node.clientHeight + 1).map((node) => `${node.className}: ${node.scrollHeight} > ${node.clientHeight}`)
     );
     expect(clipped, `cards whose content is cut at ${at}`).toEqual([]);

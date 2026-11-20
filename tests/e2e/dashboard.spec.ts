@@ -792,7 +792,7 @@ for (const size of [{ width: 1440, height: 900 }, { width: 1440, height: 780 }, 
     await page.waitForLoadState("networkidle");
     expect(await page.evaluate(() => document.documentElement.scrollHeight - innerHeight), "vertical page scroll").toBeLessThanOrEqual(0);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - innerWidth), "horizontal page scroll").toBeLessThanOrEqual(0);
-    const clipped = await page.locator(".nt-kpi, .nt-metrics, .nt-gauges > *, .nt-cal, .nt-comp, .nt-prep").evaluateAll((nodes) =>
+    const clipped = await page.locator(".nt-kpi, .nt-metrics, .nt-gauges > *, .nt-today, .nt-comp, .nt-prep").evaluateAll((nodes) =>
       nodes.filter((node) => node.scrollHeight > node.clientHeight + 1).map((node) => `${node.className}: ${node.scrollHeight} > ${node.clientHeight}`)
     );
     expect(clipped, "cards whose content is cut").toEqual([]);

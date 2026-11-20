@@ -1,10 +1,12 @@
 import type { Locator, Page } from "@playwright/test";
 import { sql } from "./database";
 import { expect, expectIssues, test } from "./fixtures";
+import { contrast, toRgb } from "./theme-helpers";
 
 // "Comidas de hoy" (specs/dashboard-real-data, US1): the timeline card that replaces the static calorie card.
 // Real UI, real routes, real Postgres (the e2e copy); every test sets its meals by SQL and the afterEach puts them back.
-// Written before the timeline exists, so every title but the hero-only guard ("Hero selection is unchanged") is red.
+// Written before the timeline exists: the US1e titles for overflow, phone and keyboard (T019 to T021) stay red until the
+// overflow CSS and MealTimeline behaviour land (T025, T026); the midnight guard (T022) and the earlier US1 titles are green.
 
 const dayKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
 const TODAY = dayKey(new Date());
@@ -418,5 +420,573 @@ test.describe("failed saves", () => {
     expect(requests).toHaveLength(1);
     await expect(rows(page)).toHaveCount(3);
     await expect(list(page).locator("[aria-pressed], input, [role=checkbox], [role=switch]")).toHaveCount(0);
+  });
+});
+
+/* ---------- US1e: overflow, phone, keyboard and midnight (T019 to T021 red until T025/T026; T022 is a green guard) ---------- */
+
+const EIGHT: Slot[] = Array.from({ length: 8 }, (_, index) => ({ name: `Comida ${index + 1}`, time: `${String(7 + index * 2).padStart(2, "0")}:00` }));
+const eightRow = (index: number, state: string) => `${EIGHT[index].time}, ${EIGHT[index].name}, ${state}`;
+const DESKTOP_SIZES = [{ width: 1440, height: 900 }, { width: 1440, height: 780 }, { width: 1280, height: 768 }, { width: 1920, height: 1080 }, { width: 1920, height: 800 }];
+const SHORT_LAPTOP = { width: 1280, height: 768 };
+const PHONE = { width: 390, height: 844 };
+const ROW_PX = 56;
+const MIN_ROW_PX = 44;
+const CAP_PX = 336;
+const FADE_PX = 16;
+/** Soft polls on states the app sets synchronously: a short timeout so one red run does not spend minutes on them. */
+const SOFT = { timeout: 1500 };
+
+const card = (page: Page) => page.locator(".nt-today");
+const listBox = (page: Page) => list(page).evaluate((node) => node.getBoundingClientRect().toJSON());
+const rowHeights = (page: Page) => rows(page).evaluateAll((nodes) => nodes.map((node) => node.getBoundingClientRect().height));
+const scrollList = (page: Page, top: number | "end") => list(page).evaluate((node, to) => node.scrollTo({ top: to === "end" ? node.scrollHeight : to, behavior: "instant" }), top);
+const listScroll = (page: Page) => list(page).evaluate((node) => ({ top: node.scrollTop, max: node.scrollHeight - node.clientHeight, height: node.clientHeight }));
+/** The fade sizes the list currently asks for (spec REQ-7): the plan drives the mask from these two custom properties. */
+const fades = (page: Page) =>
+  list(page).evaluate((node) => {
+    const style = getComputedStyle(node);
+    return { top: parseFloat(style.getPropertyValue("--nt-tl-fade-top")), bottom: parseFloat(style.getPropertyValue("--nt-tl-fade-bottom")) };
+  });
+const activeLabel = (page: Page) => page.evaluate(() => document.activeElement?.getAttribute("aria-label") ?? null);
+const pageOverflow = (page: Page) => page.evaluate(() => ({ vertical: document.documentElement.scrollHeight - innerHeight, horizontal: document.documentElement.scrollWidth - innerWidth }));
+
+/** The list's computed edge treatment: its mask, and the 1px divider widths and colour that replace the mask. */
+const edgeStyle = (page: Page) =>
+  list(page).evaluate((node) => {
+    const style = getComputedStyle(node);
+    return {
+      mask: style.maskImage || style.webkitMaskImage || "none",
+      top: parseFloat(style.borderTopWidth) || 0,
+      bottom: parseFloat(style.borderBottomWidth) || 0,
+      topStyle: style.borderTopStyle,
+      bottomStyle: style.borderBottomStyle,
+      topColor: style.borderTopColor,
+      bottomColor: style.borderBottomColor,
+      cardBackground: getComputedStyle(node.closest(".nt-today")!).backgroundColor
+    };
+  });
+
+/** WCAG contrast of two computed CSS colours; alpha of the foreground is composited on the background. */
+async function ratio(page: Page, foreground: string, background: string): Promise<number> {
+  const [back, front] = await Promise.all([toRgb(page, background), toRgb(page, foreground)]);
+  const mixed = [0, 1, 2].map((i) => front[i] * front[3] + back[i] * (1 - front[3]));
+  return contrast([mixed[0], mixed[1], mixed[2], 1], [back[0], back[1], back[2], 1]);
+}
+
+/** Colours of one row's parts, as the browser computes them right now. */
+const rowColors = (button: Locator) =>
+  button.evaluate((node) => {
+    const color = (selector: string) => {
+      const part = node.querySelector(selector);
+      return part ? getComputedStyle(part).color : null;
+    };
+    const icon = node.querySelector("svg");
+    return {
+      time: color(".nt-today-time"),
+      state: color(".nt-today-state"),
+      icon: icon ? getComputedStyle(icon).stroke : null,
+      marker: getComputedStyle(node).borderInlineStartColor,
+      markerWidth: parseFloat(getComputedStyle(node).borderInlineStartWidth),
+      background: getComputedStyle(node).backgroundColor,
+      cardBackground: getComputedStyle(node.closest(".nt-today")!).backgroundColor
+    };
+  });
+
+const ringOf = (button: Locator) =>
+  button.evaluate((node) => {
+    const style = getComputedStyle(node);
+    return { style: style.outlineStyle, width: parseFloat(style.outlineWidth), offset: parseFloat(style.outlineOffset), color: style.outlineColor, cardBackground: getComputedStyle(node.closest(".nt-today")!).backgroundColor };
+  });
+
+/** A system colour as the browser resolves it (for forced colours, where the palette is not ours). */
+const systemColor = (page: Page, name: "CanvasText" | "Canvas") =>
+  page.evaluate((keyword) => {
+    const probe = document.createElement("span");
+    probe.style.color = keyword;
+    document.body.append(probe);
+    const resolved = getComputedStyle(probe).color;
+    probe.remove();
+    return resolved;
+  }, name);
+
+/** Scrollbars and scroll animation settle: the value read twice, 100 ms apart, is the same. */
+async function settledScroll(read: () => Promise<number>) {
+  let previous = Number.NaN;
+  await expect
+    .poll(async () => {
+      const value = await read();
+      const same = value === previous;
+      previous = value;
+      return same;
+    })
+    .toBe(true);
+  return read();
+}
+
+/** In the first animation frame after the next click, what the page and the list had scrolled to. */
+const frameAfterNextClick = (page: Page) =>
+  page.evaluate(() => {
+    const holder = window as unknown as { __frame: { y: number; top: number } | null };
+    holder.__frame = null;
+    window.addEventListener(
+      "click",
+      () => requestAnimationFrame(() => (holder.__frame = { y: scrollY, top: document.querySelector("ul[aria-label='Comidas de hoy']")!.scrollTop })),
+      { capture: true, once: true }
+    );
+  });
+const readFrame = (page: Page) => page.evaluate(() => (window as unknown as { __frame: { y: number; top: number } | null }).__frame);
+
+test("Comidas de hoy: 8 meals tighten, then scroll with edge fades", async ({ page }) => {
+  // REQ-7: 8 meals at 1280×768 cannot fit at 44px, so the list scrolls inside the card with rows of at least 44px.
+  withMeals(EIGHT, { done: [] });
+  await open(page, SHORT_LAPTOP);
+  await expect(rows(page)).toHaveCount(8);
+  for (const height of await rowHeights(page)) {
+    expect.soft(height, "8 meals: row at least the minimum").toBeGreaterThanOrEqual(MIN_ROW_PX - 0.01);
+    expect.soft(height, "8 meals: row at most the default").toBeLessThanOrEqual(ROW_PX + 0.01);
+  }
+  const scrolling = await list(page).evaluate((node) => ({ overflowY: getComputedStyle(node).overflowY, scrolls: node.scrollHeight > node.clientHeight }));
+  expect.soft(["auto", "scroll"], "list overflow-y").toContain(scrolling.overflowY);
+  expect.soft(scrolling.scrolls, "8 meals scroll inside the list").toBe(true);
+  const eightCard = await card(page).evaluate((node) => node.getBoundingClientRect().toJSON());
+
+  // Every row is reachable by scroll: at the end the last row sits inside the list.
+  await scrollList(page, "end");
+  const atEnd = await listBox(page);
+  const last = await rows(page).nth(7).evaluate((node) => node.getBoundingClientRect().toJSON());
+  expect.soft(last.bottom, "last row inside the list at the end").toBeLessThanOrEqual(atEnd.bottom + 1);
+  await scrollList(page, 0);
+
+  // Every row is reachable by Tab, and each focused row is whole and clear of the fades (REQ-19).
+  await rows(page).nth(0).focus();
+  for (let index = 0; index < 8; index++) {
+    if (index > 0) await page.keyboard.press("Tab");
+    await expect.poll(() => activeLabel(page)).toMatch(new RegExp(`^${EIGHT[index].time}, ${EIGHT[index].name}, `));
+    await expect.soft.poll(async () => {
+      const [box, within, fade] = await Promise.all([rows(page).nth(index).evaluate((node) => node.getBoundingClientRect().toJSON()), listBox(page), fades(page)]);
+      return box.top >= within.top + (fade.top || 0) - 1 && box.bottom <= within.bottom - (fade.bottom || 0) + 1;
+    }, { message: `row ${index + 1} clear of the list edges and its fades`, ...SOFT }).toBe(true);
+  }
+
+  // Edge fades: a bottom fade until the end, both in between, and a top fade at the end.
+  await scrollList(page, 0);
+  await expect.soft.poll(() => fades(page), SOFT).toEqual({ top: 0, bottom: FADE_PX });
+  const { max } = await listScroll(page);
+  await scrollList(page, Math.round(max / 2));
+  await expect.soft.poll(() => fades(page), SOFT).toEqual({ top: FADE_PX, bottom: FADE_PX });
+  await scrollList(page, "end");
+  await expect.soft.poll(() => fades(page), SOFT).toEqual({ top: FADE_PX, bottom: 0 });
+
+  // The fade is a mask and catches no pointer: at a faded edge the pointer lands on a row of the list.
+  await scrollList(page, Math.round(max / 2));
+  const hit = await list(page).evaluate((node) => {
+    const box = node.getBoundingClientRect();
+    // The middle of the first and last visible rows, so a gap between rows cannot yield the list itself.
+    const visible = [...node.querySelectorAll("button")].map((button) => button.getBoundingClientRect()).filter((rect) => rect.bottom > box.top && rect.top < box.bottom);
+    const edges = [visible[0], visible.at(-1)!];
+    return edges.map((rect) => document.elementFromPoint(box.left + box.width / 2, Math.min(Math.max(rect.top + rect.height / 2, box.top + 1), box.bottom - 1))?.closest("button")?.getAttribute("aria-label") ?? null);
+  });
+  for (const found of hit) expect.soft(found, "pointer lands on a row at a faded edge").toMatch(/^\d\d:00, Comida \d, /);
+  await expect.soft(list(page)).not.toHaveCSS("pointer-events", "none");
+  const normal = await edgeStyle(page);
+  expect.soft(normal.mask, "mask while fading").not.toBe("none");
+  expect.soft([normal.top, normal.bottom], "no dividers while fading").toEqual([0, 0]);
+
+  // Reduced motion: the fade changes without a transition, and so does the list that carries it (also with normal motion).
+  for (const motion of ["no-preference", "reduce"] as const) {
+    await page.emulateMedia({ reducedMotion: motion });
+    const durations = await list(page).evaluate((node) => getComputedStyle(node).transitionDuration.split(",").map((value) => parseFloat(value) * (value.trim().endsWith("ms") ? 0.001 : 1)));
+    expect.soft(durations.every((seconds) => seconds === 0), `${motion}: list transition durations ${durations}`).toBe(true);
+  }
+  await page.emulateMedia({ reducedMotion: null });
+
+  // The page never gets a scrollbar at the five desktop sizes with 8 meals.
+  for (const size of DESKTOP_SIZES) {
+    await open(page, size);
+    await expect(rows(page)).toHaveCount(8);
+    const overflow = await pageOverflow(page);
+    expect.soft(overflow.vertical, `vertical page scroll at ${size.width}×${size.height}`).toBeLessThanOrEqual(0);
+    expect.soft(overflow.horizontal, `horizontal page scroll at ${size.width}×${size.height}`).toBeLessThanOrEqual(0);
+  }
+
+  // Tighten: 4 meals at 1440×900 do not fit at 56px but do at about 48.6px (plan, Measurements), so rows shrink evenly and the list does not scroll.
+  withMeals(FOUR, { done: [] });
+  await open(page, { width: 1440, height: 900 });
+  await expect(rows(page)).toHaveCount(4);
+  const tight = await rowHeights(page);
+  for (const height of tight) {
+    expect.soft(height, "4 meals at 1440×900: tightened below the default").toBeLessThan(ROW_PX - 0.5);
+    expect.soft(height, "4 meals at 1440×900: above the minimum").toBeGreaterThan(MIN_ROW_PX + 0.5);
+  }
+  expect.soft(Math.max(...tight) - Math.min(...tight), "4 meals: rows shrink evenly").toBeLessThanOrEqual(0.5);
+  const fits = await listScroll(page);
+  expect.soft(fits.max, "4 meals at 1440×900 do not scroll").toBeLessThanOrEqual(1);
+
+  // 1 meal: the row keeps the default height and the card its size.
+  withMeals([{ name: "Desayuno", time: "07:00" }], { done: [] });
+  await open(page, SHORT_LAPTOP);
+  await expect(rows(page)).toHaveCount(1);
+  expect((await rowHeights(page))[0]).toBeCloseTo(ROW_PX, 0);
+  const oneCard = await card(page).evaluate((node) => node.getBoundingClientRect().toJSON());
+  expect(oneCard.height).toBeCloseTo(eightCard.height, 0);
+  expect(oneCard.width).toBeCloseTo(eightCard.width, 0);
+
+  // At 390×844 the list is capped at 6 rows of 56px with 8 meals, and 3 meals take their own 3 rows.
+  withMeals(EIGHT, { done: [] });
+  await open(page, PHONE);
+  await expect(rows(page)).toHaveCount(8);
+  const capped = await listScroll(page);
+  expect.soft(capped.height, "8 meals at 390: capped").toBeCloseTo(CAP_PX, 0);
+  expect.soft(capped.max, "8 meals at 390 scroll").toBeGreaterThan(0);
+  withMeals(EIGHT.slice(0, 3), { done: [] });
+  await open(page, PHONE);
+  expect.soft((await listScroll(page)).height, "3 meals at 390: own rows").toBeCloseTo(3 * ROW_PX, 0);
+
+  // From 938px to 1279px the page scrolls, so the list has its own height: the cap with 8 meals, its own rows with 3, and the list adds no page scroll of its own.
+  for (const size of [{ width: 938, height: 900 }, { width: 1100, height: 900 }]) {
+    const at = `${size.width}×${size.height}`;
+    withMeals(EIGHT, { done: [] });
+    await open(page, size);
+    await expect(rows(page)).toHaveCount(8);
+    const eightList = await listScroll(page);
+    const eightPage = await pageOverflow(page);
+    expect.soft(eightList.height, `${at}: 8 meals capped`).toBeCloseTo(CAP_PX, 0);
+    expect.soft(eightList.max, `${at}: 8 meals scroll in the list`).toBeGreaterThan(0);
+    expect.soft(eightPage.horizontal, `${at}: no horizontal page scroll`).toBeLessThanOrEqual(0);
+    withMeals(EIGHT.slice(0, 3), { done: [] });
+    await open(page, size);
+    await expect(rows(page)).toHaveCount(3);
+    const threeList = await listScroll(page);
+    const threePage = await pageOverflow(page);
+    expect.soft(threeList.height, `${at}: 3 meals take their own rows`).toBeCloseTo(3 * ROW_PX, 0);
+    // The page may scroll here, but only by what the list's height adds; the extra rows themselves are not page content.
+    expect.soft(eightPage.vertical - threePage.vertical, `${at}: page growth from 3 to 8 meals is at most the cap's extra height`).toBeLessThanOrEqual(CAP_PX - 3 * ROW_PX + 1);
+  }
+
+  // Reduced transparency (CDP), more contrast and forced colours replace the fade with a 1px divider of 3:1 on the faded edges.
+  withMeals(EIGHT, { done: [] });
+  await open(page, SHORT_LAPTOP);
+  const client = await page.context().newCDPSession(page);
+  const modes: { name: string; apply: () => Promise<void>; undo: () => Promise<void>; background: () => Promise<string | null> }[] = [
+    {
+      name: "reduced transparency",
+      apply: () => client.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-transparency", value: "reduce" }] }).then(() => undefined),
+      undo: () => client.send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-reduced-transparency", value: "no-preference" }] }).then(() => undefined),
+      background: async () => null
+    },
+    { name: "more contrast", apply: () => page.emulateMedia({ contrast: "more" }), undo: () => page.emulateMedia({ contrast: null }), background: async () => null },
+    { name: "forced colours", apply: () => page.emulateMedia({ forcedColors: "active" }), undo: () => page.emulateMedia({ forcedColors: null }), background: () => systemColor(page, "Canvas") }
+  ];
+  for (const mode of modes) {
+    await mode.apply();
+    await scrollList(page, 0);
+    await expect.soft.poll(async () => (await edgeStyle(page)).mask, { message: `${mode.name}: no mask`, ...SOFT }).toBe("none");
+    // At the start only the bottom edge hides rows; at the end only the top edge does.
+    await expect.soft.poll(async () => { const edges = await edgeStyle(page); return [edges.top, edges.bottom]; }, { message: `${mode.name} at the start`, ...SOFT }).toEqual([0, 1]);
+    const edges = await edgeStyle(page);
+    const background = (await mode.background()) ?? edges.cardBackground;
+    expect.soft(edges.bottomStyle, `${mode.name}: divider style`).toBe("solid");
+    expect.soft(await ratio(page, edges.bottomColor, background), `${mode.name}: divider contrast`).toBeGreaterThanOrEqual(3);
+    await scrollList(page, "end");
+    await expect.soft.poll(async () => { const now = await edgeStyle(page); return [now.top, now.bottom]; }, { message: `${mode.name} at the end`, ...SOFT }).toEqual([1, 0]);
+    const end = await edgeStyle(page);
+    expect.soft(end.topStyle, `${mode.name}: top divider style`).toBe("solid");
+    expect.soft(await ratio(page, end.topColor, background), `${mode.name}: divider contrast at the top`).toBeGreaterThanOrEqual(3);
+    await mode.undo();
+  }
+});
+
+test("Comidas de hoy: phone row tap brings the hero below the top bar; desktop only scrolls the list", async ({ page }) => {
+  withMeals(EIGHT, { done: [] });
+
+  // REQ-9 at 390px: with the page scrolled down to the rows, a row activation brings the hero's top edge to the top bar's bottom edge.
+  await open(page, PHONE);
+  await expect(rows(page)).toHaveCount(8);
+  // The bar is static on a phone and scrolls away; then the hero must come to the very top. A sticky bar would be the target instead.
+  const heroGap = () =>
+    page.evaluate(() => {
+      const bar = document.querySelector(".nt-topbar")!.getBoundingClientRect();
+      const top = document.querySelector(".nt-hero")!.getBoundingClientRect().top;
+      return top - Math.max(bar.bottom, 0);
+    });
+  const toRows = () => page.evaluate(() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "instant" }));
+  await toRows();
+  expect(await heroGap(), "hero is out of view before the tap").toBeLessThan(-100);
+  await row(page, eightRow(4, "Pendiente")).click();
+  await expect(hero(page)).toHaveText("Comida 5");
+  await expect.poll(heroGap, "hero top at or just below the top bar").toBeGreaterThanOrEqual(-1);
+  await expect.poll(heroGap).toBeLessThanOrEqual(24);
+  expect(await activeLabel(page), "focus stays on the row").toBe(eightRow(4, "Pendiente"));
+
+  // Under reduced motion the page is already at its final scroll in the first animation frame.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await open(page, PHONE);
+  await toRows();
+  await frameAfterNextClick(page);
+  await row(page, eightRow(2, "Pendiente")).click();
+  await expect(hero(page)).toHaveText("Comida 3");
+  const finalY = await settledScroll(() => page.evaluate(() => scrollY));
+  expect(finalY, "the page scrolled to the hero").toBeGreaterThan(0);
+  expect(await readFrame(page), "first frame after the tap").toMatchObject({ y: finalY });
+  expect(await heroGap()).toBeGreaterThanOrEqual(-1);
+  expect(await heroGap()).toBeLessThanOrEqual(24);
+  expect(await activeLabel(page)).toBe(eightRow(2, "Pendiente"));
+  await page.emulateMedia({ reducedMotion: null });
+
+  // REQ-9 at 938px and up: a row activation leaves the page's scroll position alone.
+  await open(page, { width: 1100, height: 700 });
+  const reach = await page.evaluate(() => document.documentElement.scrollHeight - innerHeight);
+  expect(reach, "the page scrolls at 1100×700").toBeGreaterThan(40);
+  // Bring the row into view first, so it is the app and not Playwright's click that could move the page.
+  await rows(page).nth(3).scrollIntoViewIfNeeded();
+  const scrolledTo = await settledScroll(() => page.evaluate(() => scrollY));
+  expect(scrolledTo, "the page is scrolled before the tap").toBeGreaterThan(0);
+  await row(page, eightRow(3, "Pendiente")).click();
+  await expect(hero(page)).toHaveText("Comida 4");
+  await page.waitForTimeout(400);
+  expect(await page.evaluate(() => scrollY)).toBe(scrolledTo);
+
+  // REQ-5: with the page not scrolled, selecting meal 8 moves only the list.
+  await open(page, SHORT_LAPTOP);
+  const before = await listScroll(page);
+  expect(before.max).toBeGreaterThan(0);
+  expect(before.top).toBe(0);
+  await dots(page).nth(7).click();
+  await expect(hero(page)).toHaveText("Comida 8");
+  const lastTop = await settledScroll(() => list(page).evaluate((node) => node.scrollTop));
+  expect(lastTop, "the list scrolled to meal 8").toBeGreaterThan(0);
+  const moved = await rows(page).nth(7).evaluate((node) => {
+    const own = node.getBoundingClientRect();
+    const frame = node.closest("ul")!.getBoundingClientRect();
+    const scrolled: number[] = [];
+    for (let up: HTMLElement | null = node.closest("ul")!.parentElement; up; up = up.parentElement) if (up.scrollTop) scrolled.push(up.scrollTop);
+    return { visible: own.top >= frame.top - 1 && own.bottom <= frame.bottom + 1, pageY: scrollY, scrolled };
+  });
+  expect(moved).toEqual({ visible: true, pageY: 0, scrolled: [] });
+
+  // Reduced motion: the list is already where it ends up in the first frame after the selection (no smooth scroll).
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await open(page, SHORT_LAPTOP);
+  await frameAfterNextClick(page);
+  await dots(page).nth(7).click();
+  await expect(hero(page)).toHaveText("Comida 8");
+  const finalTop = await settledScroll(() => list(page).evaluate((node) => node.scrollTop));
+  expect(finalTop).toBeGreaterThan(0);
+  expect(await readFrame(page), "first frame after the selection").toEqual({ y: 0, top: finalTop });
+});
+
+test("Comidas de hoy: keyboard path, focus, hover, contrast, forced colours", async ({ page }) => {
+  withMeals(FOUR, { done: [0] });
+  await open(page);
+  await expect(rows(page)).toHaveCount(4);
+
+  // REQ-19: Tab goes hero controls, then Métricas, then the rows in plan order, then past the counts card (which has no stop here).
+  await expect(page.locator(".nt-comp").locator("a, button, input, select, textarea, [tabindex]:not([tabindex='-1'])")).toHaveCount(0);
+  await page.locator(".nt-hero button").first().focus();
+  const stops: string[] = [];
+  const labels: string[] = [];
+  for (let step = 0; step < 60; step++) {
+    const where = await page.evaluate(() => {
+      const node = document.activeElement as HTMLElement;
+      const region = node.closest(".nt-hero") ? "hero" : node.closest(".nt-metrics") ? "metrics" : node.closest(".nt-today") ? "today" : node.closest(".nt-comp") ? "comp" : node.closest(".nt-kpi") ? "kpi" : "other";
+      return { region, label: region === "today" ? node.getAttribute("aria-label") : null };
+    });
+    if (where.label) labels.push(where.label);
+    if (stops.at(-1) !== where.region) stops.push(where.region);
+    if (labels.length === 4 && where.region !== "today") break;
+    await page.keyboard.press("Tab");
+  }
+  expect(stops.filter((region) => region !== "kpi" && region !== "other")).toEqual(["hero", "metrics", "today"]);
+  expect(labels).toEqual(["07:00, Desayuno, Cumplida", "10:30, Colación, Siguiente", "14:00, Comida, Pendiente", "20:00, Cena, Pendiente"]);
+
+  // REQ-19: marking meal 3 in the hero keeps focus on row 3 and the list where it is.
+  withMeals(EIGHT, { done: [] });
+  await open(page, SHORT_LAPTOP);
+  await scrollList(page, "end");
+  await rows(page).nth(2).focus();
+  await page.keyboard.press("Enter");
+  await expect(hero(page)).toHaveText("Comida 3");
+  // The read deliberately precedes the 900 ms auto-advance after a check-off, so it is the position before any move.
+  const rest = await settledScroll(() => list(page).evaluate((node) => node.scrollTop));
+  // A script click isolates the invariant (a check-off must not move focus or the list): a real click would focus the hero button.
+  await Promise.all([saved(page), markButton(page).evaluate((node: HTMLElement) => node.click())]);
+  await expect(label(markButton(page))).toHaveText("Cumplida");
+  expect(await activeLabel(page)).toBe(eightRow(2, "Cumplida"));
+  expect(await list(page).evaluate((node) => node.scrollTop), "the list did not jump").toBe(rest);
+
+  // REQ-19: the row-6 ring is whole, inside the list and clear of both fades.
+  await open(page, SHORT_LAPTOP);
+  await rows(page).nth(4).focus();
+  await page.keyboard.press("Tab");
+  await expect.poll(() => activeLabel(page)).toBe(eightRow(5, "Pendiente"));
+  const six = rows(page).nth(5);
+  await expect.soft.poll(() => fades(page), SOFT).toEqual({ top: FADE_PX, bottom: FADE_PX });
+  const ring = await ringOf(six);
+  expect.soft(ring.style, "row-6 ring style").not.toBe("none");
+  expect.soft(ring.width, "row-6 ring width").toBeGreaterThanOrEqual(2);
+  // Where the ring is actually drawn: the row box grown by the outline offset plus its width. The list clips it and the fades cover its edges.
+  const [sixBox, frame] = await Promise.all([six.evaluate((node) => node.getBoundingClientRect().toJSON()), listBox(page)]);
+  const reach = ring.style === "none" ? 0 : ring.width + ring.offset;
+  expect.soft(sixBox.top - reach, "ring top clear of the top fade").toBeGreaterThanOrEqual(frame.top + FADE_PX - 1);
+  expect.soft(sixBox.bottom + reach, "ring bottom clear of the bottom fade").toBeLessThanOrEqual(frame.bottom - FADE_PX + 1);
+  expect.soft(sixBox.left - reach, "ring left inside the list").toBeGreaterThanOrEqual(frame.left - 0.5);
+  expect.soft(sixBox.right + reach, "ring right inside the list").toBeLessThanOrEqual(frame.right + 0.5);
+
+  // REQ-18: hover shows within 150 ms with normal motion, and instantly with no transform under reduced motion.
+  withMeals(FOUR, { done: [0] });
+  await open(page);
+  const target = row(page, "14:00, Comida, Pendiente");
+  const paint = (button: Locator) => button.evaluate((node) => ({ background: getComputedStyle(node).backgroundColor, transform: getComputedStyle(node).transform, durations: getComputedStyle(node).transitionDuration }));
+  const hoverBackground = await page.evaluate(() => {
+    const probe = document.createElement("span");
+    probe.style.color = "var(--nt-yellow-hover)";
+    document.querySelector(".nt-today")!.append(probe);
+    const resolved = getComputedStyle(probe).color;
+    probe.remove();
+    return resolved;
+  });
+  for (const motion of ["no-preference", "reduce"] as const) {
+    await page.emulateMedia({ reducedMotion: motion });
+    await page.mouse.move(0, 0);
+    const resting = (await paint(target)).background;
+    await target.hover();
+    await expect.poll(async () => (await paint(target)).background, { timeout: 400 }).toBe(hoverBackground);
+    expect(resting).not.toBe(hoverBackground);
+    const after = await paint(target);
+    expect(after.transform, `${motion}: no transform`).toBe("none");
+    const seconds = after.durations.split(",").map((value) => parseFloat(value) * (value.trim().endsWith("ms") ? 0.001 : 1));
+    if (motion === "reduce") expect(seconds.every((value) => value === 0), `reduce: transition durations ${seconds}`).toBe(true);
+    else {
+      expect(Math.max(...seconds), "normal motion: a transition of at most 150 ms").toBeLessThanOrEqual(0.15);
+      expect(Math.max(...seconds), "normal motion: some transition").toBeGreaterThan(0);
+    }
+  }
+  await page.emulateMedia({ reducedMotion: null });
+
+  // REQ-18, NFR: contrast of text, icons, marker and ring in both themes; the ring also on the selected row and while hovered.
+  for (const scheme of ["light", "dark"] as const) {
+    await page.emulateMedia({ colorScheme: scheme });
+    // The app follows the system scheme: wait until it has really switched before reading any colour.
+    await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).colorScheme), { message: `html color-scheme is ${scheme}` }).toBe(scheme);
+    await page.mouse.move(0, 0);
+    const selected = row(page, "10:30, Colación, Siguiente");
+    const colors = await rowColors(selected);
+    expect.soft(colors.markerWidth, `${scheme}: marker`).toBeGreaterThan(0);
+    expect.soft(await ratio(page, colors.marker, colors.cardBackground), `${scheme}: marker`).toBeGreaterThanOrEqual(3);
+    const next = await selected.evaluate((node) => {
+      const pill = node.querySelector(".nt-today-pill")!;
+      return { color: getComputedStyle(pill).color, background: getComputedStyle(pill).backgroundColor };
+    });
+    expect.soft(await ratio(page, next.color, next.background), `${scheme}: "Siguiente" pill`).toBeGreaterThanOrEqual(4.5);
+    const done = await rowColors(row(page, "07:00, Desayuno, Cumplida"));
+    expect.soft(await ratio(page, done.icon!, done.cardBackground), `${scheme}: check icon`).toBeGreaterThanOrEqual(3);
+    expect.soft(await ratio(page, done.time!, done.cardBackground), `${scheme}: time`).toBeGreaterThanOrEqual(4.5);
+    expect.soft(await ratio(page, done.state!, done.cardBackground), `${scheme}: "Cumplida"`).toBeGreaterThanOrEqual(4.5);
+    const pending = await rowColors(target);
+    expect.soft(await ratio(page, pending.time!, pending.cardBackground), `${scheme}: pending time`).toBeGreaterThanOrEqual(4.5);
+    expect.soft(await ratio(page, pending.state!, pending.cardBackground), `${scheme}: "Pendiente"`).toBeGreaterThanOrEqual(4.5);
+    await target.hover();
+    await expect.poll(async () => (await paint(target)).background, { timeout: 400 }).toBe(hoverBackground);
+    const hovered = await rowColors(target);
+    expect.soft(await ratio(page, hovered.time!, hovered.background), `${scheme}: time on hover`).toBeGreaterThanOrEqual(4.5);
+    expect.soft(await ratio(page, hovered.state!, hovered.background), `${scheme}: "Pendiente" on hover`).toBeGreaterThanOrEqual(4.5);
+    await page.mouse.move(0, 0);
+
+    // The ring on the selected row and on a plain one, by keyboard; hover does not replace it.
+    await selected.focus();
+    await page.keyboard.press("Shift+Tab");
+    await page.keyboard.press("Tab");
+    await expect.poll(() => activeLabel(page)).toBe("10:30, Colación, Siguiente");
+    for (const [button, name] of [[selected, "selected"], [target, "plain"]] as const) {
+      if (name === "plain") {
+        await page.keyboard.press("Tab");
+        await expect.poll(() => activeLabel(page)).toBe("14:00, Comida, Pendiente");
+      }
+      const focus = await ringOf(button);
+      expect.soft(focus.style, `${scheme} ${name}: ring`).not.toBe("none");
+      expect.soft(focus.width, `${scheme} ${name}: ring width`).toBeGreaterThanOrEqual(2);
+      expect.soft(await ratio(page, focus.color, focus.cardBackground), `${scheme} ${name} row: ring contrast`).toBeGreaterThanOrEqual(3);
+      await button.hover();
+      expect.soft((await ringOf(button)).style, `${scheme} ${name}: ring while hovered`).not.toBe("none");
+      await page.mouse.move(0, 0);
+    }
+  }
+  await page.emulateMedia({ colorScheme: null });
+
+  // Forced colours: rows, check icon, the selected cue and the ring all stay visible, drawn in system colours.
+  await page.emulateMedia({ forcedColors: "active" });
+  const [canvas, canvasText] = [await systemColor(page, "Canvas"), await systemColor(page, "CanvasText")];
+  for (let index = 0; index < 4; index++) await expect(rows(page).nth(index)).toBeVisible();
+  const forced = await rowColors(row(page, "10:30, Colación, Siguiente"));
+  expect.soft(forced.markerWidth, "forced: marker width").toBeGreaterThan(0);
+  expect.soft(forced.marker, "selected marker in CanvasText").toBe(canvasText);
+  const forcedDone = await rowColors(row(page, "07:00, Desayuno, Cumplida"));
+  expect.soft(await ratio(page, forcedDone.icon!, canvas), "check icon against Canvas").toBeGreaterThanOrEqual(3);
+  expect.soft(await ratio(page, forcedDone.state!, canvas), "words against Canvas").toBeGreaterThanOrEqual(4.5);
+  const forcedNext = await row(page, "10:30, Colación, Siguiente").locator(".nt-today-pill").evaluate((node) => ({ color: getComputedStyle(node).color, background: getComputedStyle(node).backgroundColor }));
+  expect.soft(await ratio(page, forcedNext.color, forcedNext.background === "rgba(0, 0, 0, 0)" ? canvas : forcedNext.background), "the cue word stays readable").toBeGreaterThanOrEqual(4.5);
+  await row(page, "10:30, Colación, Siguiente").focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  const forcedRing = await ringOf(row(page, "10:30, Colación, Siguiente"));
+  expect.soft(forcedRing.style, "forced: ring style").not.toBe("none");
+  expect.soft(forcedRing.width, "forced: ring width").toBeGreaterThanOrEqual(2);
+  expect.soft(await ratio(page, forcedRing.color, canvas), "ring against Canvas").toBeGreaterThanOrEqual(3);
+});
+
+test.describe("midnight", () => {
+  test.use({ expectedIssues: expectIssues(...FAILED_PUT) });
+
+  test("Midnight: rows reset on focus; an in-flight save settles against its day", async ({ page }) => {
+    const DAY = 86_400_000;
+    const start = Date.now();
+    // `days` after the test began; the page clock is separate from this process's, so it is always set from `start`.
+    const midnight = async (days: number) => {
+      await page.clock.setSystemTime(new Date(start + days * DAY));
+      await page.evaluate(() => window.dispatchEvent(new Event("focus")));
+    };
+
+    // The rows follow the new day: every Cumplida becomes Pendiente, the first is Siguiente and the selected row stays.
+    withMeals(FOUR, { done: [0, 1] });
+    await open(page);
+    // The page loaded before the clock is installed, so server and client agree on the date during hydration.
+    await page.clock.install({ time: new Date() });
+    await row(page, /Cena, Pendiente/).click();
+    await expect(hero(page)).toHaveText("Cena");
+    await expect(row(page, "07:00, Desayuno, Cumplida")).toBeVisible();
+    await expect(row(page, "10:30, Colación, Cumplida")).toBeVisible();
+    await expect(row(page, "14:00, Comida, Siguiente")).toBeVisible();
+    await midnight(1);
+    await expect(row(page, "07:00, Desayuno, Siguiente")).toBeVisible();
+    await expect(row(page, "10:30, Colación, Pendiente")).toBeVisible();
+    await expect(row(page, "14:00, Comida, Pendiente")).toBeVisible();
+    await expect(row(page, "20:00, Cena, Pendiente")).toBeVisible();
+    await expect(list(page).getByText("Cumplida")).toHaveCount(0);
+    await expect(list(page).locator("[aria-current=true]")).toHaveAccessibleName("20:00, Cena, Pendiente");
+    await expect(hero(page)).toHaveText("Cena");
+    await midnight(0);
+    await expect(row(page, "07:00, Desayuno, Cumplida")).toBeVisible();
+
+    // A check-off held across midnight and then refused: yesterday's meal comes back unchecked, today's rows are not touched.
+    withMeals(FOUR, { done: [] });
+    await open(page);
+    await page.clock.install({ time: new Date() });
+    const release = await holdSaves(page, "fail");
+    await markButton(page).click();
+    await expect(row(page, "07:00, Desayuno, Cumplida")).toBeVisible();
+    await midnight(1);
+    // The held mark belongs to yesterday: the new day starts with nothing done.
+    await expect(row(page, "07:00, Desayuno, Siguiente")).toBeVisible();
+    await expect(list(page).getByText("Cumplida")).toHaveCount(0);
+    release();
+    await expect(page.locator("section[aria-live]").getByText(TOAST)).toHaveCount(1);
+    await expect(row(page, "07:00, Desayuno, Siguiente")).toBeVisible();
+    for (const [index, name] of ["07:00, Desayuno, Siguiente", "10:30, Colación, Pendiente", "14:00, Comida, Pendiente", "20:00, Cena, Pendiente"].entries()) await expect(rows(page).nth(index)).toHaveAccessibleName(name);
+    // Back on yesterday, the rollback is there: the meal is unchecked again.
+    await midnight(0);
+    await expect(row(page, "07:00, Desayuno, Siguiente")).toBeVisible();
+    await expect(list(page).getByText("Cumplida")).toHaveCount(0);
+    expect(mealsDone()).toBe("");
   });
 });
