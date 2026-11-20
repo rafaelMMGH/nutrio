@@ -82,13 +82,13 @@ Per batch:
   - `<ul aria-label="Comidas de hoy">` with native row buttons: `aria-label={rowLabel}`, `aria-current`, `aria-hidden` visible parts; time column only when `hasTimes`; `Check` plus "Cumplida", "Siguiente" pill and "Pendiente" word.
   - Empty states: "Sin plan activo" with a "Subir plan" button that calls `openUpload` (spec v1.2), and "Tu plan no tiene comidas".
   - Row activation calls `onSelect(id)`. The component is not rendered until T015 (REQ-1 to REQ-4, REQ-8, REQ-10).
-- [ ] T014 [US1] Lift per plan "selection and marking lifted into Dashboard" (src/components/nutrio/Hero.tsx, src/components/nutrio/Dashboard.tsx):
+- [x] T014 [US1] Lift per plan "selection and marking lifted into Dashboard" (src/components/nutrio/Hero.tsx, src/components/nutrio/Dashboard.tsx):
   - Move `index` (with its initializer), `saving`, `lockedUntil`, `said`, `live`, `advance`, `advanceFor`, `mounted`, `reannounce`, `say`, `go` and `press` from Hero into Dashboard, unchanged. `go` keeps re-announcing the shown meal's dot; `index` is never reset, so a stale selection clamps as today (spec v1.2).
   - Dashboard derives `shownId = meals[Math.min(index, meals.length - 1)]?.id` for `live` (and the timeline in T015).
   - Hero takes `{ meals, doneIds, index, saving, said, onSelect: go, onPress: press }`, keeps its `Math.min` line, arrow keys, the status region, the pager and the dot focus callback. No ref, no imperative handle.
   - In its own commit after the lift, rename the pager `tablist` `aria-label` from "Comidas de hoy" to "Elegir comida" (spec v1.2). `grep -rn "Comidas de hoy" tests/e2e` finds no pager lookup today (all use `.nt-pager button`); rerun it and update any hit that targets the pager.
   - REQ-5, REQ-20.
-- [ ] T014a [US1] Run tsc, unit tests, T010a (still green), and in `dashboard.spec.ts` the carousel, "Marcar cumplida", "failed saves", Racha and empty-state titles; then `cooking-mode.spec.ts` in full. Restore the screenshots folder.
+- [x] T014a [US1] Run tsc, unit tests, T010a (still green), and in `dashboard.spec.ts` the carousel, "Marcar cumplida", "failed saves", Racha and empty-state titles; then `cooking-mode.spec.ts` in full. Restore the screenshots folder.
 
 **Checkpoint:** US1c reviewed and committed; screen unchanged; T009 to T012 still red.
 

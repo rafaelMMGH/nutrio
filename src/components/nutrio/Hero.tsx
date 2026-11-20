@@ -118,7 +118,7 @@ export function Hero({ meals, doneIds, index, saving, said, onSelect: go, onPres
       </div>
 
       {meals.length > 1 && (
-        <div className="nt-pager" role="tablist" aria-label="Comidas de hoy" aria-orientation="vertical" onKeyDown={onKey}>
+        <div className="nt-pager" role="tablist" aria-label="Elegir comida" aria-orientation="vertical" onKeyDown={onKey}>
           {meals.map((item, i) => (
             <button key={item.id} type="button" role="tab" aria-selected={i === index} tabIndex={i === index ? 0 : -1} aria-label={`${mealLabel(item.name)}: ${mealTitle(item)}`} title={mealLabel(item.name)} className={i === index ? "is-active" : undefined} onClick={() => go(i)} ref={(node) => { if (node && i === index && document.activeElement?.parentElement === node.parentElement) node.focus(); }} />
           ))}
