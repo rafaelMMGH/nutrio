@@ -91,4 +91,4 @@ None. Each story's groundwork is inside its own batch.
 
 ## Phase 6: Snapshots (gated)
 
-- [ ] T038 [US3] Only after the user approves the visuals at the US3 checkpoint (their explicit yes in the conversation; skip otherwise): regenerate `npx playwright test tests/e2e/a-theme-visual.spec.ts -g "home looks as it did" --update-snapshots` (local, gitignored) and run `tests/e2e/dashboard.spec.ts -g "screenshot"` to rewrite `specs/alt-dashboard/screenshots/dashboard-*.png`; commit the PNGs on their own (specs/alt-dashboard/screenshots/)
+- [x] T038 [US3] (done 2026-11-19 by dashboard-real-data T042) Only after the user approves the visuals at the US3 checkpoint (their explicit yes in the conversation; skip otherwise): regenerate `npx playwright test tests/e2e/a-theme-visual.spec.ts -g "home looks as it did" --update-snapshots` (local, gitignored) and run `tests/e2e/dashboard.spec.ts -g "screenshot"` to rewrite `specs/alt-dashboard/screenshots/dashboard-*.png`; commit the PNGs on their own (specs/alt-dashboard/screenshots/)

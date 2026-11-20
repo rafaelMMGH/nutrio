@@ -1,6 +1,6 @@
 # Spec: Dashboard real data
 
-**Status:** planned (Gate 2 approved by the user 2026-11-19: plan v1.2 and 46 tasks, decisions D15-D20; Gate 1 approved 2026-11-19)
+**Status:** implemented (2026-11-19; branch feature/dashboard-real-data. Gate 2 approved 2026-11-19: plan v1.2 and 46 tasks, decisions D15-D20; Gate 1 approved 2026-11-19)
 **Version:** 1.2 · **Branch:** feature/dashboard-real-data, from `main` · **Owner:** Rafael Martinez · **Date:** 2026-11-19
 
 > The *what* and *why* only. UI copy is quoted in Spanish (Mexico). Existing UI elements are named as the user sees them. Supersedes the "static cards" non-goals of `specs/dashboard-polish/spec.md` and `specs/metric-dials/spec.md`, and `specs/alt-dashboard/plan.md` §5.6 ("solo visuales"). Over the ~150-line budget on purpose: large feature, two stories, a counting rule with worked examples.

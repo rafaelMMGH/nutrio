@@ -215,7 +215,7 @@ Per batch:
 
 ## Phase 6: Snapshots (gated)
 
-- [ ] T042 [Housekeeping] Only after the user's explicit yes to the visuals:
+- [x] T042 [Housekeeping] Only after the user's explicit yes to the visuals:
   - Regenerate the "home" snapshot with `npx playwright test tests/e2e/a-theme-visual.spec.ts -g "home looks as it did" --update-snapshots` (local, gitignored).
   - Rerun `tests/e2e/dashboard.spec.ts -g "screenshot|fits 1440×780|empty state"` to rewrite `specs/alt-dashboard/screenshots/dashboard-*.png` (the only task allowed to change them). This also closes dashboard-polish T038.
   - Commit the changed `dashboard-*.png` on their own; restore `account-menu-*.png` if touched (specs/alt-dashboard/screenshots/).
