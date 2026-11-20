@@ -1,13 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState, type KeyboardEvent } from "react";
+import type { KeyboardEvent } from "react";
 import { ArrowUpRight, Beef, Clock, CookingPot, Star } from "lucide-react";
 import { foodIcon, mealLabel, mealTitle, type Meal } from "@/components/dashboard/food";
 import { prepMinutes, recipeRating } from "@/lib/metrics";
 import { ActionButton } from "@/components/arc/action-button/action-button";
-import type { MealResult } from "./day-log-saves";
-import { TAP_LOCK_MS, acceptTap, createAdvance } from "./mark-logic";
 import { DottedProgress, Figure, IconBadge, Pill } from "./primitives";
 
 // Fixed until the real logic exists (alt-dashboard P9).
@@ -28,73 +26,11 @@ function plateIcons(meal: Meal) {
   return [...new Set(icons)].slice(0, SPOTS.length);
 }
 
-type Props = { meals: Meal[]; doneIds: string[]; onToggle: (mealId: string, done: boolean) => Promise<MealResult> };
+type Props = { meals: Meal[]; doneIds: string[]; index: number; saving: ReadonlySet<string>; said: string; onSelect: (index: number) => void; onPress: (mealId: string) => void };
 
 // Left column (alt-dashboard §5.3): one slide per meal option of today, in the plan's order. No autoplay.
-export function Hero({ meals, doneIds, onToggle }: Props) {
-  // Opens on the first meal still pending today.
-  const [index, setIndex] = useState(() => Math.max(0, meals.findIndex((meal) => !doneIds.includes(meal.id))));
+export function Hero({ meals, doneIds, index, saving, said, onSelect: go, onPress: press }: Props) {
   const meal = meals[Math.min(index, meals.length - 1)];
-
-  // Meals whose mark is being saved, and until when each ignores further taps (specs/dashboard-polish REQ-25).
-  const [saving, setSaving] = useState<ReadonlySet<string>>(new Set());
-  const lockedUntil = useRef(new Map<string, number>());
-  // What the status region says (REQ-24); empty after a failure, which only the toast reports.
-  const [said, setSaid] = useState("");
-  // Read when a timer or a save settles, after the render that started it.
-  const live = useRef({ mealId: meal?.id, doneIds, saving });
-  live.current = { mealId: meal?.id, doneIds, saving };
-
-  // After a mark is saved the carousel moves on to the next pending meal (REQ-6); the wait lets "Cumplida" show first.
-  const [advance] = useState(createAdvance);
-  // The meal the pending advance was armed for: only a rollback of that meal cancels it (REQ-25d).
-  const advanceFor = useRef<string | null>(null);
-  const mounted = useRef(false);
-  const reannounce = useRef<ReturnType<typeof setTimeout>>(undefined);
-  // Set on every mount, not just initially: strict mode runs effect, cleanup, effect.
-  useEffect(() => {
-    mounted.current = true;
-    return () => {
-      mounted.current = false;
-      advance.cancel();
-      clearTimeout(reannounce.current);
-    };
-  }, [advance]);
-  function say(text: string) {
-    clearTimeout(reannounce.current);
-    setSaid(text);
-  }
-  function go(next: number) {
-    advance.cancel();
-    setIndex(next);
-    const target = meals[next].id;
-    if (live.current.saving.has(target)) return say("Guardando");
-    if (!live.current.doneIds.includes(target)) return say("");
-    // Moving between two done meals would leave the same text, which a screen reader does not announce again: clear first.
-    say("");
-    reannounce.current = setTimeout(() => setSaid("Cumplida"), 80);
-  }
-
-  async function press(mealId: string) {
-    if (!acceptTap({ pending: saving.has(mealId), lockedUntil: lockedUntil.current.get(mealId) ?? 0, now: Date.now() })) return;
-    lockedUntil.current.set(mealId, Date.now() + TAP_LOCK_MS);
-    advance.cancel();
-    const marking = !doneIds.includes(mealId);
-    if (marking) setSaving((current) => new Set(current).add(mealId));
-    say(marking ? "Guardando" : "Comida desmarcada");
-    const result = await onToggle(mealId, marking);
-    if (!mounted.current) return;
-    if (marking) setSaving((current) => new Set([...current].filter((id) => id !== mealId)));
-    const onScreen = live.current.mealId === mealId;
-    if (result === "failed") {
-      if (advanceFor.current === mealId) advance.cancel();
-      if (onScreen) say("");
-    } else if (result === "saved" && marking && onScreen) {
-      say("Cumplida");
-      advanceFor.current = mealId;
-      advance.start(meals.findIndex((item) => item.id === mealId), meals, () => live.current.doneIds, go);
-    }
-  }
 
   if (!meal) {
     return (
@@ -146,7 +82,7 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
             successLabel="Cumplida"
             state={saving.has(meal.id) ? "pending" : done ? "success" : "idle"}
             instantKey={meal.id}
-            onPress={() => void press(meal.id)}
+            onPress={() => press(meal.id)}
           />
         </div>
       </div>
@@ -182,7 +118,7 @@ export function Hero({ meals, doneIds, onToggle }: Props) {
       </div>
 
       {meals.length > 1 && (
-        <div className="nt-pager" role="tablist" aria-label="Comidas de hoy" aria-orientation="vertical" onKeyDown={onKey}>
+        <div className="nt-pager" role="tablist" aria-label="Elegir comida" aria-orientation="vertical" onKeyDown={onKey}>
           {meals.map((item, i) => (
             <button key={item.id} type="button" role="tab" aria-selected={i === index} tabIndex={i === index ? 0 : -1} aria-label={`${mealLabel(item.name)}: ${mealTitle(item)}`} title={mealLabel(item.name)} className={i === index ? "is-active" : undefined} onClick={() => go(i)} ref={(node) => { if (node && i === index && document.activeElement?.parentElement === node.parentElement) node.focus(); }} />
           ))}

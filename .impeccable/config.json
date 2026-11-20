@@ -1,0 +1,17 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "side-tab",
+        "value": "*",
+        "files": [
+          "src/components/nutrio/meal-timeline.css"
+        ],
+        "createdAt": "2026-11-20T01:54:51.009Z",
+        "reason": "Selected-row cue required by approved spec dashboard-real-data REQ-5 (leading marker on the start edge, not colour alone) and plan.md line 41; approved at Gate 1"
+      }
+    ]
+  }
+}

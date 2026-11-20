@@ -1,0 +1,72 @@
+/* Comidas de hoy card (specs/dashboard-real-data). Rows are 56px, shrink evenly to 44px, then the list scrolls (REQ-7). */
+.nt-today-list {
+  /* Set from scroll position and size by MealTimeline: the size of the fade each edge asks for. */
+  --nt-tl-fade-top: 0px;
+  --nt-tl-fade-bottom: 0px;
+  display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; margin: 0; padding: 0; list-style: none;
+  overflow-y: auto;
+  scroll-padding-block: 16px;
+  /* A mask paints nothing over the card and catches no pointer. */
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--nt-tl-fade-top), #000 calc(100% - var(--nt-tl-fade-bottom)), transparent);
+  transition: none;
+}
+.nt-today-list > li { display: flex; flex: 1 1 0; min-height: 44px; max-height: 56px; }
+
+/* Where the page scrolls the list gets its own height: its rows, up to 6 (--nt-tl-rows is the row count, set inline). */
+@media (max-width: 1279px) {
+  .nt-today-list { flex: none; height: min(calc(var(--nt-tl-rows) * 56px), 336px); }
+  .nt-today-list > li { flex: none; height: 56px; }
+}
+
+/* Without transparency, or with contrast forced, a 1px divider marks each faded edge instead of the fade. */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active) {
+  .nt-today-list {
+    mask-image: none;
+    border-top: min(1px, var(--nt-tl-fade-top)) solid var(--nt-on-accent-line);
+    border-bottom: min(1px, var(--nt-tl-fade-bottom)) solid var(--nt-on-accent-line);
+  }
+}
+
+.nt-today-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  width: 100%;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--nt-on-accent);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+/* Without times the name takes the first column. */
+.nt-today-row > :first-child:not(.nt-today-time) { grid-column: 1 / 3; }
+.nt-today-time { color: var(--nt-on-accent-sub); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.nt-today-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 15px; font-weight: 400; }
+.nt-today-state { display: inline-flex; align-items: center; gap: 4px; color: var(--nt-on-accent-sub); font-size: 12px; white-space: nowrap; }
+.nt-today-row.is-done .nt-today-state { color: var(--nt-on-accent); }
+.nt-today-pill { padding: 2px 10px; border-radius: var(--nt-radius-pill); background: var(--nt-on-accent); color: var(--nt-yellow); }
+
+/* The current row: an inline-start marker (padding gives back most of its width so the text does not shift) and a heavier name. */
+/* The marker's outer corners are square: on the rounded row a 4px border would curve into a bracket. */
+.nt-today-row[aria-current="true"] { padding-inline-start: 4px; border-inline-start: 4px solid var(--nt-on-accent); border-start-start-radius: 0; border-end-start-radius: 0; }
+.nt-today-row[aria-current="true"] .nt-today-name { font-weight: 600; }
+
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .nt-today-row { transition: background-color 150ms ease-out; }
+}
+@media (hover: hover) {
+  .nt-today-row:hover { background: var(--nt-yellow-hover); }
+}
+.nt-today-row:active { background: var(--nt-yellow-press); transition: none; }
+/* The shell's focus rule (primitives.css) is more specific and draws a box-shadow; this inset outline stays inside the list and shows in forced colours. */
+.nt .nt-today-row:focus-visible { outline: 2px solid var(--nt-on-accent); outline-offset: -2px; box-shadow: none; }
+@media (forced-colors: active) {
+  .nt-today-row[aria-current="true"] { border-inline-start-color: CanvasText; }
+}
+
+.nt-today-empty { display: grid; justify-items: start; gap: 4px; margin: 0; color: var(--nt-on-accent-sub); font-size: 14px; }
+.nt-today-empty .nt-link { margin-top: 4px; color: var(--nt-on-accent); text-decoration: underline; }

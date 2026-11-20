@@ -1,6 +1,6 @@
 # Spec: Dashboard polish
 
-**Status:** planned (Gate 2: plan and 38 tasks approved by the user 2026-11-18; Gate 1 approved 2026-11-18, all defaults accepted; v1.3 amendments approved 2026-11-18)
+**Status:** implemented (merged to `main` as PR #16, commit c8b9e98; marked implemented by the user 2026-11-19. T037 screenshots and T038 snapshot regeneration were left open, see `specs/BACKLOG.md`. Earlier: Gate 2: plan and 38 tasks approved by the user 2026-11-18; Gate 1 approved 2026-11-18, all defaults accepted; v1.3 amendments approved 2026-11-18)
 **Version:** 1.3 · **Branch:** feature/dashboard-polish, from `main` · **Owner:** Rafael Martinez · **Date:** 2026-11-18
 
 > The *what* and *why* only. UI copy is quoted in Spanish (Mexico). Existing UI elements are named as the user sees them. Supersedes `specs/cooking-mode/spec.md` REQ-4 and D1 (hero text link and plate dot) and `specs/alt-dashboard/plan.md` §5.4 KPI 1 ("Comidas de hoy").
@@ -12,7 +12,7 @@ Three small changes to the signed-in dashboard, shipped together because they to
 ## Goals / Non-goals
 
 - Goals: marking and unmarking a meal feels immediate and smooth, and never shows success when the save failed (US1); a KPI that adds information instead of repeating a dial (US2); one clear, good-looking "Modo Cocina" entry on the plate (US3).
-- Non-goals: the static cards "Cumplimiento del plan" and "Resumen calórico" (backlog); new data, schema, API or dependency; recipe photos; the KPIs "Planes", "Recetas", "Compras"; changing Modo Cocina itself or the recipe page's button and its ring-and-dot icon.
+- Non-goals: the static cards "Cumplimiento del plan" and "Resumen calórico" (backlog; superseded by `specs/dashboard-real-data/`, which gives them real data); new data, schema, API or dependency; recipe photos; the KPIs "Planes", "Recetas", "Compras"; changing Modo Cocina itself or the recipe page's button and its ring-and-dot icon.
 - Out of scope: DST and timezone travel (dates are browser-local), several tabs open at once, viewports under 360px.
 
 ## Decisions
@@ -145,10 +145,10 @@ Resolved at Gate 1: defaults accepted (user, 2026-11-18). No open question remai
 
 ## Progress
 
-- [ ] US1 (P1): action button (REQ-1 to REQ-9, REQ-24 to REQ-27)
-- [ ] US2 (P2): Racha KPI (REQ-10 to REQ-15, REQ-28, REQ-29)
-- [ ] US3 (P3): Modo Cocina glass pill (REQ-16 to REQ-23, REQ-30, REQ-31)
-- [ ] Housekeeping: annotations in cooking-mode and alt-dashboard, metric-dials set to implemented, affected e2e rewritten (D20, D21)
+- [x] US1 (P1): action button (REQ-1 to REQ-9, REQ-24 to REQ-27)
+- [x] US2 (P2): Racha KPI (REQ-10 to REQ-15, REQ-28, REQ-29)
+- [x] US3 (P3): Modo Cocina glass pill (REQ-16 to REQ-23, REQ-30, REQ-31)
+- [x] Housekeeping: annotations in cooking-mode and alt-dashboard, metric-dials set to implemented, affected e2e rewritten (D20, D21)
 
 ## Change log
 

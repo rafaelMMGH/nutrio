@@ -18,7 +18,7 @@ The four gauge tiles in the dashboard's "Métricas" card (Adherencia, Calorías,
 - Goal: the Peso card shows the goal as a mark and a line under the dial, and the assistant agrees with it on whether the goal is reached (US4).
 - Non-goal: recording real intake (Calorías and Proteína stay estimates).
 - Non-goal: showing past months' goals (rows are kept, not displayed).
-- Non-goal: changing the KPI row (Comidas, Planes, Recetas, Compras) or the yellow "Resumen calórico" card.
+- Non-goal: changing the KPI row (Comidas, Planes, Recetas, Compras) or the yellow "Resumen calórico" card. (Superseded by `specs/dashboard-real-data/`: that card becomes "Comidas de hoy" with real data.)
 - Non-goal: fixing the older e2e debt, or changing how Adherencia is calculated.
 
 ## Decisions

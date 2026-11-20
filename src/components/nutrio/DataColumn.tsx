@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
-import { ArrowUp, ArrowUpRight, ChevronDown, ClipboardList, ConciergeBell, Flame, Gauge, Package, Utensils } from "lucide-react";
+import { ClipboardList, ConciergeBell, Flame, Gauge, Package, Utensils } from "lucide-react";
+import { useShell } from "@/components/app/AppShell";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { metricReadouts, type DialReadout, type Metrics, type Period } from "@/lib/metrics";
 import { kpiContexts, streakText } from "@/lib/kpis";
-import { Card, Figure, IconBadge, Pill, RadialGauge, SegmentedTabs } from "./primitives";
+import { Card, Figure, IconBadge, RadialGauge, SegmentedTabs } from "./primitives";
 import DetentDial from "./DetentDial";
 import { showEndLabels } from "./dial-logic";
 import { RollingNumber } from "./RollingNumber";
@@ -203,62 +204,19 @@ function WeightDialog({ weight, goal, onSave, onClose }: { weight: number | null
   );
 }
 
-/* ---------- Yellow and sky cards (§5.6) ---------- */
+/* ---------- Sky card (§5.6) ---------- */
 
-// Bar heights (0–1) and whether the bar is filled, as in the reference.
-const BARS: [number, boolean][] = [[0.52, false], [0.62, false], [0.76, true], [0.66, true], [0.5, false], [0.42, false], [0.62, false], [0.68, true], [0.8, true]];
-const HOURS = ["7:00", "10:00", "13:00", "17:00", "21:00"];
+type ComplianceCounts = { planned: number; done: number; unmarked: number; pending: number };
 
-// TODO: solo visual — pendiente de revisión
-export function CaloriesCard() {
-  return (
-    <Card tone="yellow" className="nt-cal" aria-labelledby="nt-cal-title">
-      <header className="nt-card-head">
-        <IconBadge>
-          <Flame />
-        </IconBadge>
-        <h2 id="nt-cal-title">Resumen calórico</h2>
-        <Pill className="nt-push" aria-hidden>
-          Hoy <ChevronDown size={16} />
-        </Pill>
-      </header>
-      <div className="nt-cal-main">
-        <div>
-          <span className="nt-small">Calorías del día</span>
-          <p className="nt-cal-total">
-            1,850<small>kcal</small>
-          </p>
-          <Pill tone="success">
-            <ArrowUp size={12} aria-hidden /> +12.8%
-          </Pill>
-        </div>
-        <dl className="nt-cal-side">
-          <div>
-            <dt>Comidas completadas</dt>
-            <dd>4</dd>
-          </div>
-          <div>
-            <dt>Promedio por comida</dt>
-            <dd>462</dd>
-          </div>
-        </dl>
-      </div>
-      <div className="nt-bars" aria-hidden>
-        {BARS.map(([height, filled], index) => (
-          <i key={index} className={filled ? "is-filled" : undefined} style={{ height: `${height * 100}%` }} />
-        ))}
-      </div>
-      <div className="nt-hours" aria-hidden>
-        {HOURS.map((hour) => (
-          <span key={hour}>{hour}</span>
-        ))}
-      </div>
-    </Card>
-  );
-}
-
-// TODO: solo visual — pendiente de revisión
-export function ComplianceCard() {
+/** Cumplimiento del plan: real counts since the plan began (spec dashboard-real-data REQ-12 to REQ-15). `since` is the "Desde …" header. */
+export function ComplianceCard({ counts, since, hasPlan }: { counts: ComplianceCounts; since: string; hasPlan: boolean }) {
+  const { openUpload } = useShell();
+  const { planned, done, unmarked, pending } = counts;
+  const stats = [
+    { label: "Cumplidas", value: done, dot: "done" },
+    { label: "Sin marcar", value: unmarked, dot: "unmarked" },
+    { label: "Pendientes", value: pending, dot: "pending" }
+  ];
   return (
     <Card tone="sky" className="nt-comp" aria-labelledby="nt-comp-title">
       <header className="nt-card-head">
@@ -266,47 +224,40 @@ export function ComplianceCard() {
           <Utensils />
         </IconBadge>
         <h2 id="nt-comp-title">Cumplimiento del plan</h2>
-        <span className="nt-arrow nt-push" aria-hidden>
-          <ArrowUpRight size={18} />
-        </span>
+        {hasPlan && <span className="nt-since nt-push">{since}</span>}
       </header>
-      <div className="nt-arc">
-        <span className="nt-live">
-          <i aria-hidden /> En vivo
-        </span>
-        <svg viewBox="0 0 200 104" preserveAspectRatio="xMidYMax meet" aria-hidden>
-          <defs>
-            <linearGradient id="nt-arc-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0" stopColor="var(--nt-sky-deep)" stopOpacity="0.38" />
-              <stop offset="1" stopColor="var(--nt-sky-deep)" stopOpacity="0" />
-            </linearGradient>
-          </defs>
-          <path d="M10 100 A90 90 0 0 1 143 21 L133 38 A70 70 0 0 0 30 100 Z" fill="url(#nt-arc-fill)" />
-          <path d="M10 100 A90 90 0 0 1 143 21" fill="none" stroke="var(--nt-sky-deep)" strokeWidth="2.2" strokeLinecap="round" />
-          <path d="M143 21 A90 90 0 0 1 181 63" fill="none" stroke="#ffffff" strokeWidth="2.2" strokeLinecap="round" />
-          <path d="M181 63 A90 90 0 0 1 190 100" fill="none" stroke="var(--nt-orange)" strokeWidth="2.2" strokeLinecap="round" />
-          <circle cx="10" cy="100" r="2.6" fill="#fff" stroke="var(--nt-sky-deep)" strokeWidth="1" />
-          <circle cx="190" cy="100" r="2.6" fill="#fff" stroke="var(--nt-orange)" strokeWidth="1" />
-        </svg>
-        <p className="nt-arc-total">
-          <b>32</b>
-          <span>Comidas planificadas</span>
-        </p>
-      </div>
-      <dl className="nt-comp-stats">
-        <div>
-          <dd>25</dd>
-          <dt><i style={{ background: "var(--nt-sky-deep)" }} aria-hidden /> Cumplidas</dt>
+      {hasPlan ? (
+        <>
+          <div className="nt-arc">
+            {/* pathLength 100 makes the dash length the percentage, whatever the arc's size. */}
+            <svg viewBox="0 0 200 104" preserveAspectRatio="xMidYMax meet" role="img" aria-label={`${done} de ${planned} comidas cumplidas`}>
+              <path className="nt-arc-track" d="M10 100 A90 90 0 0 1 190 100" fill="none" pathLength={100} />
+              {done > 0 && <path className="nt-arc-fill" d="M10 100 A90 90 0 0 1 190 100" fill="none" pathLength={100} strokeDasharray={`${Math.min(100, (done / planned) * 100)} 100`} />}
+            </svg>
+            <p className="nt-arc-total">
+              <b>{planned}</b>
+              <span>Planificadas</span>
+            </p>
+          </div>
+          <dl className="nt-comp-stats">
+            {stats.map((stat) => (
+              <div key={stat.label}>
+                <dt>
+                  <i className={`nt-dot-${stat.dot}`} aria-hidden /> {stat.label}
+                </dt>
+                <dd>{stat.value}</dd>
+              </div>
+            ))}
+          </dl>
+        </>
+      ) : (
+        <div className="nt-today-empty">
+          <p>Sin plan activo</p>
+          <button type="button" className="nt-link" onClick={openUpload}>
+            Subir plan
+          </button>
         </div>
-        <div>
-          <dd>05</dd>
-          <dt><i style={{ background: "#ffffff" }} aria-hidden /> Pendientes</dt>
-        </div>
-        <div>
-          <dd>02</dd>
-          <dt><i style={{ background: "var(--nt-orange)" }} aria-hidden /> Omitidas</dt>
-        </div>
-      </dl>
+      )}
     </Card>
   );
 }

@@ -59,6 +59,17 @@
   --nt-cook-opaque: #1c1d23;
   --nt-cook-edge: #bfc1c8;
   --nt-cook-sub: #d6d8de;
+  /* Content on the yellow and sky cards (specs/dashboard-real-data). Both cards keep their light colour in dark while --nt-ink
+     flips, so this content has its own tokens. Hex values name their DESIGN §11 primitive; no primitive variables exist yet.
+     Measured by tests/unit/real-data-contrast.test.ts, in light and dark:
+     on-accent (neutral-900): yellow 15.5, hover 17.0, press 13.5, sky 13.4.
+     on-accent-sub (neutral-600): yellow 6.7, hover 7.4, press 5.8, sky 5.8; the same colour is the 1px divider (3:1 needed).
+     Arc fill --nt-sky-deep on sky: 5.7. */
+  --nt-on-accent: #0e0e10;
+  --nt-on-accent-sub: #4b4e55;
+  --nt-on-accent-line: var(--nt-on-accent-sub);
+  --nt-yellow-hover: #faf1cc; /* butter-100 */
+  --nt-yellow-press: var(--nt-yellow-accent);
   color: var(--nt-ink);
 }
 /* The geometric sans only applies to the new frame and the dashboard; inner pages keep their own typeface. */

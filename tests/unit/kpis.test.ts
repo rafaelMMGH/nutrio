@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { countSince, kpiContexts, planContext, streakText } from "@/lib/kpis";
+import { countSince, kpiContexts, planContext, sinceLabel, streakText } from "@/lib/kpis";
 
 describe("countSince", () => {
   const now = new Date("2026-11-15T12:00:00Z");
@@ -71,5 +71,17 @@ describe("streakText (REQ-14)", () => {
   it("invites to start at 0, with or without a past best", () => {
     assert.deepEqual(streakText({ current: 0, best: 9 }), { value: "0 días", unit: "días", context: "Empieza hoy" });
     assert.deepEqual(streakText({ current: 0, best: 0 }), { value: "0 días", unit: "días", context: "Empieza hoy" });
+  });
+});
+
+describe("sinceLabel", () => {
+  it("omits the year in the current year", () => {
+    assert.equal(sinceLabel("2026-11-12", "2026-11-19"), "Desde 12 nov");
+  });
+  it("adds the year for another year", () => {
+    assert.equal(sinceLabel("2025-11-12", "2026-11-19"), "Desde 12 nov 2025");
+  });
+  it("uses the September abbreviation from SHORT_MONTHS", () => {
+    assert.equal(sinceLabel("2026-09-03", "2026-11-19"), "Desde 3 sep");
   });
 });
