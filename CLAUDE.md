@@ -8,7 +8,9 @@ Personal, self-hosted Next.js 15 (App Router, React 19) app that parses a nutrit
 
 ```bash
 npm run dev                    # dev server on :3000 (usually already running; see below)
-npx tsc --noEmit               # type check (there is no lint script)
+npx tsc --noEmit               # type check
+npm run lint                   # eslint (flat config, eslint.config.mjs)
+npm run check                  # tsc + lint + unit tests; run before handing work back
 npm run test:e2e               # Playwright suite (clones the DB, own next dev on :3200)
 npx playwright test -g "name"  # single e2e test by title
 npm run test:e2e:report        # open last HTML report
@@ -16,6 +18,8 @@ npm run db:migrate             # create + apply a migration (any schema change n
 npm run db:generate            # regenerate Prisma client into src/generated/prisma (gitignored; also runs on postinstall)
 npm run db:import -- --replace # reload the legacy data/db.json into Postgres
 ```
+
+`eslint-suppressions.json` is the lint baseline of pre-existing violations and only shrinks: fix the code, then run `npx eslint . --prune-suppressions` (lint fails on stale suppressions). Never add to it with `--suppress-all`.
 
 `DATABASE_URL` lives in `.env.local`; `prisma.config.ts` loads it for the Prisma CLI.
 
@@ -71,7 +75,7 @@ No agent or teammate performs these without the user's explicit yes:
 
 Sessions start as the `orchestrator` agent (`.claude/settings.json`). It routes each request (feature, bug fix, spec-change, refactor, investigate, review, question) and runs the matching flow; see `docs/agent-workflow.md`.
 
-- For agents: type-check with `npx tsc --noEmit` (there is no lint script), test with `npm run test:e2e`, and never run `next build` in place.
+- For agents: type-check and lint with `npm run check`, test with `npm run test:e2e`, and never run `next build` in place.
 - Specs live in `specs/<feature>/` (`spec.md`, `plan.md`, `tasks.md`, `checklists/`). Bugs in `specs/bugs/`, refactor notes in `specs/refactors/`. Templates in `specs/_templates/`. Specs are written in English; UI copy stays in Spanish (Mexico).
 - Spec status: `draft → approved → planned → partial → implemented`. Approved specs change only through the spec-change route.
 - Branches: `feature/<feature>`, `fix/<name>`, `refactor/<name>`. Commits reference story, task, and requirement IDs.
