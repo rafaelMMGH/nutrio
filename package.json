@@ -12,10 +12,14 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:import": "tsx --env-file=.env.local scripts/import-db-json.ts",
+    "db:seed:e2e": "tsx scripts/seed-e2e.ts",
+    "e2e:snapshot": "tsx --env-file=.env.local scripts/e2e-snapshot.ts",
     "db:studio": "prisma studio",
     "postinstall": "prisma generate",
     "test:unit": "tsx --test tests/unit/*.test.ts",
     "test:e2e": "playwright test",
+    "test:e2e:smoke": "playwright test --grep @smoke --grep-invert @quarantine",
+    "test:e2e:tag": "playwright test --grep-invert @quarantine --grep",
     "test:e2e:report": "playwright show-report"
   },
   "dependencies": {

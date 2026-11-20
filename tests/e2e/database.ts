@@ -1,11 +1,15 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 
-// The e2e suite never touches the real database. Global setup clones it once into the template "<name>-e2e", then
+// The e2e suite never touches the real database. Global setup builds the template "<name>-e2e" once, then
 // creates one database per Playwright worker from that template ("<name>-e2e-<i>", i = parallelIndex). Each worker has
 // its own `next dev` on BASE_PORT + i connected to its own database, so spec files run in parallel without sharing
 // data. The template is never served: no server connects to it, which CREATE DATABASE ... TEMPLATE requires.
 // Teardown drops the worker databases and the template.
+//
+// The template's data (E2E_DATA): "seed" (default) applies prisma/migrations and loads the committed, anonymized
+// snapshot in tests/e2e/fixtures/seed/ (scripts/seed-e2e.ts, dates shifted to keep their distance to today), so every
+// run, local or CI, starts from the same data. "clone" copies the real database, as before.
 
 export const BASE_PORT = 3200;
 
@@ -60,12 +64,29 @@ function psql(url: string, args: string[], input?: Buffer) {
 
 const adminUrl = () => databaseUrl("postgres");
 
-/** Fresh copy of the real database (schema and data) as the template, then one copy of the template per worker. */
+function dataSource() {
+  const raw = process.env.E2E_DATA;
+  if (raw === undefined && !existsSync("tests/e2e/fixtures/seed/manifest.json")) {
+    // No snapshot committed yet: CI has no real database to clone, so it must stop; locally the clone still works.
+    if (process.env.CI) throw new Error("No e2e seed in tests/e2e/fixtures/seed/: run `npm run e2e:snapshot` locally and commit it.");
+    console.warn("No e2e seed yet (tests/e2e/fixtures/seed/): cloning the real database. Run `npm run e2e:snapshot` once to switch to the seed.");
+    return "clone";
+  }
+  const source = raw ?? "seed";
+  if (source !== "seed" && source !== "clone") throw new Error(`E2E_DATA must be "seed" or "clone", got "${source}"`);
+  return source;
+}
+
+/** Fresh template (seeded or cloned, see E2E_DATA), then one copy of the template per worker. */
 export function cloneDatabase() {
   const template = templateDatabaseName();
   psql(adminUrl(), ["-c", `DROP DATABASE IF EXISTS ${quote(template)} WITH (FORCE)`, "-c", `CREATE DATABASE ${quote(template)}`]);
-  const dump = execFileSync("pg_dump", ["--no-owner", "--dbname", sourceUrl().toString()], { maxBuffer: 512 * 1024 * 1024 });
-  psql(databaseUrl(template), [], dump);
+  if (dataSource() === "clone") {
+    const dump = execFileSync("pg_dump", ["--no-owner", "--dbname", sourceUrl().toString()], { maxBuffer: 512 * 1024 * 1024 });
+    psql(databaseUrl(template), [], dump);
+  } else {
+    execFileSync("npx", ["tsx", "scripts/seed-e2e.ts", databaseUrl(template)], { stdio: "inherit" });
+  }
   for (let index = 0; index < workerCount(); index++) {
     const name = quote(workerDatabaseName(index));
     psql(adminUrl(), ["-c", `DROP DATABASE IF EXISTS ${name} WITH (FORCE)`, "-c", `CREATE DATABASE ${name} TEMPLATE ${quote(template)}`]);
