@@ -202,14 +202,14 @@ Per batch:
 
 ## Phase 5: Housekeeping
 
-- [ ] T039 [P] [Housekeeping] DESIGN.md (tracked since T001), committed on its own (DESIGN.md):
+- [x] T039 [P] [Housekeeping] DESIGN.md (tracked since T001), committed on its own (DESIGN.md):
   - Rewrite §8.12 (drop "solo visuales"): «Comidas de hoy» timeline and «Cumplimiento del plan» counts.
   - §3.2: add the new semantic tokens.
   - §3.5: add the ratios measured in T003.
   - §7: card icons `hand-platter` and `check`; the hero pager is named "Elegir comida".
   - D14.
-- [ ] T040 [P] [Housekeeping] `grep -rn "solo visual" src` is empty; tick the spec's Progress list (all three items); update the BACKLOG entry for this feature (specs/dashboard-real-data/spec.md, specs/BACKLOG.md)
-- [ ] T041 [Housekeeping] Final run, one at a time: tsc, unit tests, then `dashboard-real-data.spec.ts`, `dashboard.spec.ts --grep-invert "screenshot"`, `metric-dials.spec.ts` and `cooking-mode.spec.ts` in full; restore the screenshots folder. Save light, dark, 1280×768 (8 meals), 938px and 360px screenshots to the session scratchpad for the user. These are not committed.
+- [x] T040 [P] [Housekeeping] `grep -rn "solo visual" src` is empty; tick the spec's Progress list (all three items); update the BACKLOG entry for this feature (specs/dashboard-real-data/spec.md, specs/BACKLOG.md)
+- [x] T041 [Housekeeping] Final run, one at a time: tsc, unit tests, then `dashboard-real-data.spec.ts`, `dashboard.spec.ts --grep-invert "screenshot"`, `metric-dials.spec.ts` and `cooking-mode.spec.ts` in full; restore the screenshots folder. Save light, dark, 1280×768 (8 meals), 938px and 360px screenshots to the session scratchpad for the user. These are not committed.
 
 **Checkpoint:** Feature complete. **Stop for the user's visual check** of the T041 screenshots.
 
