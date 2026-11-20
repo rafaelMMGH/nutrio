@@ -158,7 +158,7 @@ Per batch:
 
 ### Batch US2a: count rules (≈200 lines)
 
-- [ ] T028 [P] [US2] Unit tests for `compliance` (tests/unit/compliance.test.ts):
+- [x] T028 [P] [US2] Unit tests for `compliance` (tests/unit/compliance.test.ts):
   - REQ-12: 4 meals, created 12 nov, today 14 nov gives Planificadas 12.
   - REQ-13: 4 + 3 + 2 done gives 9 / 2 / 1; with 13 nov missing, 6 / 4 Sin marcar.
   - REQ-17: day 1 with 1 done gives 4 / 1 / 3 / 0.
@@ -167,9 +167,9 @@ Per batch:
   - REQ-14: the invariant and no negative figure over a deterministic grid; 23:59 with 2 unchecked gives Pendientes 2.
   - REQ-10 and REQ-15: no meals gives 0 / 0 / 0 / 0.
   - REQ-11: the same logs with today + 1 move yesterday's unchecked meals to Sin marcar.
-- [ ] T029 [P] [US2] Unit tests for `sinceLabel`: "Desde 12 nov" in the current year, "Desde 12 nov 2025" otherwise, and the September abbreviation from `SHORT_MONTHS` (REQ-15) (tests/unit/kpis.test.ts)
-- [ ] T030 [P] [US2] After T028 is shown red, implement `compliance({ logs, slotIds, start, today })` so T028 passes (src/lib/compliance.ts)
-- [ ] T031 [P] [US2] After T029 is shown red, implement `sinceLabel(startKey, today)` on the existing `SHORT_MONTHS` so T029 passes (src/lib/kpis.ts)
+- [x] T029 [P] [US2] Unit tests for `sinceLabel`: "Desde 12 nov" in the current year, "Desde 12 nov 2025" otherwise, and the September abbreviation from `SHORT_MONTHS` (REQ-15) (tests/unit/kpis.test.ts)
+- [x] T030 [P] [US2] After T028 is shown red, implement `compliance({ logs, slotIds, start, today })` so T028 passes (src/lib/compliance.ts)
+- [x] T031 [P] [US2] After T029 is shown red, implement `sinceLabel(startKey, today)` on the existing `SHORT_MONTHS` so T029 passes (src/lib/kpis.ts)
 
 **Checkpoint:** US2a reviewed and committed; screen unchanged.
 

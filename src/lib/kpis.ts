@@ -37,3 +37,10 @@ export function streakText({ current, best }: { current: number; best: number })
   const context = current === 0 ? "Empieza hoy" : current === best ? "¡Tu mejor racha!" : `mejor: ${best}`;
   return { value, unit, context };
 }
+
+// The counts card's header: "Desde 12 nov", with the year when the plan began in another year. Written by hand, not with Intl, whose output differs between Node and browsers.
+export function sinceLabel(startKey: string, today: string) {
+  const [year, month, day] = startKey.split("-").map(Number);
+  const label = `Desde ${day} ${SHORT_MONTHS[month - 1]}`;
+  return year === Number(today.slice(0, 4)) ? label : `${label} ${year}`;
+}
