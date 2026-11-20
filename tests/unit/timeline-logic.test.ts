@@ -75,3 +75,12 @@ test("REQ-5: the result is clamped to 0 and the maximum", () => {
   assert.equal(listScrollTop({ ...view, top: 5, bottom: 45 }), 0);
   assert.equal(listScrollTop({ ...view, top: 950, bottom: 1000 }), 800);
 });
+
+test("REQ-2: none done makes the first meal next and the rest pending", () => {
+  const { rows } = timelineRows(four, []);
+  assert.deepEqual(rows.map((row) => row.state), ["next", "pending", "pending", "pending"]);
+});
+
+test("a plan with no meals gives no rows and no times", () => {
+  assert.deepEqual(timelineRows([], []), { rows: [], hasTimes: false });
+});

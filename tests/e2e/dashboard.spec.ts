@@ -752,10 +752,10 @@ test("Peso gauge opens the weight editor and saves today's weight", async ({ pag
   sql(`update daily_logs set weight_kg = ${previous || "null"} where date = '${TODAY}'`);
 });
 
-test("yellow and sky cards are static; the old dashboard is gone; the assistant still opens", async ({ page }) => {
-  await expect(page.locator(".nt-cal")).toContainText("Resumen calórico");
+test("Comidas de hoy replaces the static yellow card; the old dashboard is gone; the assistant still opens", async ({ page }) => {
+  await expect(page.locator(".nt-today").getByRole("heading", { name: "Comidas de hoy", level: 2 })).toBeVisible();
+  await expect(page.locator(".nt-cal")).toHaveCount(0);
   await expect(page.locator(".nt-comp")).toContainText("Cumplimiento del plan");
-  expect(await page.locator(".nt-cal button, .nt-cal a, .nt-comp button, .nt-comp a").count()).toBe(0);
   await expect(page.locator(".home, .home-grid")).toHaveCount(0);
   await expect(page.getByText(/Dishes sold/i)).toHaveCount(0);
 
