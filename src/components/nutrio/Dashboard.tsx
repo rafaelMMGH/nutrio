@@ -7,17 +7,19 @@ import { type Meal } from "@/components/dashboard/food";
 import { kpiContexts, type GroceriesSource } from "@/lib/kpis";
 import { dashboardMetrics, type Period } from "@/lib/metrics";
 import { streaks } from "@/lib/streak";
-import { CaloriesCard, ComplianceCard, KpiRow, MetricsCard } from "./DataColumn";
+import { ComplianceCard, KpiRow, MetricsCard } from "./DataColumn";
 import { Hero } from "./Hero";
+import { MealTimeline } from "./MealTimeline";
 import { TAP_LOCK_MS, acceptTap, createAdvance } from "./mark-logic";
 import { useToday } from "./useToday";
 import { send, useDailyLogs, type ServerLog } from "./useDailyLogs";
 import "./primitives.css";
 import "./dashboard.css";
+import "./meal-timeline.css";
 
 export type DashboardProps = {
   meals: Meal[];
-  /** When the active plan version was created; null without an active schedule ("Sin plan activo"). Unused until the counts card. */
+  /** When the active plan version was created; null without an active schedule ("Sin plan activo"). */
   planCreatedAt: string | null;
   dailyLogs: ServerLog[];
   kcalGoal: number | null;
@@ -29,7 +31,7 @@ export type DashboardProps = {
 };
 
 // Redesigned dashboard (specs/alt-dashboard/plan.md): hero carousel on the left, data column on the right.
-export function Dashboard({ meals, dailyLogs, kcalGoal, proteinPct, weightGoal: serverGoal, counts, kpiContext }: DashboardProps) {
+export function Dashboard({ meals, planCreatedAt, dailyLogs, kcalGoal, proteinPct, weightGoal: serverGoal, counts, kpiContext }: DashboardProps) {
   const { refresh } = useShell();
   const today = useToday();
   const logs = useDailyLogs(dailyLogs, refresh);
@@ -140,7 +142,7 @@ export function Dashboard({ meals, dailyLogs, kcalGoal, proteinPct, weightGoal: 
         />
         <MetricsCard period={period} onPeriod={setPeriod} metrics={metrics} weightToday={todayLog.weight_kg ?? null} weightGoal={weightGoal} onSaveWeight={saveWeight} />
         <div className="nt-pair">
-          <CaloriesCard />
+          <MealTimeline meals={meals} doneIds={doneIds} hasPlan={planCreatedAt !== null} shownId={shownId} onSelect={(id) => (id === shownId ? advance.cancel() : go(meals.findIndex((meal) => meal.id === id)))} />
           <ComplianceCard />
         </div>
       </div>

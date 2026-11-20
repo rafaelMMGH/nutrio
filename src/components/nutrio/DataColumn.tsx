@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
-import { ArrowUp, ArrowUpRight, ChevronDown, ClipboardList, ConciergeBell, Flame, Gauge, Package, Utensils } from "lucide-react";
+import { ArrowUpRight, ClipboardList, ConciergeBell, Flame, Gauge, Package, Utensils } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { metricReadouts, type DialReadout, type Metrics, type Period } from "@/lib/metrics";
 import { kpiContexts, streakText } from "@/lib/kpis";
-import { Card, Figure, IconBadge, Pill, RadialGauge, SegmentedTabs } from "./primitives";
+import { Card, Figure, IconBadge, RadialGauge, SegmentedTabs } from "./primitives";
 import DetentDial from "./DetentDial";
 import { showEndLabels } from "./dial-logic";
 import { RollingNumber } from "./RollingNumber";
@@ -203,59 +203,7 @@ function WeightDialog({ weight, goal, onSave, onClose }: { weight: number | null
   );
 }
 
-/* ---------- Yellow and sky cards (§5.6) ---------- */
-
-// Bar heights (0–1) and whether the bar is filled, as in the reference.
-const BARS: [number, boolean][] = [[0.52, false], [0.62, false], [0.76, true], [0.66, true], [0.5, false], [0.42, false], [0.62, false], [0.68, true], [0.8, true]];
-const HOURS = ["7:00", "10:00", "13:00", "17:00", "21:00"];
-
-// TODO: solo visual — pendiente de revisión
-export function CaloriesCard() {
-  return (
-    <Card tone="yellow" className="nt-cal" aria-labelledby="nt-cal-title">
-      <header className="nt-card-head">
-        <IconBadge>
-          <Flame />
-        </IconBadge>
-        <h2 id="nt-cal-title">Resumen calórico</h2>
-        <Pill className="nt-push" aria-hidden>
-          Hoy <ChevronDown size={16} />
-        </Pill>
-      </header>
-      <div className="nt-cal-main">
-        <div>
-          <span className="nt-small">Calorías del día</span>
-          <p className="nt-cal-total">
-            1,850<small>kcal</small>
-          </p>
-          <Pill tone="success">
-            <ArrowUp size={12} aria-hidden /> +12.8%
-          </Pill>
-        </div>
-        <dl className="nt-cal-side">
-          <div>
-            <dt>Comidas completadas</dt>
-            <dd>4</dd>
-          </div>
-          <div>
-            <dt>Promedio por comida</dt>
-            <dd>462</dd>
-          </div>
-        </dl>
-      </div>
-      <div className="nt-bars" aria-hidden>
-        {BARS.map(([height, filled], index) => (
-          <i key={index} className={filled ? "is-filled" : undefined} style={{ height: `${height * 100}%` }} />
-        ))}
-      </div>
-      <div className="nt-hours" aria-hidden>
-        {HOURS.map((hour) => (
-          <span key={hour}>{hour}</span>
-        ))}
-      </div>
-    </Card>
-  );
-}
+/* ---------- Sky card (§5.6) ---------- */
 
 // TODO: solo visual — pendiente de revisión
 export function ComplianceCard() {

@@ -94,14 +94,14 @@ Per batch:
 
 ### Batch US1d: timeline card rendered (≈150 lines)
 
-- [ ] T015 [US1] Dashboard renders `MealTimeline` in place of `CaloriesCard`, passing `shownId`, `onSelect={(id) => (id === shownId ? advance.cancel() : go(meals.findIndex((meal) => meal.id === id)))}` (a same-row click cancels a pending auto-advance and is silent, spec v1.2; no new handler, constitution 3), the optimistic `todayLog.meals_done` and `hasPlan = planCreatedAt !== null`. DOM order inside `.nt-data` stays KpiRow, MetricsCard, then `.nt-pair` with `MealTimeline` first and `ComplianceCard` second, with no CSS `order`, so Métricas precedes the rows (REQ-19). Delete `CaloriesCard`, `BARS`, `HOURS`, its `// TODO: solo visual` comment and unused imports (REQ-5, REQ-6, REQ-8, REQ-11) (src/components/nutrio/Dashboard.tsx, src/components/nutrio/DataColumn.tsx)
-- [ ] T016 [P] [US1] Delete `mealTime` and `DEFAULT_TIMES`, which invented hours; `grep -rn mealTime src tests` is empty (D12, REQ-3) (src/components/dashboard/food.ts)
-- [ ] T017 [US1] Base CSS (src/components/nutrio/meal-timeline.css, src/components/nutrio/dashboard.css):
+- [x] T015 [US1] Dashboard renders `MealTimeline` in place of `CaloriesCard`, passing `shownId`, `onSelect={(id) => (id === shownId ? advance.cancel() : go(meals.findIndex((meal) => meal.id === id)))}` (a same-row click cancels a pending auto-advance and is silent, spec v1.2; no new handler, constitution 3), the optimistic `todayLog.meals_done` and `hasPlan = planCreatedAt !== null`. DOM order inside `.nt-data` stays KpiRow, MetricsCard, then `.nt-pair` with `MealTimeline` first and `ComplianceCard` second, with no CSS `order`, so Métricas precedes the rows (REQ-19). Delete `CaloriesCard`, `BARS`, `HOURS`, its `// TODO: solo visual` comment and unused imports (REQ-5, REQ-6, REQ-8, REQ-11) (src/components/nutrio/Dashboard.tsx, src/components/nutrio/DataColumn.tsx)
+- [x] T016 [P] [US1] Delete `mealTime` and `DEFAULT_TIMES`, which invented hours; `grep -rn mealTime src tests` is empty (D12, REQ-3) (src/components/dashboard/food.ts)
+- [x] T017 [US1] Base CSS (src/components/nutrio/meal-timeline.css, src/components/nutrio/dashboard.css):
   - Row grid `auto minmax(0,1fr) auto`, one-line ellipsis name, time and state never shrink.
   - State styles with `--nt-on-accent` and `--nt-on-accent-sub`; selected marker plus weight 600.
   - Delete `.nt-cal-*`, `.nt-bars`, `.nt-hours` and their short-screen rules from `dashboard.css`.
   - REQ-1, REQ-2, REQ-5, REQ-8.
-- [ ] T018 [US1] Run tsc, unit tests, T009 to T012 and T010a, and the carousel, "Marcar cumplida", "failed saves", Racha and empty-state titles in `dashboard.spec.ts`. Restore the screenshots folder.
+- [x] T018 [US1] Run tsc, unit tests, T009 to T012 and T010a, and the carousel, "Marcar cumplida", "failed saves", Racha and empty-state titles in `dashboard.spec.ts`. Restore the screenshots folder.
 
 **Checkpoint:** US1d reviewed and committed (turns the US1b red commit green). Timeline on screen with base layout.
 

@@ -118,17 +118,6 @@ export function mealLabel(name: string) {
   return labels[normalize(name)] || name;
 }
 
-const DEFAULT_TIMES: Record<string, string> = { "pre-entreno": "06:30", desayuno: "08:00", comida: "14:30", cena: "20:00" };
-
-// Typical times until the user sets their own; a second colación of the day goes in the afternoon.
-export function mealTime(meal: Meal, meals: Meal[]) {
-  if (meal.time_window) return meal.time_window;
-  const key = normalize(meal.name);
-  if (key !== "colacion") return DEFAULT_TIMES[key] || "12:00";
-  const lunch = meals.find((item) => normalize(item.name) === "comida");
-  return lunch && meal.display_order > lunch.display_order ? "17:30" : "11:00";
-}
-
 // Hand-rolled instead of toLocaleTimeString: Node and each browser ship different CLDR data for es-MX
 // ("8:30 a.m." vs "8:30 am"), which breaks hydration. Unparsable input stays "Invalid Date" as before.
 export function formatTime(value: string) {

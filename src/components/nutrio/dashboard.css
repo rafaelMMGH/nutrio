@@ -249,21 +249,6 @@ button.nt-gauge-tile:hover { background: #202024; }
 .nt-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); gap: var(--nt-gap); min-height: 0; }
 .nt-pair .nt-card { display: flex; flex-direction: column; gap: 12px; padding: 18px 22px; min-height: 0; overflow: hidden; }
 
-.nt-cal-main { display: flex; align-items: flex-end; gap: 16px; }
-.nt-cal-total { font-size: 40px; line-height: 1.1; letter-spacing: -0.02em; white-space: nowrap; }
-.nt-cal-total small { font-size: 14px; margin-left: 4px; letter-spacing: 0; }
-.nt-cal-side { display: grid; gap: 8px; flex: 1; min-width: 0; padding-left: 16px; border-left: 1px solid rgb(14 14 16 / 0.35); font-size: 12px; align-self: center; }
-.nt-cal-side div { display: flex; justify-content: space-between; gap: 8px; }
-.nt-bars { flex: 1; min-height: 56px; display: grid; grid-template-columns: repeat(9, 1fr); align-items: end; gap: 8px; }
-.nt-bars i {
-  display: block;
-  border: 1px solid #0e0e10;
-  border-bottom: 0;
-  background: repeating-linear-gradient(90deg, transparent 0 5px, rgb(14 14 16 / 0.35) 5px 6px);
-}
-.nt-bars i.is-filled { background: radial-gradient(#0e0e10 0.9px, transparent 1.1px) 0 0 / 3px 3px; }
-.nt-hours { display: flex; justify-content: space-between; font-size: 12px; }
-
 .nt-arc { position: relative; flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; min-height: 96px; }
 .nt-arc svg { flex: 1; min-height: 0; width: 100%; overflow: visible; }
 .nt-live { flex: none; }
@@ -313,8 +298,6 @@ button.nt-gauge-tile:hover { background: #202024; }
   .nt-gauge-value { font-size: 26px; }
   .nt-gauge { width: 60px; height: 60px; }
   .nt-pair .nt-card { gap: 8px; padding: 14px 20px; }
-  .nt-cal-total { font-size: 32px; }
-  .nt-bars { min-height: 40px; }
   .nt-arc { min-height: 64px; }
   .nt-arc-total b, .nt-comp-stats dd { font-size: 24px; }
   .nt-prep { gap: 12px; padding: 14px 18px 16px; }
