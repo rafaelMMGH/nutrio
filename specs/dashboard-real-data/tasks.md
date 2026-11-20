@@ -187,16 +187,16 @@ Per batch:
 
 ### Batch US2c: counts card (≈220 lines)
 
-- [ ] T035 [US2] Rewrite `ComplianceCard({ counts, since, hasPlan })` (src/components/nutrio/DataColumn.tsx):
+- [x] T035 [US2] Rewrite `ComplianceCard({ counts, since, hasPlan })` (src/components/nutrio/DataColumn.tsx):
   - "Desde …" header in place of "En vivo"; arrow removed.
   - Arc `role="img"` with its text, a hairline track and a `--nt-sky-deep` fill via `pathLength` and `stroke-dasharray`.
   - Planificadas at the centre; Cumplidas, Sin marcar and Pendientes with labels; plain numbers.
   - Empty states; no raw hex.
   - Remove the `// TODO: solo visual` comment.
   - REQ-12, REQ-15.
-- [ ] T036 [US2] Dashboard computes `compliance` from the optimistic `logs.list()`, with `start = dateKey(new Date(planCreatedAt))` and `useToday()`, and `sinceLabel`. It passes them to `ComplianceCard` (REQ-11, REQ-12, REQ-13, REQ-16) (src/components/nutrio/Dashboard.tsx)
-- [ ] T037 [US2] CSS (src/components/nutrio/dashboard.css): arc and figure layout for four-digit figures at 360px and at 200% zoom, with labels in `--nt-on-accent-sub` and the short-screen rules. Delete `.nt-live`, the `.nt-card.tone-sky .nt-arrow` rule and the gradient (REQ-15, NFR).
-- [ ] T038 [US2] Run tsc, unit tests and T032 to T034. Then run `dashboard-real-data.spec.ts`, `dashboard.spec.ts --grep-invert "screenshot"` and `metric-dials.spec.ts` in full, once each, and restore the screenshots folder.
+- [x] T036 [US2] Dashboard computes `compliance` from the optimistic `logs.list()`, with `start = dateKey(new Date(planCreatedAt))` and `useToday()`, and `sinceLabel`. It passes them to `ComplianceCard` (REQ-11, REQ-12, REQ-13, REQ-16) (src/components/nutrio/Dashboard.tsx)
+- [x] T037 [US2] CSS (src/components/nutrio/dashboard.css): arc and figure layout for four-digit figures at 360px and at 200% zoom, with labels in `--nt-on-accent-sub` and the short-screen rules. Delete `.nt-live`, the `.nt-card.tone-sky .nt-arrow` rule and the gradient (REQ-15, NFR).
+- [x] T038 [US2] Run tsc, unit tests and T032 to T034. Then run `dashboard-real-data.spec.ts`, `dashboard.spec.ts --grep-invert "screenshot"` and `metric-dials.spec.ts` in full, once each, and restore the screenshots folder.
 
 **Checkpoint:** US2 complete. Review, commit (turns the US2b red commit green), then continue.
 

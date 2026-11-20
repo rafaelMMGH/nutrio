@@ -3,8 +3,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { useShell } from "@/components/app/AppShell";
-import { type Meal } from "@/components/dashboard/food";
-import { kpiContexts, type GroceriesSource } from "@/lib/kpis";
+import { dateKey, type Meal } from "@/components/dashboard/food";
+import { compliance } from "@/lib/compliance";
+import { kpiContexts, sinceLabel, type GroceriesSource } from "@/lib/kpis";
 import { dashboardMetrics, type Period } from "@/lib/metrics";
 import { streaks } from "@/lib/streak";
 import { ComplianceCard, KpiRow, MetricsCard } from "./DataColumn";
@@ -47,6 +48,10 @@ export function Dashboard({ meals, planCreatedAt, dailyLogs, kcalGoal, proteinPc
   const todayLog = logs.get(today);
   // From the optimistic logs, so marking, unmarking and a rollback move Racha with no extra request (REQ-15).
   const streak = streaks({ logs: allLogs, slotIds, today });
+
+  // Counts and arc come from the same optimistic logs, so marking, unmarking and a rollback move them with no extra request (REQ-16).
+  const planStart = planCreatedAt === null ? today : dateKey(new Date(planCreatedAt));
+  const planCounts = compliance({ logs: allLogs, slotIds, start: planStart, today });
 
   function toggleMeal(mealId: string, done: boolean) {
     return logs.setMeal(today, mealId, done);
@@ -143,7 +148,7 @@ export function Dashboard({ meals, planCreatedAt, dailyLogs, kcalGoal, proteinPc
         <MetricsCard period={period} onPeriod={setPeriod} metrics={metrics} weightToday={todayLog.weight_kg ?? null} weightGoal={weightGoal} onSaveWeight={saveWeight} />
         <div className="nt-pair">
           <MealTimeline meals={meals} doneIds={doneIds} hasPlan={planCreatedAt !== null} shownId={shownId} onSelect={(id) => (id === shownId ? advance.cancel() : go(meals.findIndex((meal) => meal.id === id)))} />
-          <ComplianceCard />
+          <ComplianceCard counts={planCounts} since={sinceLabel(planStart, today)} hasPlan={planCreatedAt !== null} />
         </div>
       </div>
     </div>
