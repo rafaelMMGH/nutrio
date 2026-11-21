@@ -69,7 +69,7 @@ Findings, with file:line references: `specs/bugs/shopping-list-findings.md`.
 
 ## Done
 
-- 2026-11-19: **Real data on the dashboard cards** (`specs/dashboard-real-data/`, spec `implemented`, branch `feature/dashboard-real-data`, not pushed): «Comidas de hoy» timeline replaces the fake Calorías card; «Cumplimiento del plan» shows real counts since the plan version began. Also closed dashboard-polish T038 (screenshots regenerated); T037 superseded.
+- 2026-11-19: **Real data on the dashboard cards** merged as PR #17 (`specs/dashboard-real-data/`, spec `implemented`): «Comidas de hoy» timeline replaces the fake Calorías card; «Cumplimiento del plan» shows real counts since the plan version began. Also closed dashboard-polish T038 (screenshots regenerated); T037 superseded.
 
 - 2026-11-19: **Dashboard polish** merged as PR #16 (spec `implemented`): one-tap "Marcar cumplida", Racha KPI, Modo Cocina glass pill.
 - 2026-11-18: **E2E database and server per worker** (`refactor/e2e-db-per-worker`): 3 workers by default (`E2E_WORKERS`), full suite 32.9 → about 18 min with the same results. Note: `specs/refactors/e2e-db-per-worker.md`.
