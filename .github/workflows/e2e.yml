@@ -46,8 +46,6 @@ jobs:
       E2E_WORKERS: "1"
       # Seed the template from tests/e2e/fixtures/seed/ (there is no real database to clone in CI).
       E2E_DATA: seed
-      # next dev logs go here (outside the checkout); uploaded on failure.
-      E2E_LOG_DIR: ${{ runner.temp }}
       NEXT_TELEMETRY_DISABLED: "1"
 
     steps:
@@ -73,6 +71,9 @@ jobs:
       # Applies prisma/migrations and loads the committed seed into the template database, then clones it per worker.
       - name: Run e2e shard
         run: npx playwright test --shard=${{ matrix.shard }}/3 --grep-invert @quarantine
+        env:
+          # next dev logs go here (outside the checkout); uploaded on failure. The runner context is not available in job-level env.
+          E2E_LOG_DIR: ${{ runner.temp }}
 
       # Diagnostics: which files in the checkout changed during the run (a file that keeps changing makes next dev recompile).
       - name: List files changed during the run
