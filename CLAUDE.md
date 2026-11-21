@@ -75,7 +75,7 @@ No agent or teammate performs these without the user's explicit yes:
 
 - Workflow mode: solo
 - Story checkpoints: off
-- E2E full suite: ci
+- E2E full suite: local
 - Open features limit: 2
 
 Sessions start as the `orchestrator` agent. Lanes: **Lite** (visual or one-module work, ≤ 15 REQs, one gate) and **Full** (data model, migrations, API contracts, auth/security, privacy; ≤ 30 REQs). Over the limit: split the feature.
@@ -93,7 +93,6 @@ Sessions start as the `orchestrator` agent. Lanes: **Lite** (visual or one-modul
 | Unit | `npm run test:unit` | local, always |
 | Lint | `npm run lint` (or `npm run check` = type-check + lint + unit) | local, always |
 | E2E smoke + feature | `npm run test:e2e:smoke` / `npm run test:e2e:tag -- @<feature>` | local, while iterating and in review |
-| E2E full | `e2e` workflow (3 shards) on push of the feature branch | CI, once per feature before the final check |
-| E2E full (fallback) | `npm run test:e2e` (3 workers, one `next dev` each) | local, only if CI is unavailable |
+| E2E full | `npm run test:e2e` (3 workers, one `next dev` each) | local, once per feature before the final check |
 
 E2E rules: respect the e2e lock for local runs; `@quarantine` tests are excluded everywhere; tests write screenshots only to `test-results/`; `docs/screenshots/` is updated only by its own command. Never run `next build` in place.

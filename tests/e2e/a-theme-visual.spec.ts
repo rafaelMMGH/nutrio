@@ -7,9 +7,6 @@ import { dynamicMasks, inScopePages, lightLockedPages, seedTheme } from "./theme
 // local only (tests/e2e/*-snapshots is gitignored: they contain personal data). The "a-" prefix runs this file
 // before dashboard.spec.ts changes the data.
 
-// The baseline PNGs are macOS renders and gitignored, so CI (Linux, no snapshots) cannot compare against them.
-test.skip(!!process.env.CI, "visual baselines exist only on the local macOS machine");
-
 const shot = { maxDiffPixelRatio: 0.01, stylePath: "./tests/e2e/screenshot.css", fullPage: true } as const;
 const slug = (name: string) => name.replace(/\s+/g, "-");
 
