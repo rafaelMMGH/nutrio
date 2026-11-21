@@ -1,9 +1,10 @@
 # Spec: <Feature name>
 
+**Lane:** full
 **Status:** draft | approved | planned | partial | implemented
 **Version:** 1.0 · **Branch:** feature/<feature> · **Owner:** <name>
 
-> Budget: ~150 lines. The *what* and *why* only; no technology choices (those go in plan.md).
+> Budget: ~150 lines. The *what* and *why* only; at most 30 requirements. No technology choices: decisions go in decisions.md, the how in plan.md.
 
 ## Overview
 
@@ -13,12 +14,6 @@ One paragraph: the problem, who has it, and why it matters now.
 
 - Goal: ...
 - Non-goal: ...
-
-## Decisions
-
-One line per decision from the grilling session.
-
-- <Decision>: <short reason>
 
 ## User stories
 

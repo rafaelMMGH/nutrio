@@ -20,7 +20,9 @@
     "test:e2e": "playwright test",
     "test:e2e:smoke": "playwright test --grep @smoke --grep-invert @quarantine",
     "test:e2e:tag": "playwright test --grep-invert @quarantine --grep",
-    "test:e2e:report": "playwright show-report"
+    "test:e2e:report": "playwright show-report",
+    "lint": "eslint .",
+    "check": "tsc --noEmit && npm run lint && npm run test:unit"
   },
   "dependencies": {
     "@base-ui/react": "^1.5.0",
@@ -43,12 +45,15 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "3.3.7",
     "@playwright/test": "1.63.0",
     "@tailwindcss/postcss": "^4.3.0",
     "@types/node": "^22.10.2",
     "@types/pg": "^8.23.1",
     "@types/react": "^19.0.2",
     "@types/react-dom": "^19.0.2",
+    "eslint": "9.39.5",
+    "eslint-config-next": "15.5.18",
     "postcss": "^8.5.15",
     "prisma": "^7.10.0",
     "tailwindcss": "^4.3.0",

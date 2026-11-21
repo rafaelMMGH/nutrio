@@ -8,7 +8,9 @@ Personal, self-hosted Next.js 15 (App Router, React 19) app that parses a nutrit
 
 ```bash
 npm run dev                    # dev server on :3000 (usually already running; see below)
-npx tsc --noEmit               # type check (there is no lint script)
+npx tsc --noEmit               # type check
+npm run lint                   # eslint (flat config, eslint.config.mjs)
+npm run check                  # tsc + lint + unit tests; run before handing work back
 npm run test:e2e               # Playwright suite (clones the DB, own next dev on :3200)
 npx playwright test -g "name"  # single e2e test by title
 npm run test:e2e:report        # open last HTML report
@@ -17,13 +19,15 @@ npm run db:generate            # regenerate Prisma client into src/generated/pri
 npm run db:import -- --replace # reload the legacy data/db.json into Postgres
 ```
 
+`eslint-suppressions.json` is the lint baseline of pre-existing violations and only shrinks: fix the code, then run `npx eslint . --prune-suppressions` (lint fails on stale suppressions). Never add to it with `--suppress-all`.
+
 `DATABASE_URL` lives in `.env.local`; `prisma.config.ts` loads it for the Prisma CLI.
 
 ## Working without disturbing the user's environment
 
 - The user keeps `next dev` running on :3000 against their real data. Do not run `next build` in place: it rewrites the shared `.next`. To check a production build, copy the project to a scratch dir (symlink `node_modules`) and build there.
 - The e2e suite is safe: global setup clones the DB into the template `<name>-e2e` (needs `psql`/`pg_dump`) and creates `<name>-e2e-<i>` from it for each of 3 workers (`E2E_WORKERS=1` runs serially); each worker `i` has its own `next dev -p 3200+i` with `NEXT_DIST_DIR=.next-e2e-<i>` and signs in through the login form, and teardown drops all the databases. Files run in parallel, tests inside a file in order, `sql()` and `baseURL` follow the worker's `parallelIndex`, and any console error or failed API call fails the test.
-- `@playwright/test` is pinned to 1.63.0 and `unpdf` to exactly 1.7.0 (newer versions require Node 22; this machine runs Node 20). Prisma is pinned to 7.x for the same reason.
+- `@playwright/test` is pinned to 1.63.0 and `unpdf` to exactly 1.7.0 (newer versions require Node 22; this machine runs Node 24). Prisma is pinned to 7.x for the same reason.
 
 ## Architecture
 
@@ -62,17 +66,33 @@ Non-negotiable rules live in [`CONSTITUTION.md`](CONSTITUTION.md). verifier-spec
 No agent or teammate performs these without the user's explicit yes:
 
 1. Push, force-push, or delete branches
-2. Add or upgrade dependencies (versions are pinned for Node 20; see above)
+2. Add or upgrade dependencies (versions are pinned for Node 24; see above)
 3. Modify CI/CD, deployment, environment, or secret files (`.env.local`)
 4. Database migrations or destructive data commands (`npm run db:migrate`, `db:import -- --replace`)
 5. Open PRs or post PR comments
 
 ## Spec-driven workflow
 
-Sessions start as the `orchestrator` agent (`.claude/settings.json`). It routes each request (feature, bug fix, spec-change, refactor, investigate, review, question) and runs the matching flow; see `docs/agent-workflow.md`.
+- Workflow mode: solo
+- Story checkpoints: off
+- E2E full suite: local
+- Open features limit: 2
 
-- For agents: type-check with `npx tsc --noEmit` (there is no lint script), test with `npm run test:e2e`, and never run `next build` in place.
-- Specs live in `specs/<feature>/` (`spec.md`, `plan.md`, `tasks.md`, `checklists/`). Bugs in `specs/bugs/`, refactor notes in `specs/refactors/`. Templates in `specs/_templates/`. Specs are written in English; UI copy stays in Spanish (Mexico).
-- Spec status: `draft → approved → planned → partial → implemented`. Approved specs change only through the spec-change route.
-- Branches: `feature/<feature>`, `fix/<name>`, `refactor/<name>`. Commits reference story, task, and requirement IDs.
-- To start a session as a different agent: `claude --agent <name>`.
+Sessions start as the `orchestrator` agent. Lanes: **Lite** (visual or one-module work, ≤ 15 REQs, one gate) and **Full** (data model, migrations, API contracts, auth/security, privacy; ≤ 30 REQs). Over the limit: split the feature.
+
+- Specs: `specs/<feature>/` with `spec.md`, `decisions.md`, `tasks.md` (+ `plan.md` in Full). Metrics in `specs/_metrics.md`.
+- Spec versions are `MAJOR.MINOR`; wording fixes change nothing and go straight in as `docs(spec):` commits.
+- Mechanical checks: `node scripts/spec-check.mjs <feature> [--tests [--story USn]]`. Tests cite requirements as `<feature>/REQ-n`.
+- Branches `feature/`, `fix/`, `refactor/`; commits cite `US# T### REQ-#`.
+
+### Test tiers
+
+| Tier | Command | Where and when |
+|---|---|---|
+| Type-check | `npx tsc --noEmit` | local, always |
+| Unit | `npm run test:unit` | local, always |
+| Lint | `npm run lint` (or `npm run check` = type-check + lint + unit) | local, always |
+| E2E smoke + feature | `npm run test:e2e:smoke` / `npm run test:e2e:tag -- @<feature>` | local, while iterating and in review |
+| E2E full | `npm run test:e2e` (3 workers, one `next dev` each) | local, once per feature before the final check |
+
+E2E rules: respect the e2e lock for local runs; `@quarantine` tests are excluded everywhere; tests write screenshots only to `test-results/`; `docs/screenshots/` is updated only by its own command. Never run `next build` in place.

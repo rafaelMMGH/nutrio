@@ -1,0 +1,149 @@
+{
+  "src/app/not-found.tsx": {
+    "@next/next/no-img-element": {
+      "count": 1
+    }
+  },
+  "src/components/app/navigation.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 2
+    }
+  },
+  "src/components/auth/LoginForm.tsx": {
+    "@next/next/no-img-element": {
+      "count": 1
+    }
+  },
+  "src/components/cooking/CookingMode.tsx": {
+    "@next/next/no-img-element": {
+      "count": 4
+    },
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "src/components/groceries/CartView.tsx": {
+    "@next/next/no-img-element": {
+      "count": 1
+    }
+  },
+  "src/components/groceries/GroceriesView.tsx": {
+    "@next/next/no-img-element": {
+      "count": 1
+    }
+  },
+  "src/components/groceries/ManualAddForm.tsx": {
+    "@next/next/no-img-element": {
+      "count": 1
+    }
+  },
+  "src/components/landing/Landing.tsx": {
+    "@next/next/no-img-element": {
+      "count": 4
+    }
+  },
+  "src/components/nutrio/Hero.tsx": {
+    "@next/next/no-img-element": {
+      "count": 2
+    }
+  },
+  "src/components/nutrio/TopBar.tsx": {
+    "@next/next/no-img-element": {
+      "count": 1
+    }
+  },
+  "src/components/recipes/RecipeCard.tsx": {
+    "@next/next/no-img-element": {
+      "count": 2
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/components/recipes/RecipeDetail.tsx": {
+    "@next/next/no-img-element": {
+      "count": 3
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    }
+  },
+  "src/components/recipes/RecipesView.tsx": {
+    "@next/next/no-img-element": {
+      "count": 2
+    },
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    }
+  },
+  "src/components/recipes/recipe-meta.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 5
+    }
+  },
+  "src/components/recipes/useRecipeActions.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 4
+    }
+  },
+  "src/components/shared/AssistantChat.tsx": {
+    "react-hooks/exhaustive-deps": {
+      "count": 2
+    }
+  },
+  "src/components/shared/useDictation.ts": {
+    "@typescript-eslint/no-unused-expressions": {
+      "count": 1
+    }
+  },
+  "src/lib/domain/cart.ts": {
+    "@typescript-eslint/no-explicit-any": {
+      "count": 1
+    }
+  },
+  "src/lib/domain/chat-metrics.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "src/lib/domain/pdf-plan.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "src/server.js": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "tests/e2e/assistant-errors.spec.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "tests/e2e/assistant-helpers.ts": {
+    "react-hooks/rules-of-hooks": {
+      "count": 2
+    }
+  },
+  "tests/e2e/cooking-mode.spec.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  },
+  "tests/e2e/fixtures.ts": {
+    "react-hooks/rules-of-hooks": {
+      "count": 2
+    }
+  },
+  "tests/e2e/theme-palette.spec.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 2
+    }
+  },
+  "tests/unit/mark-logic.test.ts": {
+    "@typescript-eslint/no-unused-vars": {
+      "count": 1
+    }
+  }
+}

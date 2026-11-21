@@ -1,5 +1,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 
 // The e2e suite never touches the real database. Global setup builds the template "<name>-e2e" once, then
 // creates one database per Playwright worker from that template ("<name>-e2e-<i>", i = parallelIndex). Each worker has
@@ -24,7 +26,10 @@ export function workerCount() {
 export const workerPort = (index: number) => BASE_PORT + index;
 export const workerBaseUrl = (index: number) => `http://localhost:${workerPort(index)}`;
 export const authStatePath = (index: number) => `tests/e2e/.auth/user-${index}.json`;
-export const serverLogName = (index: number) => `.server-${index}.log`;
+// Server logs live outside the checkout: a log inside the project is a file that `next dev` can see change, and each
+// line it writes would trigger another compile. E2E_LOG_DIR overrides the folder (CI uploads it on failure).
+export const serverLogDir = () => path.join(process.env.E2E_LOG_DIR || tmpdir(), "nutrio-e2e-logs");
+export const serverLogPath = (index: number) => path.join(serverLogDir(), `server-${index}.log`);
 
 /**
  * The calling worker's parallelIndex (stable 0..workers-1, also after a worker restart; never workerIndex, which grows

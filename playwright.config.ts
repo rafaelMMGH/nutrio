@@ -1,11 +1,13 @@
+import { mkdirSync } from "node:fs";
 import { defineConfig, devices } from "@playwright/test";
-import { authStatePath, BASE_PORT, serverLogName, workerCount, workerDatabaseUrl, workerPort } from "./tests/e2e/database";
+import { authStatePath, BASE_PORT, serverLogDir, serverLogPath, workerCount, workerDatabaseUrl, workerPort } from "./tests/e2e/database";
 import { acquireRunLock } from "./tests/e2e/run-lock";
 
 // End-to-end tests run against their own `next dev` per worker (port BASE_PORT + parallelIndex), each backed by its own
 // throwaway copy of the database (created in global setup, dropped in global teardown), so spec files run in parallel
 // without sharing data. The dev server on :3000 and its data are never touched.
 const WORKERS = workerCount();
+mkdirSync(serverLogDir(), { recursive: true });
 
 // Refuse a second concurrent run here: Playwright clears test-results/ right after loading the config, before the
 // web server and global setup, so any later check would already have broken the first run's traces.
@@ -41,7 +43,7 @@ export default defineConfig({
   ],
   // One server per worker, each on its own database. None serves the template, so cloning it never meets open connections.
   webServer: Array.from({ length: WORKERS }, (_, index) => ({
-    command: `sh -c "npx next dev -p ${workerPort(index)} 2>&1 | tee tests/e2e/${serverLogName(index)}"`,
+    command: `sh -c "npx next dev -p ${workerPort(index)} 2>&1 | tee '${serverLogPath(index)}'"`,
     url: `http://localhost:${workerPort(index)}/login`,
     reuseExistingServer: false,
     // Three cold compiles run at once, so the first /login takes longer than with a single server.
