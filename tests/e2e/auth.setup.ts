@@ -7,6 +7,8 @@ import { authStatePath, workerBaseUrl, workerCount } from "./database";
 // Never log out in tests: logout deletes the session.
 for (let index = 0; index < workerCount(); index++) {
   setup(`sign in with the demo account on worker ${index}`, async ({ page }) => {
+    // The first visit compiles /login, /api/auth/login and / from cold; on CI that alone can exceed the 60s default.
+    setup.setTimeout(180_000);
     const origin = workerBaseUrl(index);
     await page.goto(`${origin}/login`);
     // The form has no action: clicking before React hydrates submits it natively as a GET to /login?email=...
@@ -14,9 +16,9 @@ for (let index = 0; index < workerCount(); index++) {
     await page.waitForFunction(() => {
       const form = document.querySelector(".login-form");
       return !!form && Object.keys(form).some((key) => key.startsWith("__reactProps"));
-    }, undefined, { timeout: 45_000 });
+    }, undefined, { timeout: 90_000 });
     await page.locator(".login-submit").click();
-    await page.waitForURL(`${origin}/`);
+    await page.waitForURL(`${origin}/`, { timeout: 90_000 });
     await expect(page.locator(".nt-dash h1")).toHaveText("Dashboard");
     await page.context().storageState({ path: authStatePath(index) });
   });
