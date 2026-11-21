@@ -41,8 +41,9 @@ jobs:
     env:
       # The e2e global setup derives its template ("nutritional_manager-e2e") and the per-worker databases from this URL.
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/nutritional_manager
-      # Each worker runs its own `next dev`; two per shard stay reliable on the 4-core hosted runner.
-      E2E_WORKERS: "2"
+      # One worker (one `next dev`) per shard: each server rewrites next-env.d.ts with its own dist dir, and on
+      # Linux two servers in one checkout keep triggering each other's recompiles, so the login never completes.
+      E2E_WORKERS: "1"
       # Seed the template from tests/e2e/fixtures/seed/ (there is no real database to clone in CI).
       E2E_DATA: seed
       NEXT_TELEMETRY_DISABLED: "1"
