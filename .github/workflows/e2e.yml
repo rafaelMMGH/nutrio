@@ -46,6 +46,8 @@ jobs:
       E2E_WORKERS: "1"
       # Seed the template from tests/e2e/fixtures/seed/ (there is no real database to clone in CI).
       E2E_DATA: seed
+      # next dev logs go here (outside the checkout); uploaded on failure.
+      E2E_LOG_DIR: ${{ runner.temp }}
       NEXT_TELEMETRY_DISABLED: "1"
 
     steps:
@@ -72,6 +74,11 @@ jobs:
       - name: Run e2e shard
         run: npx playwright test --shard=${{ matrix.shard }}/3 --grep-invert @quarantine
 
+      # Diagnostics: which files in the checkout changed during the run (a file that keeps changing makes next dev recompile).
+      - name: List files changed during the run
+        if: failure()
+        run: find . -newer package-lock.json -type f -not -path "./node_modules/*" -not -path "./.git/*" -not -path "./.next*" -not -path "./test-results/*" -not -path "./playwright-report/*" | head -50
+
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
@@ -79,8 +86,8 @@ jobs:
           path: |
             playwright-report/
             test-results/
-            tests/e2e/.server-*.log
+            ${{ runner.temp }}/nutrio-e2e-logs/
           retention-days: 7
           if-no-files-found: ignore
-          # The next dev logs are dotfiles (tests/e2e/.server-*.log).
+          # Includes dot-folders such as .auth.
           include-hidden-files: true
