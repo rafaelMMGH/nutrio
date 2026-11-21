@@ -81,3 +81,5 @@ jobs:
             tests/e2e/.server-*.log
           retention-days: 7
           if-no-files-found: ignore
+          # The next dev logs are dotfiles (tests/e2e/.server-*.log).
+          include-hidden-files: true

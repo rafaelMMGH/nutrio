@@ -9,6 +9,12 @@ for (let index = 0; index < workerCount(); index++) {
   setup(`sign in with the demo account on worker ${index}`, async ({ page }) => {
     const origin = workerBaseUrl(index);
     await page.goto(`${origin}/login`);
+    // The form has no action: clicking before React hydrates submits it natively as a GET to /login?email=...
+    // A cold `next dev` (CI) hydrates late, so wait until React has attached its props to the form.
+    await page.waitForFunction(() => {
+      const form = document.querySelector(".login-form");
+      return !!form && Object.keys(form).some((key) => key.startsWith("__reactProps"));
+    }, undefined, { timeout: 45_000 });
     await page.locator(".login-submit").click();
     await page.waitForURL(`${origin}/`);
     await expect(page.locator(".nt-dash h1")).toHaveText("Dashboard");
